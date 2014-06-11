@@ -3,10 +3,15 @@ package com.conveyal.akkaplay;
 import java.util.ArrayList;
 import java.util.List;
 
+import scala.concurrent.duration.Duration;
 import akka.actor.ActorRef;
+import akka.actor.OneForOneStrategy;
 import akka.actor.Props;
+import akka.actor.SupervisorStrategy;
+import akka.actor.SupervisorStrategy.Directive;
 import akka.actor.Terminated;
 import akka.actor.UntypedActor;
+import akka.japi.Function;
 import akka.routing.ActorRefRoutee;
 import akka.routing.RoundRobinRoutingLogic;
 import akka.routing.Routee;
@@ -17,6 +22,7 @@ public class TaskMaster extends UntypedActor {
 	Router router;
 	int tasksOut;
 	private long timerStart=0;
+	SupervisorStrategy strategy;
 	
 	TaskMaster(){
 		tasksOut = 0;
@@ -28,6 +34,14 @@ public class TaskMaster extends UntypedActor {
 		      routees.add(new ActorRefRoutee(r));
 		}
 		router = new Router(new RoundRobinRoutingLogic(), routees);
+		
+		Function func = new Function<Throwable,Directive>(){
+			@Override
+			public Directive apply(Throwable t) throws Exception {
+				return SupervisorStrategy.stop();
+			}
+		};
+		strategy = new OneForOneStrategy(10,Duration.create("30 seconds"), func);
 	}
 
 	@Override
@@ -56,6 +70,13 @@ public class TaskMaster extends UntypedActor {
 		    getContext().watch(r);
 		    router = router.addRoutee(new ActorRefRoutee(r));
 		}
+	}
+	
+
+	
+	@Override
+	public SupervisorStrategy supervisorStrategy() {
+	  return strategy;
 	}
 
 }
