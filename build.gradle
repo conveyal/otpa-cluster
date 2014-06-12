@@ -31,5 +31,6 @@ eclipse {
 dependencies {
   compile group: 'org.scala-lang', name:'scala-library', version:'2.10.4'
   compile group: 'com.typesafe.akka', name: 'akka-actor_2.10', version: '2.3.3'
+  compile group: 'com.typesafe.akka', name: 'akka-remote_2.10', version: '2.3.3'
   compile group: 'org.scala-lang', name: 'scala-library', version: '2.10.4'
 }
