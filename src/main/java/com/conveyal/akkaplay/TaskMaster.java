@@ -24,12 +24,14 @@ public class TaskMaster extends UntypedActor {
 	private long timerStart=0;
 	SupervisorStrategy strategy;
 	
+	ActorRef child;
+	
 	TaskMaster(){
 		tasksOut = 0;
 		
 		List<Routee> routees = new ArrayList<Routee>();
 		for (int i = 0; i < 50; i++) {
-		      ActorRef r = getContext().actorOf(Props.create(PrimeTester.class));
+		      ActorRef r = getContext().actorOf(Props.create(PrimeTester.class), "primetester-"+i);
 		      getContext().watch(r);
 		      routees.add(new ActorRefRoutee(r));
 		}
@@ -38,7 +40,7 @@ public class TaskMaster extends UntypedActor {
 		Function func = new Function<Throwable,Directive>(){
 			@Override
 			public Directive apply(Throwable t) throws Exception {
-				return SupervisorStrategy.stop();
+				return SupervisorStrategy.restart();
 			}
 		};
 		strategy = new OneForOneStrategy(10,Duration.create("30 seconds"), func);
