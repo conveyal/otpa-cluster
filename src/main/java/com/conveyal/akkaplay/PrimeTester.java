@@ -18,13 +18,13 @@ public class PrimeTester extends UntypedActor implements RequiresMessageQueue<Bo
   @Override
   public void onReceive(Object message) throws CosmicRayException {
 	  if( message instanceof PrimeCandidate ){
-		  if(rr.nextDouble()<0.01){
-			  throw new CosmicRayException();
-		  }
+//		  if(rr.nextDouble()<0.01){
+//			  throw new CosmicRayException();
+//		  }
 		  
-		  long payload = ((PrimeCandidate)message).num;
-		  boolean ret = isPrime(payload);
-		  getSender().tell(new WorkResult(payload,ret), getSelf());
+		  PrimeCandidate pc = (PrimeCandidate)message;
+		  boolean ret = isPrime(pc.num);
+		  getSender().tell(new WorkResult(pc.jobId,pc.num,ret), getSelf());
 	  } else {
 		  unhandled(message);
 	  }

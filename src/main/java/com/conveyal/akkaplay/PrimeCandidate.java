@@ -4,5 +4,10 @@ import java.io.Serializable;
 
 public class PrimeCandidate implements Serializable {
 	  public final long num;
-	  public PrimeCandidate(long num) { this.num = num; }
+	  public int jobId;
+	  
+	  public PrimeCandidate(int jobId, long num) {
+		  this.jobId = jobId;
+		  this.num = num;
+	  }
 	}

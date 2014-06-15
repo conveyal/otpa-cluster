@@ -48,7 +48,6 @@ class StartPrimeSearchHandler implements HttpHandler {
 				JobId result = (JobId) Await.result(future, timeout.duration());
 				respond(t,200,"jobId:"+result.jobId);
 			} catch (Exception e) {
-				// TODO Auto-generated catch block
 				e.printStackTrace();
 				respond(t,500,"something went wrong");
 			}

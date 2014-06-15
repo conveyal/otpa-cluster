@@ -1,7 +1,9 @@
 package com.conveyal.akkaplay;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import scala.concurrent.duration.Duration;
 import akka.actor.ActorRef;
@@ -24,11 +26,14 @@ public class TaskMaster extends UntypedActor {
 	private long timerStart=0;
 	SupervisorStrategy strategy;
 	int jobId=0;
+	Map<Integer,ArrayList<WorkResult>> jobResults;
 	
 	ActorRef child;
 	
 	TaskMaster(){
 		tasksOut = 0;
+		
+		jobResults = new HashMap<Integer,ArrayList<WorkResult>>();
 		
 		List<Routee> routees = new ArrayList<Routee>();
 		for (int i = 0; i < 50; i++) {
@@ -55,12 +60,14 @@ public class TaskMaster extends UntypedActor {
 			}
 			
 			tasksOut += 1;
-			router.route(new PrimeCandidate(((FindPrime)msg).num), getSelf());
+			router.route(new PrimeCandidate(0, ((FindPrime)msg).num), getSelf());
 		} else if( msg instanceof JobSpec ) {
 			JobSpec jobSpec = (JobSpec)msg;
 			
+			jobResults.put(jobId, new ArrayList<WorkResult>());
+			
 	        for(long i=jobSpec.start; i<jobSpec.end; i++){
-	        	router.route(new PrimeCandidate(i), getSelf());
+	        	router.route(new PrimeCandidate(jobId, i), getSelf());
 	        }
 	        
 	        getSender().tell(new JobId(jobId), getSelf());
@@ -72,6 +79,8 @@ public class TaskMaster extends UntypedActor {
 			WorkResult res = (WorkResult)msg;
 			if(res.isPrime)
 				System.out.println(msg.toString());
+			
+			jobResults.get(res.jobId).add( res );
 			
 			if( tasksOut==0 ){
 				long dt = System.currentTimeMillis()-timerStart;
