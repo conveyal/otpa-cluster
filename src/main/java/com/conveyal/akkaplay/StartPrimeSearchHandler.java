@@ -5,11 +5,24 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URI;
 
+import scala.concurrent.Await;
+import scala.concurrent.Future;
+import scala.concurrent.duration.Duration;
+import akka.actor.ActorRef;
+import akka.pattern.Patterns;
+import akka.util.Timeout;
+
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 
 class StartPrimeSearchHandler implements HttpHandler {
-    public void handle(HttpExchange t) throws IOException {
+    private ActorRef taskMaster;
+
+	public StartPrimeSearchHandler(ActorRef taskMaster) {
+    	this.taskMaster = taskMaster;
+	}
+
+	public void handle(HttpExchange t) throws IOException {
         InputStream is = t.getRequestBody();
         
         String resp;
@@ -28,7 +41,18 @@ class StartPrimeSearchHandler implements HttpHandler {
 	        long end = Long.parseLong( strJobParams[3] );
 	        
 	        resp = "find primes from "+start+" to "+end;
-	        respond(t,200,resp);
+	        
+	        Timeout timeout = new Timeout(Duration.create(5, "seconds"));
+	        Future<Object> future = Patterns.ask(taskMaster, new JobSpec(start,end), timeout);
+	        try {
+				JobId result = (JobId) Await.result(future, timeout.duration());
+				respond(t,200,"jobId:"+result.jobId);
+			} catch (Exception e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+				respond(t,500,"something went wrong");
+			}
+	        
         } else {
         	respond(t,404,"methods: ['find']");
         }

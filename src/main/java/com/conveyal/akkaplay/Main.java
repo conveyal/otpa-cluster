@@ -33,20 +33,23 @@ public class Main {
 	  ActorSystem system = ActorSystem.create("MySystem");
 	  
 	  if( role.equals("taskmaster") ){
+		  System.out.println( "setting up master" );
+		  ActorRef taskMaster = system.actorOf(Props.create(TaskMaster.class));
+		  //ActorSelection remoteTaskMaster = system.actorSelection("akka.tcp://MySystem@127.0.0.1:2553/user/taskMaster");
+		  //remoteTaskMaster.tell(new FindPrime(10000000000933L), ActorRef.noSender());
+		  
 		  HttpServer server = HttpServer.create(new InetSocketAddress(8000), 5);
-		  server.createContext("/", new StartPrimeSearchHandler());
+		  server.createContext("/", new StartPrimeSearchHandler(taskMaster));
 		  server.setExecutor(null); // creates a default executor
 		  server.start();
 		  
-		  System.out.println( "prpare to delegate" );
-		  ActorSelection remoteTaskMaster = system.actorSelection("akka.tcp://MySystem@127.0.0.1:2553/user/taskMaster");
-		  System.out.println( remoteTaskMaster );
-		  remoteTaskMaster.tell(new FindPrime(10000000000933L), ActorRef.noSender());
+
 	  } else {
-		  System.out.println( "starting up taskMaster to get some work done" );
-		  Props greeterProps = Props.create(TaskMaster.class);
-		  ActorRef taskMaster = system.actorOf(greeterProps, "taskMaster");
-		  System.out.println( "spinning up actor with path: "+taskMaster.path() );
+		  System.out.println( "stub: create worker" );
+//		  System.out.println( "starting up taskMaster to get some work done" );
+//		  Props greeterProps = Props.create(TaskMaster.class);
+//		  ActorRef taskMaster = system.actorOf(greeterProps, "taskMaster");
+//		  System.out.println( "spinning up actor with path: "+taskMaster.path() );
 	  }
 	  
 //	  long start = 10000000000000L;

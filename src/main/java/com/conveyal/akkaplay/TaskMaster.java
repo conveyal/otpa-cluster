@@ -23,6 +23,7 @@ public class TaskMaster extends UntypedActor {
 	int tasksOut;
 	private long timerStart=0;
 	SupervisorStrategy strategy;
+	int jobId=0;
 	
 	ActorRef child;
 	
@@ -55,6 +56,16 @@ public class TaskMaster extends UntypedActor {
 			
 			tasksOut += 1;
 			router.route(new PrimeCandidate(((FindPrime)msg).num), getSelf());
+		} else if( msg instanceof JobSpec ) {
+			JobSpec jobSpec = (JobSpec)msg;
+			
+	        for(long i=jobSpec.start; i<jobSpec.end; i++){
+	        	router.route(new PrimeCandidate(i), getSelf());
+	        }
+	        
+	        getSender().tell(new JobId(jobId), getSelf());
+	        
+	        jobId+=1;
 		} else if( msg instanceof WorkResult ){
 			tasksOut -= 1;
 			
