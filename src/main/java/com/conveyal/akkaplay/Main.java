@@ -38,10 +38,10 @@ public class Main {
 		  server.setExecutor(null); // creates a default executor
 		  server.start();
 		  
-//		  System.out.println( "prpare to delegate" );
-//		  ActorSelection remoteTaskMaster = system.actorSelection("akka.tcp://MySystem@127.0.0.1:2552/user/taskMaster");
-//		  System.out.println( remoteTaskMaster );
-//		  remoteTaskMaster.tell(new FindPrime(10000000000933L), ActorRef.noSender());
+		  System.out.println( "prpare to delegate" );
+		  ActorSelection remoteTaskMaster = system.actorSelection("akka.tcp://MySystem@127.0.0.1:2553/user/taskMaster");
+		  System.out.println( remoteTaskMaster );
+		  remoteTaskMaster.tell(new FindPrime(10000000000933L), ActorRef.noSender());
 	  } else {
 		  System.out.println( "starting up taskMaster to get some work done" );
 		  Props greeterProps = Props.create(TaskMaster.class);
