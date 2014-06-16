@@ -5,15 +5,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import com.conveyal.akkaplay.AddWorker;
-import com.conveyal.akkaplay.FindPrime;
-import com.conveyal.akkaplay.JobId;
-import com.conveyal.akkaplay.JobResult;
-import com.conveyal.akkaplay.JobResultQuery;
-import com.conveyal.akkaplay.JobSpec;
-import com.conveyal.akkaplay.PrimeCandidate;
-import com.conveyal.akkaplay.WorkResult;
 import com.conveyal.akkaplay.actors.PrimeTester;
+import com.conveyal.akkaplay.message.*;
 
 import scala.concurrent.duration.Duration;
 import akka.actor.ActorRef;

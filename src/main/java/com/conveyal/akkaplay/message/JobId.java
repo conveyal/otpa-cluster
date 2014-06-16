@@ -1,10 +1,10 @@
-package com.conveyal.akkaplay;
+package com.conveyal.akkaplay.message;
 
 import java.io.Serializable;
 
 public class JobId implements Serializable{
 
-	int jobId;
+	public int jobId;
 
 	public JobId(int jobId) {
 		this.jobId = jobId;

@@ -3,8 +3,7 @@ package com.conveyal.akkaplay.actors;
 import java.util.Random;
 
 import com.conveyal.akkaplay.CosmicRayException;
-import com.conveyal.akkaplay.PrimeCandidate;
-import com.conveyal.akkaplay.WorkResult;
+import com.conveyal.akkaplay.message.*;
 
 import akka.actor.ActorRef;
 import akka.actor.UntypedActor;

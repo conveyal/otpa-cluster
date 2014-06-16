@@ -1,4 +1,4 @@
-package com.conveyal.akkaplay;
+package com.conveyal.akkaplay.message;
 
 public class JobResultQuery {
 	public int jobId;

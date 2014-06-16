@@ -1,4 +1,4 @@
-package com.conveyal.akkaplay;
+package com.conveyal.akkaplay.message;
 
 import java.util.ArrayList;
 
