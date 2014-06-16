@@ -5,8 +5,8 @@ import java.io.Serializable;
 public class WorkResult implements Serializable{
 
 	private static final long serialVersionUID = 1701318134569347393L;
-	long num;
-	boolean isPrime;
+	public long num;
+	public boolean isPrime;
 	public int jobId;
 
 	public WorkResult(int jobId, long num, boolean isPrime) {

@@ -86,7 +86,6 @@ class StartPrimeSearchHandler implements HttpHandler {
         	
         	ActorSelection remoteTaskMaster = system.actorSelection("akka.tcp://"+path);
         	taskMaster.tell( new AddWorker( remoteTaskMaster ), ActorRef.noSender() );
-  		  //remoteTaskMaster.tell(new FindPrime(10000000000933L), ActorRef.noSender());
         	
         	respond(t,200,"'"+path+"' added to worker pool" );
         } else {

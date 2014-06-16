@@ -6,6 +6,8 @@ import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.net.URL;
 
+import com.conveyal.akkaplay.actors.Executive;
+import com.conveyal.akkaplay.actors.PrimeTester;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
@@ -34,9 +36,7 @@ public class Main {
 	  
 	  if( role.equals("taskmaster") ){
 		  System.out.println( "setting up master" );
-		  ActorRef taskMaster = system.actorOf(Props.create(TaskMaster.class));
-		  //ActorSelection remoteTaskMaster = system.actorSelection("akka.tcp://MySystem@127.0.0.1:2553/user/taskMaster");
-		  //remoteTaskMaster.tell(new FindPrime(10000000000933L), ActorRef.noSender());
+		  ActorRef taskMaster = system.actorOf(Props.create(Executive.class));
 		  
 		  HttpServer server = HttpServer.create(new InetSocketAddress(8000), 5);
 		  server.createContext("/", new StartPrimeSearchHandler(taskMaster, system));
