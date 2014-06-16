@@ -35,26 +35,21 @@ public class Main {
 	  ActorSystem system = ActorSystem.create("MySystem");
 	  
 	  if( role.equals("taskmaster") ){
+		  // start the executive actor
 		  System.out.println( "setting up master" );
-		  ActorRef taskMaster = system.actorOf(Props.create(Executive.class));
+		  ActorRef executive = system.actorOf(Props.create(Executive.class));
 		  
+		  // start the web server
 		  HttpServer server = HttpServer.create(new InetSocketAddress(8000), 5);
-		  server.createContext("/", new StartPrimeSearchHandler(taskMaster, system));
+		  server.createContext("/", new StartPrimeSearchHandler(executive, system));
 		  server.setExecutor(null); // creates a default executor
 		  server.start();
-		  
-
 	  } else {
+		  // start a worker
 		  Props greeterProps = Props.create(PrimeTester.class);
 		  ActorRef taskMaster = system.actorOf(greeterProps, "tester");
 		  System.out.println( "spinning up actor with path: "+taskMaster.path() );
 	  }
-	  
-//	  long start = 10000000000000L;
-//	  long span = 1000;
-//	  for(long i=start; i<=start+span; i++){
-//		  taskMaster.tell(new FindPrime(i), ActorRef.noSender());
-//	  }
 	  
   }
 }
