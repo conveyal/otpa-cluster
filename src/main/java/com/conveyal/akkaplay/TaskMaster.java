@@ -15,6 +15,7 @@ import akka.actor.Terminated;
 import akka.actor.UntypedActor;
 import akka.japi.Function;
 import akka.routing.ActorRefRoutee;
+import akka.routing.ActorSelectionRoutee;
 import akka.routing.RoundRobinRoutingLogic;
 import akka.routing.Routee;
 import akka.routing.Router;
@@ -36,20 +37,20 @@ public class TaskMaster extends UntypedActor {
 		jobResults = new HashMap<Integer,ArrayList<WorkResult>>();
 		
 		List<Routee> routees = new ArrayList<Routee>();
-		for (int i = 0; i < 50; i++) {
-		      ActorRef r = getContext().actorOf(Props.create(PrimeTester.class), "primetester-"+i);
-		      getContext().watch(r);
-		      routees.add(new ActorRefRoutee(r));
-		}
+//		for (int i = 0; i < 50; i++) {
+//		      ActorRef r = getContext().actorOf(Props.create(PrimeTester.class), "primetester-"+i);
+//		      getContext().watch(r);
+//		      routees.add(new ActorRefRoutee(r));
+//		}
 		router = new Router(new RoundRobinRoutingLogic(), routees);
 		
-		Function func = new Function<Throwable,Directive>(){
-			@Override
-			public Directive apply(Throwable t) throws Exception {
-				return SupervisorStrategy.restart();
-			}
-		};
-		strategy = new OneForOneStrategy(10,Duration.create("30 seconds"), func);
+//		Function func = new Function<Throwable,Directive>(){
+//			@Override
+//			public Directive apply(Throwable t) throws Exception {
+//				return SupervisorStrategy.restart();
+//			}
+//		};
+//		strategy = new OneForOneStrategy(10,Duration.create("30 seconds"), func);
 	}
 
 	@Override
@@ -62,6 +63,12 @@ public class TaskMaster extends UntypedActor {
 			tasksOut += 1;
 			router.route(new PrimeCandidate(0, ((FindPrime)msg).num), getSelf());
 		} else if( msg instanceof JobSpec ) {
+			// if there are no workers to route to, bail
+			if(router.routees().size()==0){
+				getSender().tell(new JobId(-1), getSelf());
+				return;
+			}
+			
 			JobSpec jobSpec = (JobSpec)msg;
 			
 			jobResults.put(jobId, new ArrayList<WorkResult>());
@@ -73,19 +80,25 @@ public class TaskMaster extends UntypedActor {
 	        getSender().tell(new JobId(jobId), getSelf());
 	        
 	        jobId+=1;
+		} else if( msg instanceof JobResultQuery ){
+			JobResultQuery jr = (JobResultQuery)msg;
+			ArrayList<WorkResult> res = jobResults.get(jr.jobId);
+			getSender().tell(new JobResult(res), getSelf());
 		} else if( msg instanceof WorkResult ){
 			tasksOut -= 1;
 			
 			WorkResult res = (WorkResult)msg;
 			if(res.isPrime)
-				System.out.println(msg.toString());
-			
-			jobResults.get(res.jobId).add( res );
+				jobResults.get(res.jobId).add( res );
 			
 			if( tasksOut==0 ){
 				long dt = System.currentTimeMillis()-timerStart;
 				System.out.println("All tasks back. It's been "+dt+"ms." );
 			}
+		} else if( msg instanceof AddWorker) {
+			AddWorker aw = (AddWorker)msg;
+			System.out.println("add worker "+aw.path);
+			router = router.addRoutee( aw.path );
 		} else if( msg instanceof Terminated ) {
 			router = router.removeRoutee(((Terminated) msg).actor());
 			ActorRef r = getContext().actorOf(Props.create(PrimeTester.class));

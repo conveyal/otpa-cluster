@@ -39,17 +39,15 @@ public class Main {
 		  //remoteTaskMaster.tell(new FindPrime(10000000000933L), ActorRef.noSender());
 		  
 		  HttpServer server = HttpServer.create(new InetSocketAddress(8000), 5);
-		  server.createContext("/", new StartPrimeSearchHandler(taskMaster));
+		  server.createContext("/", new StartPrimeSearchHandler(taskMaster, system));
 		  server.setExecutor(null); // creates a default executor
 		  server.start();
 		  
 
 	  } else {
-		  System.out.println( "stub: create worker" );
-//		  System.out.println( "starting up taskMaster to get some work done" );
-//		  Props greeterProps = Props.create(TaskMaster.class);
-//		  ActorRef taskMaster = system.actorOf(greeterProps, "taskMaster");
-//		  System.out.println( "spinning up actor with path: "+taskMaster.path() );
+		  Props greeterProps = Props.create(PrimeTester.class);
+		  ActorRef taskMaster = system.actorOf(greeterProps, "tester");
+		  System.out.println( "spinning up actor with path: "+taskMaster.path() );
 	  }
 	  
 //	  long start = 10000000000000L;

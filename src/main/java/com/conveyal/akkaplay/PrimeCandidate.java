@@ -3,7 +3,9 @@ package com.conveyal.akkaplay;
 import java.io.Serializable;
 
 public class PrimeCandidate implements Serializable {
-	  public final long num;
+	private static final long serialVersionUID = -6264940355444533421L;
+	
+	public final long num;
 	  public int jobId;
 	  
 	  public PrimeCandidate(int jobId, long num) {
