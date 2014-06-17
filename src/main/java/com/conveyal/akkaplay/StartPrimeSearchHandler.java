@@ -89,7 +89,7 @@ class StartPrimeSearchHandler implements HttpHandler {
 					
 					StringBuilder bld = new StringBuilder();
 					for(JobStatus js : result){
-						bld.append( js.curJobId+":"+js.fractionComplete+"\n" );
+						bld.append( js.manager+":"+js.curJobId+":"+js.fractionComplete+"\n" );
 					}
 					
 					respond(t,200,bld.toString());

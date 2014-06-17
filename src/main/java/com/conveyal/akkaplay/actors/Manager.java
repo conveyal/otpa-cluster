@@ -69,7 +69,7 @@ public class Manager extends UntypedActor {
 			this.executive = getSender();
 			System.out.println( "manager assigned to executive "+this.executive );
 		} else if(message instanceof JobStatusQuery){
-			getSender().tell( new JobStatus(curJobId, jobsReturned/(float)jobSize), getSelf() );
+			getSender().tell( new JobStatus(getSelf(), curJobId, jobsReturned/(float)jobSize), getSelf() );
 		}
 	}
 
