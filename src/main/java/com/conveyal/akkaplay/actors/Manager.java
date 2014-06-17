@@ -18,12 +18,12 @@ import akka.routing.Router;
 
 public class Manager extends UntypedActor {
 	
-	private HashMap<Integer, ArrayList<WorkResult>> jobResults;
+	private int curJobId=-1;
+	private ArrayList<WorkResult> jobResults;
 	private Router router;
 	private ActorRef executive;
 
 	Manager(){
-		jobResults = new HashMap<Integer,ArrayList<WorkResult>>();
 		
 		ArrayList<Routee> routees = new ArrayList<Routee>();
 		int cores = Runtime.getRuntime().availableProcessors();
@@ -42,7 +42,8 @@ public class Manager extends UntypedActor {
 			JobSpec jobSpec = (JobSpec)message;
 			System.out.println( "got job "+jobSpec.start+"-"+jobSpec.end );
 			
-			jobResults.put(jobSpec.jobId, new ArrayList<WorkResult>());
+			curJobId = jobSpec.jobId;
+			jobResults = new ArrayList<WorkResult>();
 			
 	        for(long i=jobSpec.start; i<jobSpec.end; i++){
 	        	router.route(new PrimeCandidate(jobSpec.jobId, i), getSelf());
@@ -52,7 +53,7 @@ public class Manager extends UntypedActor {
 			WorkResult res = (WorkResult)message;
 			if(res.isPrime) {
 				System.out.println( res.num );
-				jobResults.get(res.jobId).add( res );
+				jobResults.add( res );
 				this.executive.forward(res, getContext());
 			}
 			
