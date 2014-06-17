@@ -7,6 +7,7 @@ import java.net.InetSocketAddress;
 import java.net.URL;
 
 import com.conveyal.akkaplay.actors.Executive;
+import com.conveyal.akkaplay.actors.Manager;
 import com.conveyal.akkaplay.actors.PrimeTester;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
@@ -45,10 +46,10 @@ public class Main {
 		  server.setExecutor(null); // creates a default executor
 		  server.start();
 	  } else {
-		  // start a worker
-		  Props greeterProps = Props.create(PrimeTester.class);
-		  ActorRef taskMaster = system.actorOf(greeterProps, "tester");
-		  System.out.println( "spinning up actor with path: "+taskMaster.path() );
+		  // start a manager
+		  Props greeterProps = Props.create(Manager.class);
+		  ActorRef manager = system.actorOf(greeterProps, "manager");
+		  System.out.println( "spinning up actor with path: "+manager.path() );
 	  }
 	  
   }

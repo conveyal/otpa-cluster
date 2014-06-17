@@ -35,8 +35,6 @@ public class Executive extends UntypedActor {
 	ActorRef child;
 	
 	Executive(){
-		tasksOut = 0;
-		
 		jobResults = new HashMap<Integer,ArrayList<WorkResult>>();
 		
 		router = new Router(new RoundRobinRoutingLogic());
@@ -52,14 +50,7 @@ public class Executive extends UntypedActor {
 
 	@Override
 	public void onReceive(Object msg) throws Exception {
-		if( msg instanceof FindPrime ){
-			if(tasksOut==0){
-				timerStart = System.currentTimeMillis();
-			}
-			
-			tasksOut += 1;
-			router.route(new PrimeCandidate(0, ((FindPrime)msg).num), getSelf());
-		} else if( msg instanceof JobSpec ) {
+		if( msg instanceof JobSpec ) {
 			// if there are no workers to route to, bail
 			if(router.routees().size()==0){
 				getSender().tell(new JobId(-1), getSelf());
@@ -67,40 +58,37 @@ public class Executive extends UntypedActor {
 			}
 			
 			JobSpec jobSpec = (JobSpec)msg;
+			jobSpec.jobId = jobId;
 			
 			jobResults.put(jobId, new ArrayList<WorkResult>());
 			
-	        for(long i=jobSpec.start; i<jobSpec.end; i++){
-	        	router.route(new PrimeCandidate(jobId, i), getSelf());
-	        }
+			router.route( jobSpec, getSelf() );
 	        
 	        getSender().tell(new JobId(jobId), getSelf());
 	        
 	        jobId+=1;
+		} else if( msg instanceof WorkResult) {
+			WorkResult wr = (WorkResult)msg;
+			
+			jobResults.get(wr.jobId).add( wr );
+			System.out.println( "prime:"+wr.num );
+			
 		} else if( msg instanceof JobResultQuery ){
 			JobResultQuery jr = (JobResultQuery)msg;
 			ArrayList<WorkResult> res = jobResults.get(jr.jobId);
 			getSender().tell(new JobResult(res), getSelf());
-		} else if( msg instanceof WorkResult ){
-			tasksOut -= 1;
+		}  else if( msg instanceof AddManager) {
+			AddManager aw = (AddManager)msg;
+			System.out.println("add worker "+aw.remote);
 			
-			WorkResult res = (WorkResult)msg;
-			if(res.isPrime)
-				jobResults.get(res.jobId).add( res );
+			aw.remote.tell(new AssignExecutive(), getSelf());
 			
-			if( tasksOut==0 ){
-				long dt = System.currentTimeMillis()-timerStart;
-				System.out.println("All tasks back. It's been "+dt+"ms." );
-			}
-		} else if( msg instanceof AddWorker) {
-			AddWorker aw = (AddWorker)msg;
-			System.out.println("add worker "+aw.path);
-			router = router.addRoutee( aw.path );
+			router = router.addRoutee( aw.remote );
 		} else if( msg instanceof Terminated ) {
-			router = router.removeRoutee(((Terminated) msg).actor());
-			ActorRef r = getContext().actorOf(Props.create(PrimeTester.class));
-		    getContext().watch(r);
-		    router = router.addRoutee(new ActorRefRoutee(r));
+//			router = router.removeRoutee(((Terminated) msg).actor());
+//			ActorRef r = getContext().actorOf(Props.create(Manager.class));
+//		    getContext().watch(r);
+//		    router = router.addRoutee(new ActorRefRoutee(r));
 		}
 	}
 	

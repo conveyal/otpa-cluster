@@ -20,19 +20,15 @@ import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 
 class StartPrimeSearchHandler implements HttpHandler {
-    private ActorRef taskMaster;
+    private ActorRef executive;
 	private ActorSystem system;
 
-	public StartPrimeSearchHandler(ActorRef taskMaster, ActorSystem system) {
-    	this.taskMaster = taskMaster;
+	public StartPrimeSearchHandler(ActorRef executive, ActorSystem system) {
+    	this.executive = executive;
     	this.system = system;
 	}
 
 	public void handle(HttpExchange t) throws IOException {
-        InputStream is = t.getRequestBody();
-        
-        String resp;
-        
         String[] strJobParams = t.getRequestURI().getPath().split("/");
         if( strJobParams.length<2 ){
         	respond(t,404,"query format: /method/params");
@@ -45,12 +41,10 @@ class StartPrimeSearchHandler implements HttpHandler {
 
         	long start = Long.parseLong( strJobParams[2] );
 	        long end = Long.parseLong( strJobParams[3] );
-	        
-	        resp = "find primes from "+start+" to "+end;
-	        
+	        	        
 	        try {
 		        Timeout timeout = new Timeout(Duration.create(5, "seconds"));
-		        Future<Object> future = Patterns.ask(taskMaster, new JobSpec(start,end), timeout);
+		        Future<Object> future = Patterns.ask(executive, new JobSpec(start,end), timeout);
 				JobId result = (JobId) Await.result(future, timeout.duration());
 				respond(t,200,"jobId:"+result.jobId);
 	        } catch (TimeoutException e){
@@ -68,7 +62,7 @@ class StartPrimeSearchHandler implements HttpHandler {
         	
 	        try {
 		        Timeout timeout = new Timeout(Duration.create(5, "seconds"));
-		        Future<Object> future = Patterns.ask(taskMaster, new JobResultQuery(jobId), timeout);
+		        Future<Object> future = Patterns.ask(executive, new JobResultQuery(jobId), timeout);
 				JobResult result = (JobResult) Await.result(future, timeout.duration());
 				
 				StringBuilder bld = new StringBuilder();
@@ -85,8 +79,8 @@ class StartPrimeSearchHandler implements HttpHandler {
         } else if( method.equals("addworker") ){
         	String path = t.getRequestURI().getPath().substring(11);
         	
-        	ActorSelection remoteTaskMaster = system.actorSelection("akka.tcp://"+path);
-        	taskMaster.tell( new AddWorker( remoteTaskMaster ), ActorRef.noSender() );
+        	ActorSelection remoteManager = system.actorSelection("akka.tcp://"+path);
+        	executive.tell( new AddManager( remoteManager ), ActorRef.noSender() );
         	
         	respond(t,200,"'"+path+"' added to worker pool" );
         } else {
