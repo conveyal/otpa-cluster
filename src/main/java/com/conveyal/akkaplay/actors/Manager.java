@@ -5,6 +5,8 @@ import java.util.HashMap;
 
 import com.conveyal.akkaplay.message.AssignExecutive;
 import com.conveyal.akkaplay.message.JobSpec;
+import com.conveyal.akkaplay.message.JobStatus;
+import com.conveyal.akkaplay.message.JobStatusQuery;
 import com.conveyal.akkaplay.message.PrimeCandidate;
 import com.conveyal.akkaplay.message.WorkResult;
 
@@ -19,6 +21,8 @@ import akka.routing.Router;
 public class Manager extends UntypedActor {
 	
 	private int curJobId=-1;
+	private long jobSize=-1;
+	private long jobsReturned=0;
 	private ArrayList<WorkResult> jobResults;
 	private Router router;
 	private ActorRef executive;
@@ -44,13 +48,17 @@ public class Manager extends UntypedActor {
 			
 			curJobId = jobSpec.jobId;
 			jobResults = new ArrayList<WorkResult>();
+			jobSize = jobSpec.end-jobSpec.start;
+			jobsReturned=0;
 			
 	        for(long i=jobSpec.start; i<jobSpec.end; i++){
 	        	router.route(new PrimeCandidate(jobSpec.jobId, i), getSelf());
 	        }
 		} else if( message instanceof WorkResult ){
-			
 			WorkResult res = (WorkResult)message;
+			
+			jobsReturned += 1;
+			
 			if(res.isPrime) {
 				System.out.println( res.num );
 				jobResults.add( res );
@@ -60,6 +68,8 @@ public class Manager extends UntypedActor {
 		} else if(message instanceof AssignExecutive){
 			this.executive = getSender();
 			System.out.println( "manager assigned to executive "+this.executive );
+		} else if(message instanceof JobStatusQuery){
+			getSender().tell( new JobStatus(curJobId, jobsReturned/(float)jobSize), getSelf() );
 		}
 	}
 

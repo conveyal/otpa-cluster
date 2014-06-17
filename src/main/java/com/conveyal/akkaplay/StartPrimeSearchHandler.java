@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URI;
+import java.util.ArrayList;
 import java.util.concurrent.TimeoutException;
 
 import scala.concurrent.Await;
@@ -76,7 +77,27 @@ class StartPrimeSearchHandler implements HttpHandler {
 				e.printStackTrace();
 				respond(t,500,"something went wrong");
 			}
-        } else if( method.equals("addworker") ){
+          } else if( method.equals("jobstatus") ){
+	        	if(strJobParams.length!=2){
+	        		respond(t,400,"query format: /jobstatus");
+	        	}
+	        		        	
+		        try {
+			        Timeout timeout = new Timeout(Duration.create(5, "seconds"));
+			        Future<Object> future = Patterns.ask(executive, new JobStatusQuery(), timeout);
+					ArrayList<JobStatus> result = (ArrayList<JobStatus>) Await.result(future, timeout.duration());
+					
+					StringBuilder bld = new StringBuilder();
+					for(JobStatus js : result){
+						bld.append( js.curJobId+":"+js.fractionComplete+"\n" );
+					}
+					
+					respond(t,200,bld.toString());
+				} catch (Exception e) {
+					e.printStackTrace();
+					respond(t,500,"something went wrong");
+				}
+	        } else if( method.equals("addworker") ){
         	String path = t.getRequestURI().getPath().substring(11);
         	
         	ActorSelection remoteManager = system.actorSelection("akka.tcp://"+path);

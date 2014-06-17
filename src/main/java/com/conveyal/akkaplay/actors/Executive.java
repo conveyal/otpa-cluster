@@ -8,8 +8,11 @@ import java.util.Map;
 import com.conveyal.akkaplay.actors.PrimeTester;
 import com.conveyal.akkaplay.message.*;
 
+import scala.concurrent.Await;
+import scala.concurrent.Future;
 import scala.concurrent.duration.Duration;
 import akka.actor.ActorRef;
+import akka.actor.ActorSelection;
 import akka.actor.OneForOneStrategy;
 import akka.actor.Props;
 import akka.actor.SupervisorStrategy;
@@ -17,11 +20,13 @@ import akka.actor.SupervisorStrategy.Directive;
 import akka.actor.Terminated;
 import akka.actor.UntypedActor;
 import akka.japi.Function;
+import akka.pattern.Patterns;
 import akka.routing.ActorRefRoutee;
 import akka.routing.ActorSelectionRoutee;
 import akka.routing.RoundRobinRoutingLogic;
 import akka.routing.Routee;
 import akka.routing.Router;
+import akka.util.Timeout;
 
 public class Executive extends UntypedActor {
 	
@@ -31,13 +36,14 @@ public class Executive extends UntypedActor {
 	SupervisorStrategy strategy;
 	int jobId=0;
 	Map<Integer,ArrayList<WorkResult>> jobResults;
-	
-	ActorRef child;
-	
+	ArrayList<ActorSelection> managers;
+		
 	Executive(){
 		jobResults = new HashMap<Integer,ArrayList<WorkResult>>();
 		
 		router = new Router(new RoundRobinRoutingLogic());
+		
+		managers = new ArrayList<ActorSelection>();
 		
 //		Function func = new Function<Throwable,Directive>(){
 //			@Override
@@ -83,7 +89,17 @@ public class Executive extends UntypedActor {
 			
 			aw.remote.tell(new AssignExecutive(), getSelf());
 			
+			managers.add( aw.remote );
 			router = router.addRoutee( aw.remote );
+		} else if( msg instanceof JobStatusQuery ){
+			ArrayList<JobStatus> ret = new ArrayList<JobStatus>();
+			for(ActorSelection manager : managers ){
+				Timeout timeout = new Timeout(Duration.create(5, "seconds"));
+		        Future<Object> future = Patterns.ask(manager, new JobStatusQuery(), timeout);
+				JobStatus result = (JobStatus) Await.result(future, timeout.duration());
+				ret.add(result);
+			}
+			getSender().tell(ret, getSelf());
 		} else if( msg instanceof Terminated ) {
 //			router = router.removeRoutee(((Terminated) msg).actor());
 //			ActorRef r = getContext().actorOf(Props.create(Manager.class));
