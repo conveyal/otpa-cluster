@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 
 import com.conveyal.akkaplay.message.AssignExecutive;
+import com.conveyal.akkaplay.message.BuildGraph;
 import com.conveyal.akkaplay.message.JobSpec;
 import com.conveyal.akkaplay.message.JobStatus;
 import com.conveyal.akkaplay.message.JobStatusQuery;
@@ -26,6 +27,7 @@ public class Manager extends UntypedActor {
 	private ArrayList<WorkResult> jobResults;
 	private Router router;
 	private ActorRef executive;
+	private ActorRef graphBuilder;
 
 	Manager() {
 
@@ -36,6 +38,8 @@ public class Manager extends UntypedActor {
 			routees.add(new ActorRefRoutee(worker));
 		}
 		router = new Router(new RoundRobinRoutingLogic(), routees);
+		
+		graphBuilder = getContext().actorOf(Props.create(GraphBuilder.class), "builder");
 
 		System.out.println("starting manager with " + cores + " workers");
 	}
@@ -45,10 +49,9 @@ public class Manager extends UntypedActor {
 		if (message instanceof JobSpec) {
 			JobSpec jobSpec = (JobSpec) message;
 			System.out.println("got job gtfs:" + jobSpec.gtfs_path + " osm:" + jobSpec.osm_path);
-
-//			for (long i = jobSpec.start; i < jobSpec.end; i++) {
-//				router.route(new PrimeCandidate(jobSpec.jobId, i), getSelf());
-//			}
+			
+			graphBuilder.tell(new BuildGraph(jobSpec.gtfs_path,jobSpec.osm_path), getSelf());
+			
 		} else if (message instanceof WorkResult) {
 			WorkResult res = (WorkResult) message;
 
