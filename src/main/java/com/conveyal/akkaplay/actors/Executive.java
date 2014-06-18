@@ -64,13 +64,17 @@ public class Executive extends UntypedActor {
 				return;
 			}
 
+			// the executive gives jobs ids
 			JobSpec jobSpec = (JobSpec) msg;
 			jobSpec.jobId = jobId;
 
+			// make a place to catch the results of the job
 			jobResults.put(jobId, new ArrayList<WorkResult>());
 
+			// send the job to a manager
 			router.route(jobSpec, getSelf());
 
+			// send the job id to the client
 			getSender().tell(new JobId(jobId), getSelf());
 
 			jobId += 1;
