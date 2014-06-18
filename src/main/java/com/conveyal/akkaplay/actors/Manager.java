@@ -48,9 +48,9 @@ public class Manager extends UntypedActor {
 	public void onReceive(Object message) throws Exception {
 		if (message instanceof JobSpec) {
 			JobSpec jobSpec = (JobSpec) message;
-			System.out.println("got job gtfs:" + jobSpec.gtfs_path + " osm:" + jobSpec.osm_path);
+			System.out.println("got job bucket:" + jobSpec.bucket);
 			
-			graphBuilder.tell(new BuildGraph(jobSpec.gtfs_path,jobSpec.osm_path), getSelf());
+			//graphBuilder.tell(new BuildGraph(jobSpec.gtfs_path,jobSpec.osm_path), getSelf());
 			
 		} else if (message instanceof WorkResult) {
 			WorkResult res = (WorkResult) message;

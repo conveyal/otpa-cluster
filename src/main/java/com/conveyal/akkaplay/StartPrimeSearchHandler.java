@@ -51,18 +51,15 @@ class StartPrimeSearchHandler implements HttpHandler {
 		}
 		String method = strJobParams[1];
 		if (method.equals("find")) {
-			if (strJobParams.length != 2) {
-				respond(t, 400, "query format: /find?gtfs=XXX&osm=YYY");
+			if (strJobParams.length != 3) {
+				respond(t, 400, "query format: /find/{bucket}");
 			}
 			
-			Map<String,String> query = parseQS( uri.getQuery() );
-			String gtfs_path = query.get("gtfs");
-			String osm_path = query.get("osm");
-			
+			String bucket = strJobParams[2];
 
 			try {
 				Timeout timeout = new Timeout(Duration.create(5, "seconds"));
-				Future<Object> future = Patterns.ask(executive, new JobSpec(gtfs_path, osm_path), timeout);
+				Future<Object> future = Patterns.ask(executive, new JobSpec(bucket), timeout);
 				JobId result = (JobId) Await.result(future, timeout.duration());
 				respond(t, 200, "jobId:" + result.jobId);
 			} catch (TimeoutException e) {

@@ -6,6 +6,13 @@ import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.net.URL;
 
+import com.amazonaws.auth.AWSCredentials;
+import com.amazonaws.auth.BasicAWSCredentials;
+import com.amazonaws.auth.profile.ProfileCredentialsProvider;
+import com.amazonaws.services.s3.AmazonS3;
+import com.amazonaws.services.s3.AmazonS3Client;
+import com.amazonaws.services.s3.model.ObjectListing;
+import com.amazonaws.services.s3.model.S3ObjectSummary;
 import com.conveyal.akkaplay.actors.Executive;
 import com.conveyal.akkaplay.actors.Manager;
 import com.conveyal.akkaplay.actors.PrimeTester;
@@ -24,6 +31,14 @@ import akka.japi.Creator;
 public class Main {
 
 	public static void main(String[] args) throws IOException {
+		
+//		AWSCredentials creds = new ProfileCredentialsProvider().getCredentials(); //grab credentials from "~.aws/credentials"
+//		AmazonS3 s3 = new AmazonS3Client(creds);
+//		ObjectListing ol = s3.listObjects("otpac");
+//		for( S3ObjectSummary os : ol.getObjectSummaries() ){
+//			System.out.println( os.getKey() );
+//		}
+				
 		Config config = ConfigFactory.load();
 		String hostname = config.getString("akka.remote.netty.tcp.hostname");
 		int port = config.getInt("akka.remote.netty.tcp.port");
