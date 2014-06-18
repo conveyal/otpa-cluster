@@ -38,5 +38,5 @@ dependencies {
   compile group: 'org.scala-lang', name: 'scala-library', version: '2.10.4'
   compile group: 'com.amazonaws', name: 'aws-java-sdk', version: '1.7.13'
 
-  runtime files('libs/otp.jar')
+  runtime files('libs/otpwithouthttp.jar')
 }

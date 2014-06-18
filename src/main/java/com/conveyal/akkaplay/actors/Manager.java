@@ -3,6 +3,10 @@ package com.conveyal.akkaplay.actors;
 import java.util.ArrayList;
 import java.util.HashMap;
 
+import com.amazonaws.auth.AWSCredentials;
+import com.amazonaws.auth.profile.ProfileCredentialsProvider;
+import com.amazonaws.services.s3.AmazonS3;
+import com.amazonaws.services.s3.AmazonS3Client;
 import com.conveyal.akkaplay.message.AssignExecutive;
 import com.conveyal.akkaplay.message.BuildGraph;
 import com.conveyal.akkaplay.message.JobSpec;
@@ -50,7 +54,7 @@ public class Manager extends UntypedActor {
 			JobSpec jobSpec = (JobSpec) message;
 			System.out.println("got job bucket:" + jobSpec.bucket);
 			
-			//graphBuilder.tell(new BuildGraph(jobSpec.gtfs_path,jobSpec.osm_path), getSelf());
+			graphBuilder.tell(new BuildGraph(jobSpec.bucket), getSelf());
 			
 		} else if (message instanceof WorkResult) {
 			WorkResult res = (WorkResult) message;
