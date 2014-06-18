@@ -29,90 +29,89 @@ import akka.routing.Router;
 import akka.util.Timeout;
 
 public class Executive extends UntypedActor {
-	
+
 	Router router;
 	int tasksOut;
-	private long timerStart=0;
+	private long timerStart = 0;
 	SupervisorStrategy strategy;
-	int jobId=0;
-	Map<Integer,ArrayList<WorkResult>> jobResults;
+	int jobId = 0;
+	Map<Integer, ArrayList<WorkResult>> jobResults;
 	ArrayList<ActorSelection> managers;
-		
-	Executive(){
-		jobResults = new HashMap<Integer,ArrayList<WorkResult>>();
-		
+
+	Executive() {
+		jobResults = new HashMap<Integer, ArrayList<WorkResult>>();
+
 		router = new Router(new RoundRobinRoutingLogic());
-		
+
 		managers = new ArrayList<ActorSelection>();
-		
-//		Function func = new Function<Throwable,Directive>(){
-//			@Override
-//			public Directive apply(Throwable t) throws Exception {
-//				return SupervisorStrategy.restart();
-//			}
-//		};
-//		strategy = new OneForOneStrategy(10,Duration.create("30 seconds"), func);
+
+		// Function func = new Function<Throwable,Directive>(){
+		// @Override
+		// public Directive apply(Throwable t) throws Exception {
+		// return SupervisorStrategy.restart();
+		// }
+		// };
+		// strategy = new OneForOneStrategy(10,Duration.create("30 seconds"),
+		// func);
 	}
 
 	@Override
 	public void onReceive(Object msg) throws Exception {
-		if( msg instanceof JobSpec ) {
+		if (msg instanceof JobSpec) {
 			// if there are no workers to route to, bail
-			if(router.routees().size()==0){
+			if (router.routees().size() == 0) {
 				getSender().tell(new JobId(-1), getSelf());
 				return;
 			}
-			
-			JobSpec jobSpec = (JobSpec)msg;
+
+			JobSpec jobSpec = (JobSpec) msg;
 			jobSpec.jobId = jobId;
-			
+
 			jobResults.put(jobId, new ArrayList<WorkResult>());
-			
-			router.route( jobSpec, getSelf() );
-	        
-	        getSender().tell(new JobId(jobId), getSelf());
-	        
-	        jobId+=1;
-		} else if( msg instanceof WorkResult) {
-			WorkResult wr = (WorkResult)msg;
-			
-			jobResults.get(wr.jobId).add( wr );
-			System.out.println( "prime:"+wr.num );
-			
-		} else if( msg instanceof JobResultQuery ){
-			JobResultQuery jr = (JobResultQuery)msg;
+
+			router.route(jobSpec, getSelf());
+
+			getSender().tell(new JobId(jobId), getSelf());
+
+			jobId += 1;
+		} else if (msg instanceof WorkResult) {
+			WorkResult wr = (WorkResult) msg;
+
+			jobResults.get(wr.jobId).add(wr);
+			System.out.println("prime:" + wr.num);
+
+		} else if (msg instanceof JobResultQuery) {
+			JobResultQuery jr = (JobResultQuery) msg;
 			ArrayList<WorkResult> res = jobResults.get(jr.jobId);
 			getSender().tell(new JobResult(res), getSelf());
-		}  else if( msg instanceof AddManager) {
-			AddManager aw = (AddManager)msg;
-			System.out.println("add worker "+aw.remote);
-			
+		} else if (msg instanceof AddManager) {
+			AddManager aw = (AddManager) msg;
+			System.out.println("add worker " + aw.remote);
+
 			aw.remote.tell(new AssignExecutive(), getSelf());
-			
-			managers.add( aw.remote );
-			router = router.addRoutee( aw.remote );
-		} else if( msg instanceof JobStatusQuery ){
+
+			managers.add(aw.remote);
+			router = router.addRoutee(aw.remote);
+		} else if (msg instanceof JobStatusQuery) {
 			ArrayList<JobStatus> ret = new ArrayList<JobStatus>();
-			for(ActorSelection manager : managers ){
+			for (ActorSelection manager : managers) {
 				Timeout timeout = new Timeout(Duration.create(5, "seconds"));
-		        Future<Object> future = Patterns.ask(manager, new JobStatusQuery(), timeout);
+				Future<Object> future = Patterns.ask(manager, new JobStatusQuery(), timeout);
 				JobStatus result = (JobStatus) Await.result(future, timeout.duration());
 				ret.add(result);
 			}
 			getSender().tell(ret, getSelf());
-		} else if( msg instanceof Terminated ) {
-//			router = router.removeRoutee(((Terminated) msg).actor());
-//			ActorRef r = getContext().actorOf(Props.create(Manager.class));
-//		    getContext().watch(r);
-//		    router = router.addRoutee(new ActorRefRoutee(r));
+		} else if (msg instanceof Terminated) {
+			// router = router.removeRoutee(((Terminated) msg).actor());
+			// ActorRef r = getContext().actorOf(Props.create(Manager.class));
+			// getContext().watch(r);
+			// router = router.addRoutee(new ActorRefRoutee(r));
 		}
 	}
-	
 
-	
 	@Override
 	public SupervisorStrategy supervisorStrategy() {
-	  return strategy;
+		return strategy;
 	}
 
 }

@@ -5,31 +5,30 @@ import com.conveyal.akkaplay.message.*;
 import akka.actor.UntypedActor;
 
 public class PrimeTester extends UntypedActor {
-	
 
-	PrimeTester(){
+	PrimeTester() {
 	}
 
-  @Override
-  public void onReceive(Object message) {
-	  if( message instanceof PrimeCandidate ){
-		  		  		  
-		  PrimeCandidate pc = (PrimeCandidate)message;
-		  boolean ret = isPrime(pc.num);
-		  getSender().tell(new WorkResult(pc.jobId,pc.num,ret), getSelf());
-	  } else {
-		  unhandled(message);
-	  }
-  }
+	@Override
+	public void onReceive(Object message) {
+		if (message instanceof PrimeCandidate) {
 
-private boolean isPrime(long num) {
-	double top = Math.sqrt(num);
-	for(int i=2; i<=top; i++){
-		if(num%i==0){
-			return false;
+			PrimeCandidate pc = (PrimeCandidate) message;
+			boolean ret = isPrime(pc.num);
+			getSender().tell(new WorkResult(pc.jobId, pc.num, ret), getSelf());
+		} else {
+			unhandled(message);
 		}
 	}
-	return true;
-}
+
+	private boolean isPrime(long num) {
+		double top = Math.sqrt(num);
+		for (int i = 2; i <= top; i++) {
+			if (num % i == 0) {
+				return false;
+			}
+		}
+		return true;
+	}
 
 }
