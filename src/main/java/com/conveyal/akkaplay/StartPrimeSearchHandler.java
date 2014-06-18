@@ -5,6 +5,8 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.TimeoutException;
 
 import scala.concurrent.Await;
@@ -28,24 +30,39 @@ class StartPrimeSearchHandler implements HttpHandler {
 		this.executive = executive;
 		this.system = system;
 	}
+	
+	private Map<String,String> parseQS(String qs){
+		HashMap<String,String> ret = new HashMap<String,String>();
+		
+		String[] pairs = qs.split("&");
+		for(String pair : pairs){
+			String[] halves = pair.split("=");
+			ret.put(halves[0], halves[1]);
+		}
+		
+		return ret;
+	}
 
 	public void handle(HttpExchange t) throws IOException {
-		String[] strJobParams = t.getRequestURI().getPath().split("/");
+		URI uri = t.getRequestURI();
+		String[] strJobParams = uri.getPath().split("/");
 		if (strJobParams.length < 2) {
 			respond(t, 404, "query format: /method/params");
 		}
 		String method = strJobParams[1];
 		if (method.equals("find")) {
-			if (strJobParams.length != 4) {
-				respond(t, 400, "query format: /find/fromnum/tonum");
+			if (strJobParams.length != 2) {
+				respond(t, 400, "query format: /find?gtfs=XXX&osm=YYY");
 			}
-
-			long start = Long.parseLong(strJobParams[2]);
-			long end = Long.parseLong(strJobParams[3]);
+			
+			Map<String,String> query = parseQS( uri.getQuery() );
+			String gtfs_path = query.get("gtfs");
+			String osm_path = query.get("osm");
+			
 
 			try {
 				Timeout timeout = new Timeout(Duration.create(5, "seconds"));
-				Future<Object> future = Patterns.ask(executive, new JobSpec(start, end), timeout);
+				Future<Object> future = Patterns.ask(executive, new JobSpec(gtfs_path, osm_path), timeout);
 				JobId result = (JobId) Await.result(future, timeout.duration());
 				respond(t, 200, "jobId:" + result.jobId);
 			} catch (TimeoutException e) {

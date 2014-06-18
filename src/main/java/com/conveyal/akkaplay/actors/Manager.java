@@ -44,16 +44,11 @@ public class Manager extends UntypedActor {
 	public void onReceive(Object message) throws Exception {
 		if (message instanceof JobSpec) {
 			JobSpec jobSpec = (JobSpec) message;
-			System.out.println("got job " + jobSpec.start + "-" + jobSpec.end);
+			System.out.println("got job gtfs:" + jobSpec.gtfs_path + " osm:" + jobSpec.osm_path);
 
-			curJobId = jobSpec.jobId;
-			jobResults = new ArrayList<WorkResult>();
-			jobSize = jobSpec.end - jobSpec.start;
-			jobsReturned = 0;
-
-			for (long i = jobSpec.start; i < jobSpec.end; i++) {
-				router.route(new PrimeCandidate(jobSpec.jobId, i), getSelf());
-			}
+//			for (long i = jobSpec.start; i < jobSpec.end; i++) {
+//				router.route(new PrimeCandidate(jobSpec.jobId, i), getSelf());
+//			}
 		} else if (message instanceof WorkResult) {
 			WorkResult res = (WorkResult) message;
 
