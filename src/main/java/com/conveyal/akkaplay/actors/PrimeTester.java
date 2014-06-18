@@ -1,6 +1,5 @@
 package com.conveyal.akkaplay.actors;
 
-import com.conveyal.akkaplay.CosmicRayException;
 import com.conveyal.akkaplay.message.*;
 
 import akka.actor.UntypedActor;
@@ -12,7 +11,7 @@ public class PrimeTester extends UntypedActor {
 	}
 
   @Override
-  public void onReceive(Object message) throws CosmicRayException {
+  public void onReceive(Object message) {
 	  if( message instanceof PrimeCandidate ){
 		  		  		  
 		  PrimeCandidate pc = (PrimeCandidate)message;
