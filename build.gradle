@@ -1,14 +1,14 @@
 buildscript {
     repositories {
-        mavenCentral()
+        jcenter()
     }
 
     dependencies {
-        classpath 'eu.appsatori:gradle-fatjar-plugin:0.2-rc1'
+        classpath 'com.github.jengelman.gradle.plugins:shadow:0.9.0-M3'
     }
 }
 
-apply plugin: 'fatjar'
+apply plugin: 'com.github.johnrengelman.shadow'
 apply plugin: 'java'
 apply plugin: 'eclipse'
  
@@ -19,7 +19,7 @@ repositories {
         }
 }
  
-fatJar {
+jar {
     manifest {
         attributes 'Main-Class': 'com.conveyal.akkaplay.Main'
     }
