@@ -1,10 +1,10 @@
     $ gradle shadowjar
 
     start master
-    $ java -jar -Dconfig.resource=server.conf ./build/libs/findprimes-all.jar
+    $ java -jar ./build/libs/findprimes-all.jar
 
     start worker
-    $ java -jar ./build/libs/findprimes-all.jar
+    $ java -jar -Dconfig.resource=worker.conf ./build/libs/findprimes-all.jar
 
    	register worker with master
    	http://localhost:8000/addworker/MySystem@127.0.0.1:2553/user/tester
