@@ -10,6 +10,9 @@ import java.nio.channels.Channels;
 import java.nio.channels.ReadableByteChannel;
 import java.util.UUID;
 
+import org.opentripplanner.graph_builder.GraphBuilderTask;
+import org.opentripplanner.routing.graph.Graph;
+
 import com.amazonaws.auth.AWSCredentials;
 import com.amazonaws.auth.profile.ProfileCredentialsProvider;
 import com.amazonaws.services.s3.AmazonS3;
@@ -17,6 +20,7 @@ import com.amazonaws.services.s3.AmazonS3Client;
 import com.amazonaws.services.s3.model.ObjectListing;
 import com.amazonaws.services.s3.model.S3Object;
 import com.amazonaws.services.s3.model.S3ObjectSummary;
+import com.conveyal.akkaplay.AnalystGraphBuilder;
 import com.conveyal.akkaplay.message.BuildGraph;
 
 import akka.actor.UntypedActor;
@@ -24,6 +28,7 @@ import akka.actor.UntypedActor;
 public class GraphBuilder extends UntypedActor {
 
 	AmazonS3 s3;
+	static String sourceDir="graphsource";
 
 	GraphBuilder() {
 		// grab credentials from "~.aws/credentials"
@@ -37,8 +42,14 @@ public class GraphBuilder extends UntypedActor {
 		if (msg instanceof BuildGraph) {
 			BuildGraph bg = (BuildGraph) msg;
 
-			downloadGraphSourceFiles(bg.bucket,"graphsource");
-
+			//downloadGraphSourceFiles(bg.bucket,sourceDir);
+			
+			GraphBuilderTask gbt = AnalystGraphBuilder.createBuilder(new File(sourceDir+"/"+bg.bucket) );
+			gbt.setSerializeGraph(false);
+			gbt.setPath(new File("bogus")); //will never be used, because serialize set to false
+			gbt.run();
+			Graph gg = gbt.getGraph();
+			System.out.println( "graph built nvertices="+gg.countVertices()+" nedges="+gg.countVertices() );
 		}
 	}
 
