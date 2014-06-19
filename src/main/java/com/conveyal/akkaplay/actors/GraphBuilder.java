@@ -42,15 +42,31 @@ public class GraphBuilder extends UntypedActor {
 		if (msg instanceof BuildGraph) {
 			BuildGraph bg = (BuildGraph) msg;
 
-			//downloadGraphSourceFiles(bg.bucket,sourceDir);
+			if( !bucketCached(bg.bucket) ) {
+				System.out.println( "downloading graph sources" );
+				downloadGraphSourceFiles(bg.bucket,sourceDir);
+			} else {
+				System.out.println( "graph sources already cached" );
+			}
 			
-			GraphBuilderTask gbt = AnalystGraphBuilder.createBuilder(new File(sourceDir+"/"+bg.bucket) );
-			gbt.setSerializeGraph(false);
-			gbt.setPath(new File("bogus")); //will never be used, because serialize set to false
-			gbt.run();
-			Graph gg = gbt.getGraph();
-			System.out.println( "graph built nvertices="+gg.countVertices()+" nedges="+gg.countVertices() );
+			Graph gg = buildGraphToMemory(bg.bucket);
+			
+			getSender().tell(gg, getSelf());
 		}
+	}
+
+	private boolean bucketCached(String bucket) {
+		File bucketDir = new File(sourceDir+"/"+bucket);
+		return bucketDir.exists();
+	}
+
+	private Graph buildGraphToMemory(String bucket) {
+		GraphBuilderTask gbt = AnalystGraphBuilder.createBuilder(new File(sourceDir+"/"+bucket) );
+		gbt.setSerializeGraph(false);
+		gbt.setPath(new File("bogus")); //will never be used, because serialize set to false
+		gbt.run();
+		Graph gg = gbt.getGraph();
+		return gg;
 	}
 
 	private void downloadGraphSourceFiles(String bucket, String dirName) throws IOException {
