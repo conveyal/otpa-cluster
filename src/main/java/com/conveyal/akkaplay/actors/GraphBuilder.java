@@ -26,10 +26,8 @@ public class GraphBuilder extends UntypedActor {
 	AmazonS3 s3;
 
 	GraphBuilder() {
-		AWSCredentials creds = new ProfileCredentialsProvider().getCredentials(); // grab
-																					// credentials
-																					// from
-																					// "~.aws/credentials"
+		// grab credentials from "~.aws/credentials"
+		AWSCredentials creds = new ProfileCredentialsProvider().getCredentials();
 		s3 = new AmazonS3Client(creds);
 
 	}
@@ -39,45 +37,29 @@ public class GraphBuilder extends UntypedActor {
 		if (msg instanceof BuildGraph) {
 			BuildGraph bg = (BuildGraph) msg;
 
-			ObjectListing ol = s3.listObjects(bg.bucket);
-			for (S3ObjectSummary os : ol.getObjectSummaries()) {
-				System.out.println("getting " + os.getKey());
-				S3Object obj = s3.getObject(bg.bucket, os.getKey());
-				InputStream objectData = obj.getObjectContent();
-
-				String key = os.getKey();
-				if(key.charAt(key.length()-1)!='/'){
-					String filename = "tmp/" + bg.bucket + "/" + key;
-					saveFile(filename, objectData);
-				}
-			}
-
-			// URL gtfs_url = new URL("https://s3.amazonaws.com"+bg.gtfs_path);
-			// System.out.println( gtfs_url );
-			// URL osm_url = new URL("https://s3.amazonaws.com"+bg.osm_path);
-			//
-			// System.out.println( "getting gtfs" );
-			// ReadableByteChannel rbc =
-			// Channels.newChannel(gtfs_url.openStream());
-			// FileOutputStream fos = new
-			// FileOutputStream(UUID.randomUUID().toString()+".zip");
-			// fos.getChannel().transferFrom(rbc, 0, Long.MAX_VALUE);
-			//
-			// System.out.println( "getting osm" );
-			// rbc = Channels.newChannel(osm_url.openStream());
-			// fos = new
-			// FileOutputStream(UUID.randomUUID().toString()+".osm.pbf");
-			// fos.getChannel().transferFrom(rbc, 0, Long.MAX_VALUE);
-			//
-			// System.out.println(
-			// "start building graph gtfs:"+bg.gtfs_path+" osm:"+bg.osm_path );
+			downloadGraphSourceFiles(bg.bucket,"graphsource");
 
 		}
 	}
 
-	private void saveFile(String filename, InputStream inputStream) throws IOException {
-		OutputStream outputStream=null;
-		
+	private void downloadGraphSourceFiles(String bucket, String dirName) throws IOException {
+		ObjectListing ol = s3.listObjects(bucket);
+		for (S3ObjectSummary os : ol.getObjectSummaries()) {
+			System.out.println("getting " + os.getKey());
+			S3Object obj = s3.getObject(bucket, os.getKey());
+			InputStream objectData = obj.getObjectContent();
+
+			String key = os.getKey();
+			if (key.charAt(key.length() - 1) != '/') {
+				String filename = dirName + "/" + bucket + "/" + key;
+				saveFile(filename, objectData, os.getSize(), true);
+			}
+		}
+	}
+
+	private void saveFile(String filename, InputStream inputStream, long size, boolean verbose) throws IOException {
+		OutputStream outputStream = null;
+
 		try {
 
 			// write the inputStream to a FileOutputStream
@@ -88,9 +70,14 @@ public class GraphBuilder extends UntypedActor {
 
 			int read = 0;
 			byte[] bytes = new byte[1024];
+			int totalRead = 0;
 
 			while ((read = inputStream.read(bytes)) != -1) {
 				outputStream.write(bytes, 0, read);
+				totalRead += read;
+				if (verbose) {
+					System.out.print("\r" + totalRead + "/" + size);
+				}
 			}
 
 		} catch (IOException e) {
@@ -103,6 +90,10 @@ public class GraphBuilder extends UntypedActor {
 				// outputStream.flush();
 				outputStream.close();
 
+			}
+
+			if (verbose) {
+				System.out.print("\n");
 			}
 		}
 	}
