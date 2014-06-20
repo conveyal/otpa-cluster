@@ -4,9 +4,9 @@ import com.conveyal.akkaplay.message.*;
 
 import akka.actor.UntypedActor;
 
-public class PrimeTester extends UntypedActor {
+public class SPTWorker extends UntypedActor {
 
-	PrimeTester() {
+	SPTWorker() {
 	}
 
 	@Override

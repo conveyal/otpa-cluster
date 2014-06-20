@@ -15,7 +15,7 @@ import com.amazonaws.services.s3.model.ObjectListing;
 import com.amazonaws.services.s3.model.S3ObjectSummary;
 import com.conveyal.akkaplay.actors.Executive;
 import com.conveyal.akkaplay.actors.Manager;
-import com.conveyal.akkaplay.actors.PrimeTester;
+import com.conveyal.akkaplay.actors.SPTWorker;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;

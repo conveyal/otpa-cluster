@@ -53,7 +53,7 @@ public class Manager extends UntypedActor {
 		ArrayList<Routee> routees = new ArrayList<Routee>();
 		int cores = Runtime.getRuntime().availableProcessors();
 		for (int i = 0; i < cores; i++) {
-			ActorRef worker = getContext().actorOf(Props.create(PrimeTester.class), "worker-" + i);
+			ActorRef worker = getContext().actorOf(Props.create(SPTWorker.class), "worker-" + i);
 			routees.add(new ActorRefRoutee(worker));
 		}
 		router = new Router(new RoundRobinRoutingLogic(), routees);

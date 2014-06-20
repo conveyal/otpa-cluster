@@ -6,7 +6,7 @@ import java.util.List;
 import java.util.Map;
 
 import com.conveyal.akkaplay.Pointset;
-import com.conveyal.akkaplay.actors.PrimeTester;
+import com.conveyal.akkaplay.actors.SPTWorker;
 import com.conveyal.akkaplay.message.*;
 
 import scala.concurrent.Await;
