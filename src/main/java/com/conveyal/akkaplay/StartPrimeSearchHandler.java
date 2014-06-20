@@ -59,6 +59,16 @@ class StartPrimeSearchHandler implements HttpHandler {
 			String bucket = params.get("graphid");
 			String fromPtsLoc = params.get("from");
 			String toPtsLoc = params.get("to");
+			
+			if(bucket==null){
+				respond(t,400,"'bucket' is not optional");
+			}
+			if(fromPtsLoc==null){
+				respond(t,400,"'from' is not optional");
+			}
+			if(toPtsLoc==null){
+				respond(t,400,"'to' is not optional");
+			}
 
 			try {
 				Timeout timeout = new Timeout(Duration.create(5, "seconds"));

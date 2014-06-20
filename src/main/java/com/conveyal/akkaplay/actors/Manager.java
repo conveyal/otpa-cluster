@@ -9,6 +9,7 @@ import com.amazonaws.auth.AWSCredentials;
 import com.amazonaws.auth.profile.ProfileCredentialsProvider;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3Client;
+import com.conveyal.akkaplay.Pointset;
 import com.conveyal.akkaplay.message.AssignExecutive;
 import com.conveyal.akkaplay.message.BuildGraph;
 import com.conveyal.akkaplay.message.JobSpec;
@@ -41,8 +42,13 @@ public class Manager extends UntypedActor {
 	private String curGraphId=null;
 	private Graph graph=null;
 	private Status status;
+	
+	AmazonS3 s3;
 
 	Manager() {
+		// grab credentials from "~.aws/credentials"
+		AWSCredentials creds = new ProfileCredentialsProvider().getCredentials();
+		s3 = new AmazonS3Client(creds);
 
 		ArrayList<Routee> routees = new ArrayList<Routee>();
 		int cores = Runtime.getRuntime().availableProcessors();
@@ -62,6 +68,12 @@ public class Manager extends UntypedActor {
 	public void onReceive(Object message) throws Exception {
 		if (message instanceof JobSpec) {
 			JobSpec jobSpec = (JobSpec) message;
+			
+			System.out.println( "get origin pointset: "+jobSpec.fromPtsLoc );
+			Pointset fromPts = getPointset( jobSpec.fromPtsLoc );
+			
+			System.out.println( "get destination pointset: "+jobSpec.toPtsLoc );
+			Pointset toPts = getPointset( jobSpec.toPtsLoc );
 			
 			System.out.println("got job bucket:" + jobSpec.bucket);
 			
@@ -95,6 +107,11 @@ public class Manager extends UntypedActor {
 		} else if (message instanceof JobStatusQuery) {
 			getSender().tell(new JobStatus(getSelf(), curJobId, jobsReturned / (float) jobSize), getSelf());
 		}
+	}
+
+	private Pointset getPointset(String fromPtsLoc) {
+		// TODO Auto-generated method stub
+		return null;
 	}
 
 }
