@@ -5,6 +5,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.conveyal.akkaplay.Pointset;
 import com.conveyal.akkaplay.actors.PrimeTester;
 import com.conveyal.akkaplay.message.*;
 
@@ -30,7 +31,6 @@ import akka.util.Timeout;
 
 public class Executive extends UntypedActor {
 
-	Router router;
 	int tasksOut;
 	private long timerStart = 0;
 	SupervisorStrategy strategy;
@@ -40,8 +40,6 @@ public class Executive extends UntypedActor {
 
 	Executive() {
 		jobResults = new HashMap<Integer, ArrayList<WorkResult>>();
-
-		router = new Router(new RoundRobinRoutingLogic());
 
 		managers = new ArrayList<ActorSelection>();
 
@@ -59,7 +57,7 @@ public class Executive extends UntypedActor {
 	public void onReceive(Object msg) throws Exception {
 		if (msg instanceof JobSpec) {
 			// if there are no workers to route to, bail
-			if (router.routees().size() == 0) {
+			if (managers.size() == 0) {
 				getSender().tell(new JobId(-1), getSelf());
 				return;
 			}
@@ -71,11 +69,12 @@ public class Executive extends UntypedActor {
 			// make a place to catch the results of the job
 			jobResults.put(jobId, new ArrayList<WorkResult>());
 
-			// send the job to a manager
-			router.route(jobSpec, getSelf());
-
 			// send the job id to the client
 			getSender().tell(new JobId(jobId), getSelf());
+			
+			// send the job to some managers
+			//TODO send to a job manager
+			managers.get(0).tell(jobSpec, getSelf());
 
 			jobId += 1;
 		} else if (msg instanceof WorkResult) {
@@ -95,7 +94,6 @@ public class Executive extends UntypedActor {
 			aw.remote.tell(new AssignExecutive(), getSelf());
 
 			managers.add(aw.remote);
-			router = router.addRoutee(aw.remote);
 		} else if (msg instanceof JobStatusQuery) {
 			ArrayList<JobStatus> ret = new ArrayList<JobStatus>();
 			for (ActorSelection manager : managers) {
