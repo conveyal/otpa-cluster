@@ -17,6 +17,7 @@ import com.conveyal.akkaplay.Point;
 import com.conveyal.akkaplay.Pointset;
 import com.conveyal.akkaplay.message.AssignExecutive;
 import com.conveyal.akkaplay.message.BuildGraph;
+import com.conveyal.akkaplay.message.JobSliceDone;
 import com.conveyal.akkaplay.message.JobSliceSpec;
 import com.conveyal.akkaplay.message.JobSpec;
 import com.conveyal.akkaplay.message.JobStatus;
@@ -50,7 +51,7 @@ public class Manager extends UntypedActor {
 	private ArrayList<WorkResult> jobResults;
 	private ArrayList<ActorRef> workers;
 	private Router router;
-	private ActorRef executive;
+	private ActorRef jobManager;
 	private ActorRef graphBuilder;
 	
 	private String curGraphId=null;
@@ -86,6 +87,9 @@ public class Manager extends UntypedActor {
 		if (message instanceof JobSliceSpec) {
 			JobSliceSpec jobSpec = (JobSliceSpec) message;
 			
+			// bond to the jobmanager that sent this message
+			this.jobManager = getSender();
+			
 			log.debug( "got job slice: {}", jobSpec );
 			
 			// if the current graph isn't the graph specified by the job, kick the graph builder into action
@@ -115,25 +119,26 @@ public class Manager extends UntypedActor {
 				Boolean result = (Boolean) Await.result(future, timeout.duration());
 			}
 			
+			this.jobSize = 0;
+			this.jobsReturned=0;
 			for( Point from : this.jobSpec.from.getPoints() ) {
-				router.route(new OneToManyRequest(from, this.jobSpec.to), getSelf());
+				router.route(new OneToManyRequest(from, this.jobSpec.to, this.jobSpec.date), getSelf());
+				this.jobSize += 1;
 			}
 			
 		} else if (message instanceof WorkResult) {
 			WorkResult res = (WorkResult) message;
 
 			jobsReturned += 1;
-
-			if (res.isPrime) {
-				System.out.println(res.num);
-				jobResults.add(res);
-				this.executive.forward(res, getContext());
+			log.debug("{}/{} jobs returned", jobsReturned, jobSize);
+			
+			if(jobsReturned==jobSize){
+				jobManager.tell(new JobSliceDone(), getSelf());
 			}
-		} else if (message instanceof AssignExecutive) {
-			this.executive = getSender();
-			System.out.println("manager assigned to executive " + this.executive);
 		} else if (message instanceof JobStatusQuery) {
 			getSender().tell(new JobStatus(getSelf(), curJobId, jobsReturned / (float) jobSize), getSelf());
+		} else {
+			unhandled(message);
 		}
 	}
 

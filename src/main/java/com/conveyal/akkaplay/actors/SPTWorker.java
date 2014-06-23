@@ -38,22 +38,24 @@ public class SPTWorker extends UntypedActor {
 			rr.setBatch(true);
 			GenericLocation fromLoc = new GenericLocation(req.from.getLat(), req.from.getLon());
 			rr.setFrom(fromLoc);
-			rr.setDateTime( new Date() ); //TODO use actual time
+			rr.setDateTime( req.date );
 			try{
 				rr.setRoutingContext(this.graph);
 			} catch ( VertexNotFoundException ex ) {
 				log.debug("could not find origin vertex {}", fromLoc);
+				getSender().tell(new WorkResult(false), getSelf());
 				return;
 			}
 			
 			EarliestArrivalSPTService algo = new EarliestArrivalSPTService();
 			algo.setMaxDuration( 60*60 );
 			
-			long d0 = System.currentTimeMillis();
-			ShortestPathTree spt = algo.getShortestPathTree(rr);
-			long d1 = System.currentTimeMillis();
+//			long d0 = System.currentTimeMillis();
+//			ShortestPathTree spt = algo.getShortestPathTree(rr);
+//			long d1 = System.currentTimeMillis();
+//			log.debug("got spt, vertexcount={} in {} ms", spt.getVertexCount(), d1-d0 );
 			
-			log.debug("got spt {} in {} ms", spt, d1-d0 );
+			getSender().tell(new WorkResult(true), getSelf());
 		} else {
 			unhandled(message);
 		}

@@ -5,18 +5,14 @@ import java.io.Serializable;
 public class WorkResult implements Serializable{
 
 	private static final long serialVersionUID = 1701318134569347393L;
-	public long num;
-	public boolean isPrime;
-	public int jobId;
+	public boolean success;
 
-	public WorkResult(int jobId, long num, boolean isPrime) {
-		this.jobId = jobId;
-		this.num = num;
-		this.isPrime = isPrime;
+	public WorkResult(boolean success) {
+		this.success = success;
 	}
 	
 	public String toString(){
-		return num+":"+isPrime;
+		return "<Job success:"+success+">";
 	}
 
 }

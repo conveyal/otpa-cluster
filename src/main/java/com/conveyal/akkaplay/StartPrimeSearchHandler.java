@@ -106,17 +106,11 @@ class StartPrimeSearchHandler implements HttpHandler {
 			int jobId = Integer.parseInt(strJobParams[2]);
 
 			try {
-				Timeout timeout = new Timeout(Duration.create(5, "seconds"));
-				Future<Object> future = Patterns.ask(executive, new JobResultQuery(jobId), timeout);
-				JobResult result = (JobResult) Await.result(future, timeout.duration());
+//				Timeout timeout = new Timeout(Duration.create(5, "seconds"));
+//				Future<Object> future = Patterns.ask(executive, new JobResultQuery(jobId), timeout);
+//				JobResult result = (JobResult) Await.result(future, timeout.duration());
 
-				StringBuilder bld = new StringBuilder();
-				for (int i = 0; i < result.res.size(); i++) {
-					WorkResult wr = result.res.get(i);
-					bld.append(wr.num + ":" + wr.isPrime + "\n");
-				}
-
-				respond(t, 200, bld.toString());
+				respond(t, 200, "stub");
 			} catch (Exception e) {
 				e.printStackTrace();
 				respond(t, 500, "something went wrong");

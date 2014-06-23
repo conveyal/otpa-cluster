@@ -5,6 +5,10 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.Date;
+import java.util.TimeZone;
+
+import org.opentripplanner.util.DateUtils;
 
 import com.amazonaws.auth.AWSCredentials;
 import com.amazonaws.auth.profile.ProfileCredentialsProvider;
@@ -18,9 +22,12 @@ import com.conveyal.akkaplay.CsvPointset;
 import com.conveyal.akkaplay.Pointset;
 import com.conveyal.akkaplay.Util;
 import com.conveyal.akkaplay.message.AddManager;
+import com.conveyal.akkaplay.message.JobDone;
+import com.conveyal.akkaplay.message.JobSliceDone;
 import com.conveyal.akkaplay.message.JobSliceSpec;
 import com.conveyal.akkaplay.message.JobSpec;
 
+import akka.actor.ActorRef;
 import akka.actor.ActorSelection;
 import akka.actor.UntypedActor;
 import akka.event.Logging;
@@ -30,8 +37,11 @@ public class JobManager extends UntypedActor {
 
 	private ArrayList<ActorSelection> managers;
 	LoggingAdapter log = Logging.getLogger(getContext().system(), this);
+	int workersOut=0;
 	
 	AmazonS3 s3;
+	private ActorRef executive;
+	private int jobId;
 
 	JobManager() {
 		// grab credentials from "~.aws/credentials"
@@ -50,6 +60,11 @@ public class JobManager extends UntypedActor {
 		} else if (msg instanceof JobSpec) {
 			JobSpec js = (JobSpec)msg;
 			
+			this.jobId = js.jobId;
+			
+			// bond to the executive that sent this
+			this.executive = getSender();
+			
 			log.debug( "get origin pointset: {}",js.fromPtsLoc );
 			Pointset fromPts = getPointset( js.fromPtsLoc );
 			log.debug( "got origin pointset: {}",fromPts.size() );
@@ -57,12 +72,26 @@ public class JobManager extends UntypedActor {
 			log.debug( "get destination pointset: {}",js.toPtsLoc );
 			Pointset toPts = getPointset( js.toPtsLoc );
 			log.debug( "got destination pointset: {}",toPts.size() );
+			
+			TimeZone tz = TimeZone.getTimeZone(js.tz);
+			Date date = DateUtils.toDate(js.date, js.time, tz);
 
 			// split the job evenly between managers
 			for(int i=0;i<managers.size(); i++){
 				Pointset fromSplit = fromPts.split(managers.size(), i);
 				ActorSelection manager = managers.get(i);
-				manager.tell(new JobSliceSpec(fromSplit,toPts,js.bucket), getSelf());
+				
+				workersOut+=1;
+				manager.tell(new JobSliceSpec(fromSplit,toPts,js.bucket,date), getSelf());
+			}
+		} else if(msg instanceof JobSliceDone){
+			JobSliceDone doneMsg = (JobSliceDone)msg;
+			
+			workersOut-=1;
+			log.debug("worker {} is done", getSender());
+			
+			if (workersOut==0){
+				executive.tell(new JobDone(jobId, managers), getSelf());
 			}
 		}
 	}

@@ -12,9 +12,9 @@ public class JobSpec implements Serializable{
 	public String fromPtsLoc;
 	public String toPtsLoc;
 
-	private String date;
-	private String time;
-	private String tz;
+	public String date;
+	public String time;
+	public String tz;
 
 	public JobSpec(String bucket, String fromPtsLoc, String toPtsLoc, String date, String time, String tz) {
 		this.bucket = bucket;

@@ -21,6 +21,8 @@ import akka.actor.SupervisorStrategy;
 import akka.actor.SupervisorStrategy.Directive;
 import akka.actor.Terminated;
 import akka.actor.UntypedActor;
+import akka.event.Logging;
+import akka.event.LoggingAdapter;
 import akka.japi.Function;
 import akka.pattern.Patterns;
 import akka.routing.ActorRefRoutee;
@@ -39,6 +41,8 @@ public class Executive extends UntypedActor {
 	Map<Integer, ArrayList<WorkResult>> jobResults;
 	Map<ActorSelection,Integer> managers;
 	Map<Integer, ActorRef> jobManagers;
+	
+	LoggingAdapter log = Logging.getLogger(getContext().system(), this);
 
 	Executive() {
 		jobResults = new HashMap<Integer, ArrayList<WorkResult>>();
@@ -92,8 +96,7 @@ public class Executive extends UntypedActor {
 		} else if (msg instanceof WorkResult) {
 			WorkResult wr = (WorkResult) msg;
 
-			jobResults.get(wr.jobId).add(wr);
-			System.out.println("prime:" + wr.num);
+			log.debug("work result got: {}", wr);
 
 		} else if (msg instanceof JobResultQuery) {
 			JobResultQuery jr = (JobResultQuery) msg;
@@ -115,6 +118,19 @@ public class Executive extends UntypedActor {
 				ret.add(result);
 			}
 			getSender().tell(ret, getSelf());
+		} else if (msg instanceof JobDone){
+			JobDone jd = (JobDone)msg;
+			
+			// free up managers
+			for(ActorSelection manager : jd.managers){
+				managers.put(manager, null);
+			}
+			
+//			// deallocate job manager
+//			jobManagers.put(jd.jobId, null);
+//			getContext().system().stop(getSender());
+			
+			log.debug("{} says job done", getSender());
 		} else if (msg instanceof Terminated) {
 			// router = router.removeRoutee(((Terminated) msg).actor());
 			// ActorRef r = getContext().actorOf(Props.create(Manager.class));
