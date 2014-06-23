@@ -12,10 +12,17 @@ public class JobSpec implements Serializable{
 	public String fromPtsLoc;
 	public String toPtsLoc;
 
-	public JobSpec(String bucket, String fromPtsLoc, String toPtsLoc) {
+	private String date;
+	private String time;
+	private String tz;
+
+	public JobSpec(String bucket, String fromPtsLoc, String toPtsLoc, String date, String time, String tz) {
 		this.bucket = bucket;
 		this.fromPtsLoc = fromPtsLoc;
 		this.toPtsLoc = toPtsLoc;
+		this.date = date;
+		this.time = time;
+		this.tz = tz;
 	}
 
 }

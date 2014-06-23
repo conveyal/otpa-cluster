@@ -7,16 +7,15 @@ import java.io.InputStream;
 import java.io.OutputStream;
 
 public class Util {
-	public static void saveFile(String filename, InputStream inputStream, long size, boolean verbose) throws IOException {
+	public static void saveFile(File file, InputStream inputStream, long size, boolean verbose) throws IOException {
 		OutputStream outputStream = null;
 
 		try {
 
 			// write the inputStream to a FileOutputStream
-			File ff = new File(filename);
-			ff.getParentFile().mkdirs();
-			ff.createNewFile();
-			outputStream = new FileOutputStream(ff);
+			file.getParentFile().mkdirs();
+			file.createNewFile();
+			outputStream = new FileOutputStream(file);
 
 			int read = 0;
 			byte[] bytes = new byte[1024];
@@ -46,5 +45,9 @@ public class Util {
 				System.out.print("\n");
 			}
 		}
+	}
+	
+	public static void saveFile(String filename, InputStream inputStream, long size, boolean verbose) throws IOException {
+		saveFile( new File(filename), inputStream, size, verbose );
 	}
 }

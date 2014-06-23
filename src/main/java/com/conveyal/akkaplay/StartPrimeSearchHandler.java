@@ -30,16 +30,16 @@ class StartPrimeSearchHandler implements HttpHandler {
 		this.executive = executive;
 		this.system = system;
 	}
-	
-	private Map<String,String> parseQS(String qs){
-		HashMap<String,String> ret = new HashMap<String,String>();
-		
+
+	private Map<String, String> parseQS(String qs) {
+		HashMap<String, String> ret = new HashMap<String, String>();
+
 		String[] pairs = qs.split("&");
-		for(String pair : pairs){
+		for (String pair : pairs) {
 			String[] halves = pair.split("=");
 			ret.put(halves[0], halves[1]);
 		}
-		
+
 		return ret;
 	}
 
@@ -54,25 +54,42 @@ class StartPrimeSearchHandler implements HttpHandler {
 			if (strJobParams.length != 2) {
 				respond(t, 400, "query format: /find?graphid=blah");
 			}
-			
-			Map<String,String> params = parseQS(uri.getQuery()); //TODO more secure query string parsing
+
+			Map<String, String> params = parseQS(uri.getQuery()); // TODO more
+																	// secure
+																	// query
+																	// string
+																	// parsing
 			String bucket = params.get("graphid");
 			String fromPtsLoc = params.get("from");
 			String toPtsLoc = params.get("to");
-			
-			if(bucket==null){
-				respond(t,400,"'bucket' is not optional");
+			String dateStr = params.get("date");
+			String timeStr = params.get("time");
+			String timezoneStr = params.get("tz");
+
+			if (bucket == null) {
+				respond(t, 400, "'bucket' is not optional");
 			}
-			if(fromPtsLoc==null){
-				respond(t,400,"'from' is not optional");
+			if (fromPtsLoc == null) {
+				respond(t, 400, "'from' is not optional");
 			}
-			if(toPtsLoc==null){
-				respond(t,400,"'to' is not optional");
+			if (toPtsLoc == null) {
+				respond(t, 400, "'to' is not optional");
+			}
+			if (dateStr == null) {
+				respond(t, 400, "'date' is not optional");
+			}
+			if (timeStr == null) {
+				respond(t, 400, "'time' is not optional");
+			}
+			if (timezoneStr == null) {
+				respond(t, 400, "'tz' is not optional");
 			}
 
 			try {
 				Timeout timeout = new Timeout(Duration.create(5, "seconds"));
-				Future<Object> future = Patterns.ask(executive, new JobSpec(bucket, fromPtsLoc, toPtsLoc), timeout);
+				Future<Object> future = Patterns.ask(executive, new JobSpec(bucket, fromPtsLoc, toPtsLoc, dateStr,
+						timeStr, timezoneStr), timeout);
 				JobId result = (JobId) Await.result(future, timeout.duration());
 				respond(t, 200, "jobId:" + result.jobId);
 			} catch (TimeoutException e) {

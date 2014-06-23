@@ -25,11 +25,14 @@ import com.conveyal.akkaplay.Util;
 import com.conveyal.akkaplay.message.BuildGraph;
 
 import akka.actor.UntypedActor;
+import akka.event.Logging;
+import akka.event.LoggingAdapter;
 
 public class GraphBuilder extends UntypedActor {
 
 	AmazonS3 s3;
 	static String sourceDir="graphsource";
+	LoggingAdapter log = Logging.getLogger(getContext().system(), this);
 
 	GraphBuilder() {
 		// grab credentials from "~.aws/credentials"
@@ -44,10 +47,10 @@ public class GraphBuilder extends UntypedActor {
 			BuildGraph bg = (BuildGraph) msg;
 
 			if( !bucketCached(bg.bucket) ) {
-				System.out.println( "downloading graph sources" );
+				log.debug( "downloading graph sources" );
 				downloadGraphSourceFiles(bg.bucket,sourceDir);
 			} else {
-				System.out.println( "graph sources already cached" );
+				log.debug( "graph sources already cached" );
 			}
 			
 			Graph gg = buildGraphToMemory(bg.bucket);
@@ -73,7 +76,7 @@ public class GraphBuilder extends UntypedActor {
 	private void downloadGraphSourceFiles(String bucket, String dirName) throws IOException {
 		ObjectListing ol = s3.listObjects(bucket);
 		for (S3ObjectSummary os : ol.getObjectSummaries()) {
-			System.out.println("getting " + os.getKey());
+			log.debug("getting {}",os.getKey());
 			S3Object obj = s3.getObject(bucket, os.getKey());
 			InputStream objectData = obj.getObjectContent();
 
