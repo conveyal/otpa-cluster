@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 
 import com.conveyal.akkaplay.Pointset;
 import com.conveyal.akkaplay.actors.SPTWorker;
@@ -36,12 +37,15 @@ public class Executive extends UntypedActor {
 	SupervisorStrategy strategy;
 	int jobId = 0;
 	Map<Integer, ArrayList<WorkResult>> jobResults;
-	ArrayList<ActorSelection> managers;
+	Map<ActorSelection,Integer> managers;
+	Map<Integer, ActorRef> jobManagers;
 
 	Executive() {
 		jobResults = new HashMap<Integer, ArrayList<WorkResult>>();
 
-		managers = new ArrayList<ActorSelection>();
+		managers = new HashMap<ActorSelection,Integer>();
+		
+		jobManagers = new HashMap<Integer,ActorRef>();
 
 		// Function func = new Function<Throwable,Directive>(){
 		// @Override
@@ -72,9 +76,17 @@ public class Executive extends UntypedActor {
 			// send the job id to the client
 			getSender().tell(new JobId(jobId), getSelf());
 			
-			// send the job to some managers
-			//TODO send to a job manager
-			managers.get(0).tell(jobSpec, getSelf());
+			// create a job manager
+			ActorRef jobManager = getContext().actorOf(Props.create(JobManager.class), "jobmanager-"+jobId);
+			jobManagers.put( jobId, jobManager );
+			
+			// assign some managers to the job manager
+			for(ActorSelection manager : freeManagers() ){
+				assignManager( jobId, manager );
+			}
+			
+			// kick off the job
+			jobManager.tell( jobSpec, getSelf() );
 
 			jobId += 1;
 		} else if (msg instanceof WorkResult) {
@@ -93,10 +105,10 @@ public class Executive extends UntypedActor {
 
 			aw.remote.tell(new AssignExecutive(), getSelf());
 
-			managers.add(aw.remote);
+			managers.put(aw.remote,null);
 		} else if (msg instanceof JobStatusQuery) {
 			ArrayList<JobStatus> ret = new ArrayList<JobStatus>();
-			for (ActorSelection manager : managers) {
+			for (ActorSelection manager : managers.keySet()) {
 				Timeout timeout = new Timeout(Duration.create(5, "seconds"));
 				Future<Object> future = Patterns.ask(manager, new JobStatusQuery(), timeout);
 				JobStatus result = (JobStatus) Await.result(future, timeout.duration());
@@ -109,6 +121,35 @@ public class Executive extends UntypedActor {
 			// getContext().watch(r);
 			// router = router.addRoutee(new ActorRefRoutee(r));
 		}
+	}
+
+	private boolean assignManager(int jobId, ActorSelection manager) throws Exception {
+		// get the job manager for this job id
+		ActorRef jobManager = jobManagers.get(jobId);
+		
+		// assign the manager to the job manager; blocking operation
+		Timeout timeout = new Timeout(Duration.create(1, "seconds"));
+		Future<Object> future = Patterns.ask(jobManager, new AddManager(manager), timeout);
+		Boolean success = (Boolean) Await.result(future, timeout.duration());
+		
+		// if it worked, register the manager as busy
+		if( success ){
+			this.managers.put(manager, jobId);
+		}
+		
+		return success;
+	}
+
+	private ArrayList<ActorSelection> freeManagers() {
+		ArrayList<ActorSelection> ret = new ArrayList<ActorSelection>();
+		
+		for( Entry<ActorSelection,Integer> entry : this.managers.entrySet() ){
+			if(entry.getValue()==null){
+				ret.add( entry.getKey() );
+			}
+		}
+		
+		return ret;
 	}
 
 	@Override

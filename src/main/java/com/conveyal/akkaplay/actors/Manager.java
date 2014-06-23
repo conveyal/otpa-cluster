@@ -5,29 +5,42 @@ import java.util.HashMap;
 
 import org.opentripplanner.routing.graph.Graph;
 
+import scala.concurrent.Await;
+import scala.concurrent.Future;
+import scala.concurrent.duration.Duration;
+
 import com.amazonaws.auth.AWSCredentials;
 import com.amazonaws.auth.profile.ProfileCredentialsProvider;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3Client;
+import com.conveyal.akkaplay.Point;
 import com.conveyal.akkaplay.Pointset;
 import com.conveyal.akkaplay.message.AssignExecutive;
 import com.conveyal.akkaplay.message.BuildGraph;
+import com.conveyal.akkaplay.message.JobSliceSpec;
 import com.conveyal.akkaplay.message.JobSpec;
 import com.conveyal.akkaplay.message.JobStatus;
 import com.conveyal.akkaplay.message.JobStatusQuery;
+import com.conveyal.akkaplay.message.OneToManyRequest;
 import com.conveyal.akkaplay.message.PrimeCandidate;
+import com.conveyal.akkaplay.message.SetGraph;
 import com.conveyal.akkaplay.message.StartWorkers;
 import com.conveyal.akkaplay.message.WorkResult;
 
 import akka.actor.ActorRef;
 import akka.actor.Props;
 import akka.actor.UntypedActor;
+import akka.event.Logging;
+import akka.event.LoggingAdapter;
+import akka.pattern.Patterns;
 import akka.routing.ActorRefRoutee;
 import akka.routing.RoundRobinRoutingLogic;
 import akka.routing.Routee;
 import akka.routing.Router;
+import akka.util.Timeout;
 
 public class Manager extends UntypedActor {
+	LoggingAdapter log = Logging.getLogger(getContext().system(), this);
 	
 	public enum Status {READY,BUILDING_GRAPH,WORKING};
 
@@ -35,6 +48,7 @@ public class Manager extends UntypedActor {
 	private long jobSize = -1;
 	private long jobsReturned = 0;
 	private ArrayList<WorkResult> jobResults;
+	private ArrayList<ActorRef> workers;
 	private Router router;
 	private ActorRef executive;
 	private ActorRef graphBuilder;
@@ -44,6 +58,7 @@ public class Manager extends UntypedActor {
 	private Status status;
 	
 	AmazonS3 s3;
+	private JobSliceSpec jobSpec=null;
 
 	Manager() {
 		// grab credentials from "~.aws/credentials"
@@ -51,10 +66,12 @@ public class Manager extends UntypedActor {
 		s3 = new AmazonS3Client(creds);
 
 		ArrayList<Routee> routees = new ArrayList<Routee>();
+		workers = new ArrayList<ActorRef>();
 		int cores = Runtime.getRuntime().availableProcessors();
 		for (int i = 0; i < cores; i++) {
 			ActorRef worker = getContext().actorOf(Props.create(SPTWorker.class), "worker-" + i);
 			routees.add(new ActorRefRoutee(worker));
+			workers.add( worker );
 		}
 		router = new Router(new RoundRobinRoutingLogic(), routees);
 		
@@ -66,16 +83,10 @@ public class Manager extends UntypedActor {
 
 	@Override
 	public void onReceive(Object message) throws Exception {
-		if (message instanceof JobSpec) {
-			JobSpec jobSpec = (JobSpec) message;
+		if (message instanceof JobSliceSpec) {
+			JobSliceSpec jobSpec = (JobSliceSpec) message;
 			
-			System.out.println( "get origin pointset: "+jobSpec.fromPtsLoc );
-			Pointset fromPts = getPointset( jobSpec.fromPtsLoc );
-			
-			System.out.println( "get destination pointset: "+jobSpec.toPtsLoc );
-			Pointset toPts = getPointset( jobSpec.toPtsLoc );
-			
-			System.out.println("got job bucket:" + jobSpec.bucket);
+			log.debug( "got job slice: {}", jobSpec );
 			
 			// if the current graph isn't the graph specified by the job, kick the graph builder into action
 			if(graph==null || !curGraphId.equals(jobSpec.bucket)){
@@ -85,12 +96,29 @@ public class Manager extends UntypedActor {
 			} else {
 				getSelf().tell(new StartWorkers(), getSelf());
 			}
+			
+			this.jobSpec = jobSpec;
 		} else if (message instanceof Graph){
+			log.debug("got graph: {}", (Graph)message );
+			
 			this.graph = (Graph)message;
 			status = Status.READY;
 			getSelf().tell(new StartWorkers(), getSelf());
 		} else if (message instanceof StartWorkers){
-			System.out.println( "set the workers doing their thing" );
+			log.debug( "set the workers doing their thing" );
+			
+			//send graph to all workers
+			for( ActorRef worker : workers ){
+				
+				Timeout timeout = new Timeout(Duration.create(5, "seconds"));
+				Future<Object> future = Patterns.ask(worker, new SetGraph(this.graph), timeout);
+				Boolean result = (Boolean) Await.result(future, timeout.duration());
+			}
+			
+			for( Point from : this.jobSpec.from.getPoints() ) {
+				router.route(new OneToManyRequest(from, this.jobSpec.to), getSelf());
+			}
+			
 		} else if (message instanceof WorkResult) {
 			WorkResult res = (WorkResult) message;
 
@@ -107,11 +135,6 @@ public class Manager extends UntypedActor {
 		} else if (message instanceof JobStatusQuery) {
 			getSender().tell(new JobStatus(getSelf(), curJobId, jobsReturned / (float) jobSize), getSelf());
 		}
-	}
-
-	private Pointset getPointset(String fromPtsLoc) {
-		// TODO Auto-generated method stub
-		return null;
 	}
 
 }
