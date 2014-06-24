@@ -114,7 +114,7 @@ public class Manager extends UntypedActor {
 			//send graph to all workers
 			for( ActorRef worker : workers ){
 				
-				Timeout timeout = new Timeout(Duration.create(5, "seconds"));
+				Timeout timeout = new Timeout(Duration.create(10, "seconds"));
 				Future<Object> future = Patterns.ask(worker, new SetOneToManyContext(this.graph,this.jobSpec.to), timeout);
 				Boolean result = (Boolean) Await.result(future, timeout.duration());
 			}

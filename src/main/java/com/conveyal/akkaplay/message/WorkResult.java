@@ -13,6 +13,7 @@ public class WorkResult implements Serializable{
 	public boolean success;
 	public List<Histogram> histograms;
 	public Point point=null;
+	public int jobId;
 
 	public WorkResult(boolean success) {
 		this.success = success;

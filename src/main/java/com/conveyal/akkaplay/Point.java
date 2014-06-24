@@ -48,5 +48,13 @@ public class Point implements Serializable {
 		}
 		return ret;
 	}
+	
+	public String toString(){
+		String ret = "<Point ("+this.lat+","+this.lon+") ";
+		for(Entry<String,Float> entry : this.props.entrySet()){
+			ret += entry.getKey()+":"+entry.getValue()+" ";
+		}
+		return ret;
+	}
 
 }

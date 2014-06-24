@@ -99,18 +99,36 @@ class StartPrimeSearchHandler implements HttpHandler {
 				respond(t, 500, "something went wrong");
 			}
 		} else if (method.equals("jobresult")) {
-			if (strJobParams.length != 3) {
-				respond(t, 400, "query format: /jobresult/jobid");
+			if (strJobParams.length < 3) {
+				respond(t, 400, "query format: /jobresult/jobid/[workitem]");
 			}
 
 			int jobId = Integer.parseInt(strJobParams[2]);
 
 			try {
-//				Timeout timeout = new Timeout(Duration.create(5, "seconds"));
-//				Future<Object> future = Patterns.ask(executive, new JobResultQuery(jobId), timeout);
-//				JobResult result = (JobResult) Await.result(future, timeout.duration());
+				Timeout timeout = new Timeout(Duration.create(5, "seconds"));
+				Future<Object> future = Patterns.ask(executive, new JobResultQuery(jobId), timeout);
+				JobResult result = (JobResult) Await.result(future, timeout.duration());
 
-				respond(t, 200, "stub");
+				if(strJobParams.length>3){
+					int workItemIndex = Integer.parseInt(strJobParams[3]);
+					WorkResult wr = result.res.get(workItemIndex);
+					
+					StringBuilder sb = new StringBuilder();
+					sb.append( "WorkResult\n" );
+					sb.append( wr.point+"\n" );
+					for(Histogram hist : wr.histograms){
+						sb.append( hist.name+" " );
+						sb.append("[");
+						for(int i=0; i<hist.bins.length; i++){
+							sb.append( hist.bins[i]+"," );
+						}
+						sb.append("]\n");
+					}
+					respond(t, 200, sb.toString());
+				} else {
+					respond(t, 200, "result.size:"+result.res.size());
+				}
 			} catch (Exception e) {
 				e.printStackTrace();
 				respond(t, 500, "something went wrong");

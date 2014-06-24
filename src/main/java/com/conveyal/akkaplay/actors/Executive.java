@@ -37,14 +37,6 @@ public class Executive extends UntypedActor {
 		
 		jobManagers = new HashMap<Integer,ActorRef>();
 
-		// Function func = new Function<Throwable,Directive>(){
-		// @Override
-		// public Directive apply(Throwable t) throws Exception {
-		// return SupervisorStrategy.restart();
-		// }
-		// };
-		// strategy = new OneForOneStrategy(10,Duration.create("30 seconds"),
-		// func);
 	}
 
 	@Override
@@ -81,8 +73,10 @@ public class Executive extends UntypedActor {
 			jobId += 1;
 		} else if (msg instanceof WorkResult) {
 			WorkResult wr = (WorkResult) msg;
+			
+			jobResults.get(wr.jobId).add(wr);
 
-			log.debug("work result got: {}", wr);
+			//log.debug("work result got: {}", wr);
 
 		} else if (msg instanceof JobResultQuery) {
 			JobResultQuery jr = (JobResultQuery) msg;

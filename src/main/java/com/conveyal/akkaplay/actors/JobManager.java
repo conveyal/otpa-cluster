@@ -87,7 +87,9 @@ public class JobManager extends UntypedActor {
 			}
 		} else if(msg instanceof WorkResult){
 			WorkResult res = (WorkResult)msg;
-			log.debug("got result: {}", res);
+			res.jobId = jobId;
+						
+			executive.tell(res, getSelf());
 		} else if(msg instanceof JobSliceDone){
 			JobSliceDone doneMsg = (JobSliceDone)msg;
 			
