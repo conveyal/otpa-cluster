@@ -26,6 +26,7 @@ import com.conveyal.akkaplay.message.JobDone;
 import com.conveyal.akkaplay.message.JobSliceDone;
 import com.conveyal.akkaplay.message.JobSliceSpec;
 import com.conveyal.akkaplay.message.JobSpec;
+import com.conveyal.akkaplay.message.WorkResult;
 
 import akka.actor.ActorRef;
 import akka.actor.ActorSelection;
@@ -84,6 +85,9 @@ public class JobManager extends UntypedActor {
 				workersOut+=1;
 				manager.tell(new JobSliceSpec(fromSplit,toPts,js.bucket,date), getSelf());
 			}
+		} else if(msg instanceof WorkResult){
+			WorkResult res = (WorkResult)msg;
+			log.debug("got result: {}", res);
 		} else if(msg instanceof JobSliceDone){
 			JobSliceDone doneMsg = (JobSliceDone)msg;
 			

@@ -24,7 +24,7 @@ import com.conveyal.akkaplay.message.JobStatus;
 import com.conveyal.akkaplay.message.JobStatusQuery;
 import com.conveyal.akkaplay.message.OneToManyRequest;
 import com.conveyal.akkaplay.message.PrimeCandidate;
-import com.conveyal.akkaplay.message.SetGraph;
+import com.conveyal.akkaplay.message.SetOneToManyContext;
 import com.conveyal.akkaplay.message.StartWorkers;
 import com.conveyal.akkaplay.message.WorkResult;
 
@@ -115,14 +115,14 @@ public class Manager extends UntypedActor {
 			for( ActorRef worker : workers ){
 				
 				Timeout timeout = new Timeout(Duration.create(5, "seconds"));
-				Future<Object> future = Patterns.ask(worker, new SetGraph(this.graph), timeout);
+				Future<Object> future = Patterns.ask(worker, new SetOneToManyContext(this.graph,this.jobSpec.to), timeout);
 				Boolean result = (Boolean) Await.result(future, timeout.duration());
 			}
 			
 			this.jobSize = 0;
 			this.jobsReturned=0;
 			for( Point from : this.jobSpec.from.getPoints() ) {
-				router.route(new OneToManyRequest(from, this.jobSpec.to, this.jobSpec.date), getSelf());
+				router.route(new OneToManyRequest(from, this.jobSpec.date), getSelf());
 				this.jobSize += 1;
 			}
 			
@@ -130,7 +130,12 @@ public class Manager extends UntypedActor {
 			WorkResult res = (WorkResult) message;
 
 			jobsReturned += 1;
+			log.debug("got: {}", res);
 			log.debug("{}/{} jobs returned", jobsReturned, jobSize);
+			
+			if(res.success){
+				jobManager.forward(res, getContext());;
+			}
 			
 			if(jobsReturned==jobSize){
 				jobManager.tell(new JobSliceDone(), getSelf());

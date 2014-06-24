@@ -62,7 +62,7 @@ public class CsvPointset implements Pointset, Serializable {
 			} else if (headerField.equals("lon")) {
 				ret.setLon(Float.parseFloat(field));
 			} else {
-				ret.setProp(headerField, field);
+				ret.setProp(headerField, Float.parseFloat(field));
 			}
 		}
 
@@ -89,7 +89,7 @@ public class CsvPointset implements Pointset, Serializable {
 		return ret;
 	}
 
-	private Point get(int i) {
+	public Point get(int i) {
 		return this.points.get(i);
 	}
 
