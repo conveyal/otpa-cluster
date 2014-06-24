@@ -2,12 +2,9 @@ package com.conveyal.akkaplay.actors;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
-import com.conveyal.akkaplay.Pointset;
-import com.conveyal.akkaplay.actors.SPTWorker;
 import com.conveyal.akkaplay.message.*;
 
 import scala.concurrent.Await;
@@ -15,28 +12,17 @@ import scala.concurrent.Future;
 import scala.concurrent.duration.Duration;
 import akka.actor.ActorRef;
 import akka.actor.ActorSelection;
-import akka.actor.OneForOneStrategy;
 import akka.actor.Props;
-import akka.actor.SupervisorStrategy;
-import akka.actor.SupervisorStrategy.Directive;
 import akka.actor.Terminated;
 import akka.actor.UntypedActor;
 import akka.event.Logging;
 import akka.event.LoggingAdapter;
-import akka.japi.Function;
 import akka.pattern.Patterns;
-import akka.routing.ActorRefRoutee;
-import akka.routing.ActorSelectionRoutee;
-import akka.routing.RoundRobinRoutingLogic;
-import akka.routing.Routee;
-import akka.routing.Router;
 import akka.util.Timeout;
 
 public class Executive extends UntypedActor {
 
 	int tasksOut;
-	private long timerStart = 0;
-	SupervisorStrategy strategy;
 	int jobId = 0;
 	Map<Integer, ArrayList<WorkResult>> jobResults;
 	Map<ActorSelection,Integer> managers;
@@ -126,9 +112,9 @@ public class Executive extends UntypedActor {
 				managers.put(manager, null);
 			}
 			
-//			// deallocate job manager
-//			jobManagers.put(jd.jobId, null);
-//			getContext().system().stop(getSender());
+			// deallocate job manager
+			jobManagers.put(jd.jobId, null);
+			getContext().system().stop(getSender());
 			
 			log.debug("{} says job done", getSender());
 		} else if (msg instanceof Terminated) {
@@ -166,11 +152,6 @@ public class Executive extends UntypedActor {
 		}
 		
 		return ret;
-	}
-
-	@Override
-	public SupervisorStrategy supervisorStrategy() {
-		return strategy;
 	}
 
 }
