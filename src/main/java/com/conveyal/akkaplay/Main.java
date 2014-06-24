@@ -16,6 +16,7 @@ import com.amazonaws.services.s3.model.S3ObjectSummary;
 import com.conveyal.akkaplay.actors.Executive;
 import com.conveyal.akkaplay.actors.Manager;
 import com.conveyal.akkaplay.actors.SPTWorker;
+import com.conveyal.akkaplay.message.SetStatusServer;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
@@ -58,6 +59,12 @@ public class Main {
 			server.createContext("/", new StartPrimeSearchHandler(executive, system));
 			server.setExecutor(null); // creates a default executor
 			server.start();
+			
+			// start the websocket server
+			StatusServer statusServer = new StatusServer( new InetSocketAddress(8887) );
+			statusServer.start();
+			
+			executive.tell(new SetStatusServer(statusServer), ActorRef.noSender());
 		} else {
 			// start a manager
 			Props greeterProps = Props.create(Manager.class);

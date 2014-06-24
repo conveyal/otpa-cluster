@@ -5,6 +5,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import com.conveyal.akkaplay.StatusServer;
 import com.conveyal.akkaplay.message.*;
 
 import scala.concurrent.Await;
@@ -27,6 +28,7 @@ public class Executive extends UntypedActor {
 	Map<Integer, ArrayList<WorkResult>> jobResults;
 	Map<ActorSelection,Integer> managers;
 	Map<Integer, ActorRef> jobManagers;
+	StatusServer statusServer = null;
 	
 	LoggingAdapter log = Logging.getLogger(getContext().system(), this);
 
@@ -77,6 +79,9 @@ public class Executive extends UntypedActor {
 			jobResults.get(wr.jobId).add(wr);
 
 			//log.debug("work result got: {}", wr);
+			if(statusServer!=null){
+				statusServer.onWorkResult( wr );
+			}
 
 		} else if (msg instanceof JobResultQuery) {
 			JobResultQuery jr = (JobResultQuery) msg;
@@ -111,6 +116,8 @@ public class Executive extends UntypedActor {
 			getContext().system().stop(getSender());
 			
 			log.debug("{} says job done", getSender());
+		} else if (msg instanceof SetStatusServer){
+			this.statusServer = ((SetStatusServer)msg).statusServer;
 		} else if (msg instanceof Terminated) {
 			// router = router.removeRoutee(((Terminated) msg).actor());
 			// ActorRef r = getContext().actorOf(Props.create(Manager.class));
