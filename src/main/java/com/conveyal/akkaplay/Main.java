@@ -6,6 +6,12 @@ import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.net.URL;
 
+import org.glassfish.grizzly.http.server.HttpHandler;
+import org.glassfish.grizzly.http.server.HttpServer;
+import org.glassfish.grizzly.http.server.Request;
+import org.glassfish.grizzly.http.server.Response;
+import org.glassfish.grizzly.http.server.ServerConfiguration;
+
 import com.amazonaws.auth.AWSCredentials;
 import com.amazonaws.auth.BasicAWSCredentials;
 import com.amazonaws.auth.profile.ProfileCredentialsProvider;
@@ -16,10 +22,10 @@ import com.amazonaws.services.s3.model.S3ObjectSummary;
 import com.conveyal.akkaplay.actors.Executive;
 import com.conveyal.akkaplay.actors.Manager;
 import com.conveyal.akkaplay.actors.SPTWorker;
+import com.conveyal.akkaplay.handlers.AddWorkerHandler;
+import com.conveyal.akkaplay.handlers.FindHandler;
+import com.conveyal.akkaplay.handlers.GetJobResultHandler;
 import com.conveyal.akkaplay.message.SetStatusServer;
-import com.sun.net.httpserver.HttpExchange;
-import com.sun.net.httpserver.HttpHandler;
-import com.sun.net.httpserver.HttpServer;
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
 
@@ -54,10 +60,26 @@ public class Main {
 			System.out.println("setting up master");
 			ActorRef executive = system.actorOf(Props.create(Executive.class));
 
-			// start the web server
-			HttpServer server = HttpServer.create(new InetSocketAddress(8000), 5);
-			server.createContext("/", new StartPrimeSearchHandler(executive, system));
-			server.setExecutor(null); // creates a default executor
+//			// start the web server
+//			HttpServer server = HttpServer.create(new InetSocketAddress(8000), 5);
+//			server.createContext("/", new StartPrimeSearchHandler(executive, system));
+//			server.setExecutor(null); // creates a default executor
+//			server.start();
+			
+			HttpServer server = HttpServer.createSimpleServer("static");
+			ServerConfiguration svCfg = server.getServerConfiguration();
+			svCfg.addHttpHandler( new AddWorkerHandler(executive, system), "/addworker" );
+			svCfg.addHttpHandler( new GetJobResultHandler(executive), "/getstatus" );
+			svCfg.addHttpHandler( new FindHandler(executive), "/find" );
+			server.getServerConfiguration().addHttpHandler( new HttpHandler(){
+
+				@Override
+				public void service(Request request, Response response) throws Exception {
+					System.out.println( request.getRequestURI() );
+					response.getWriter().write("hello world");
+				}
+				
+			}, "/hiworld");
 			server.start();
 			
 			// start the websocket server
