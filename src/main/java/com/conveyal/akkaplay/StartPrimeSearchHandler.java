@@ -51,117 +51,133 @@ class StartPrimeSearchHandler implements HttpHandler {
 		}
 		String method = strJobParams[1];
 		if (method.equals("find")) {
-			if (strJobParams.length != 2) {
-				respond(t, 400, "query format: /find?graphid=blah");
-			}
-
-			Map<String, String> params = parseQS(uri.getQuery()); // TODO more
-																	// secure
-																	// query
-																	// string
-																	// parsing
-			String bucket = params.get("graphid");
-			String fromPtsLoc = params.get("from");
-			String toPtsLoc = params.get("to");
-			String dateStr = params.get("date");
-			String timeStr = params.get("time");
-			String timezoneStr = params.get("tz");
-
-			if (bucket == null) {
-				respond(t, 400, "'bucket' is not optional");
-			}
-			if (fromPtsLoc == null) {
-				respond(t, 400, "'from' is not optional");
-			}
-			if (toPtsLoc == null) {
-				respond(t, 400, "'to' is not optional");
-			}
-			if (dateStr == null) {
-				respond(t, 400, "'date' is not optional");
-			}
-			if (timeStr == null) {
-				respond(t, 400, "'time' is not optional");
-			}
-			if (timezoneStr == null) {
-				respond(t, 400, "'tz' is not optional");
-			}
-
-			try {
-				Timeout timeout = new Timeout(Duration.create(5, "seconds"));
-				Future<Object> future = Patterns.ask(executive, new JobSpec(bucket, fromPtsLoc, toPtsLoc, dateStr,
-						timeStr, timezoneStr), timeout);
-				JobId result = (JobId) Await.result(future, timeout.duration());
-				respond(t, 200, "jobId:" + result.jobId);
-			} catch (TimeoutException e) {
-				respond(t, 500, "request timed out");
-			} catch (Exception e) {
-				e.printStackTrace();
-				respond(t, 500, "something went wrong");
-			}
+			find(t, uri, strJobParams);
 		} else if (method.equals("jobresult")) {
-			if (strJobParams.length < 3) {
-				respond(t, 400, "query format: /jobresult/jobid/[workitem]");
-			}
-
-			int jobId = Integer.parseInt(strJobParams[2]);
-
-			try {
-				Timeout timeout = new Timeout(Duration.create(5, "seconds"));
-				Future<Object> future = Patterns.ask(executive, new JobResultQuery(jobId), timeout);
-				JobResult result = (JobResult) Await.result(future, timeout.duration());
-
-				if(strJobParams.length>3){
-					int workItemIndex = Integer.parseInt(strJobParams[3]);
-					WorkResult wr = result.res.get(workItemIndex);
-					
-					StringBuilder sb = new StringBuilder();
-					sb.append( "WorkResult\n" );
-					sb.append( wr.point+"\n" );
-					for(Histogram hist : wr.histograms){
-						sb.append( hist.name+" " );
-						sb.append("[");
-						for(int i=0; i<hist.bins.length; i++){
-							sb.append( hist.bins[i]+"," );
-						}
-						sb.append("]\n");
-					}
-					respond(t, 200, sb.toString());
-				} else {
-					respond(t, 200, "result.size:"+result.res.size());
-				}
-			} catch (Exception e) {
-				e.printStackTrace();
-				respond(t, 500, "something went wrong");
-			}
+			getJobResult(t, strJobParams);
 		} else if (method.equals("jobstatus")) {
-			if (strJobParams.length != 2) {
-				respond(t, 400, "query format: /jobstatus");
-			}
-
-			try {
-				Timeout timeout = new Timeout(Duration.create(5, "seconds"));
-				Future<Object> future = Patterns.ask(executive, new JobStatusQuery(), timeout);
-				ArrayList<JobStatus> result = (ArrayList<JobStatus>) Await.result(future, timeout.duration());
-
-				StringBuilder bld = new StringBuilder();
-				for (JobStatus js : result) {
-					bld.append(js.manager + ":" + js.curJobId + ":" + js.fractionComplete + "\n");
-				}
-
-				respond(t, 200, bld.toString());
-			} catch (Exception e) {
-				e.printStackTrace();
-				respond(t, 500, "something went wrong");
-			}
+			getJobStatus(t, strJobParams);
 		} else if (method.equals("addworker")) {
-			String path = t.getRequestURI().getPath().substring(11);
-
-			ActorSelection remoteManager = system.actorSelection("akka.tcp://" + path);
-			executive.tell(new AddManager(remoteManager), ActorRef.noSender());
-
-			respond(t, 200, "'" + path + "' added to worker pool");
+			addworker(t);
 		} else {
 			respond(t, 404, "methods: ['find','jobresult']");
+		}
+	}
+
+	private void addworker(HttpExchange t) throws IOException {
+		String path = t.getRequestURI().getPath().substring(11);
+
+		ActorSelection remoteManager = system.actorSelection("akka.tcp://" + path);
+		executive.tell(new AddManager(remoteManager), ActorRef.noSender());
+
+		respond(t, 200, "'" + path + "' added to worker pool");
+	}
+
+	private void find(HttpExchange t, URI uri, String[] strJobParams) throws IOException {
+		if (strJobParams.length != 2) {
+			respond(t, 400, "query format: /find?graphid=blah");
+		}
+
+		Map<String, String> params = parseQS(uri.getQuery()); // TODO more
+																// secure
+																// query
+																// string
+																// parsing
+		String bucket = params.get("graphid");
+		String fromPtsLoc = params.get("from");
+		String toPtsLoc = params.get("to");
+		String dateStr = params.get("date");
+		String timeStr = params.get("time");
+		String timezoneStr = params.get("tz");
+
+		if (bucket == null) {
+			respond(t, 400, "'bucket' is not optional");
+		}
+		if (fromPtsLoc == null) {
+			respond(t, 400, "'from' is not optional");
+		}
+		if (toPtsLoc == null) {
+			respond(t, 400, "'to' is not optional");
+		}
+		if (dateStr == null) {
+			respond(t, 400, "'date' is not optional");
+		}
+		if (timeStr == null) {
+			respond(t, 400, "'time' is not optional");
+		}
+		if (timezoneStr == null) {
+			respond(t, 400, "'tz' is not optional");
+		}
+
+		try {
+			Timeout timeout = new Timeout(Duration.create(5, "seconds"));
+			Future<Object> future = Patterns.ask(executive, new JobSpec(bucket, fromPtsLoc, toPtsLoc, dateStr,
+					timeStr, timezoneStr), timeout);
+			JobId result = (JobId) Await.result(future, timeout.duration());
+			respond(t, 200, "jobId:" + result.jobId);
+		} catch (TimeoutException e) {
+			respond(t, 500, "request timed out");
+		} catch (Exception e) {
+			e.printStackTrace();
+			respond(t, 500, "something went wrong");
+		}
+	}
+
+	private void getJobStatus(HttpExchange t, String[] strJobParams) throws IOException {
+		if (strJobParams.length != 2) {
+			respond(t, 400, "query format: /jobstatus");
+		}
+
+		try {
+			Timeout timeout = new Timeout(Duration.create(5, "seconds"));
+			Future<Object> future = Patterns.ask(executive, new JobStatusQuery(), timeout);
+			ArrayList<JobStatus> result = (ArrayList<JobStatus>) Await.result(future, timeout.duration());
+
+			StringBuilder bld = new StringBuilder();
+			for (JobStatus js : result) {
+				bld.append(js.manager + ":" + js.curJobId + ":" + js.fractionComplete + "\n");
+			}
+
+			respond(t, 200, bld.toString());
+		} catch (Exception e) {
+			e.printStackTrace();
+			respond(t, 500, "something went wrong");
+		}
+	}
+
+	private void getJobResult(HttpExchange t, String[] strJobParams) throws IOException {
+		if (strJobParams.length < 3) {
+			respond(t, 400, "query format: /jobresult/jobid/[workitem]");
+		}
+
+		int jobId = Integer.parseInt(strJobParams[2]);
+
+		try {
+			Timeout timeout = new Timeout(Duration.create(5, "seconds"));
+			Future<Object> future = Patterns.ask(executive, new JobResultQuery(jobId), timeout);
+			JobResult result = (JobResult) Await.result(future, timeout.duration());
+
+			if(strJobParams.length>3){
+				int workItemIndex = Integer.parseInt(strJobParams[3]);
+				WorkResult wr = result.res.get(workItemIndex);
+				
+				StringBuilder sb = new StringBuilder();
+				sb.append( "WorkResult\n" );
+				sb.append( wr.point+"\n" );
+				for(Histogram hist : wr.histograms){
+					sb.append( hist.name+" " );
+					sb.append("[");
+					for(int i=0; i<hist.bins.length; i++){
+						sb.append( hist.bins[i]+"," );
+					}
+					sb.append("]\n");
+				}
+				respond(t, 200, sb.toString());
+			} else {
+				respond(t, 200, "result.size:"+result.res.size());
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+			respond(t, 500, "something went wrong");
 		}
 	}
 
