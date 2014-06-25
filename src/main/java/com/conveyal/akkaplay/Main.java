@@ -8,9 +8,13 @@ import java.net.URL;
 
 import org.glassfish.grizzly.http.server.HttpHandler;
 import org.glassfish.grizzly.http.server.HttpServer;
+import org.glassfish.grizzly.http.server.NetworkListener;
 import org.glassfish.grizzly.http.server.Request;
 import org.glassfish.grizzly.http.server.Response;
 import org.glassfish.grizzly.http.server.ServerConfiguration;
+import org.glassfish.grizzly.websockets.WebSocketAddOn;
+import org.glassfish.grizzly.websockets.WebSocketApplication;
+import org.glassfish.grizzly.websockets.WebSocketEngine;
 
 import com.amazonaws.auth.AWSCredentials;
 import com.amazonaws.auth.BasicAWSCredentials;
@@ -65,7 +69,23 @@ public class Main {
 			svCfg.addHttpHandler( new AddWorkerHandler(executive, system), "/addworker" );
 			svCfg.addHttpHandler( new GetJobResultHandler(executive), "/getstatus" );
 			svCfg.addHttpHandler( new FindHandler(executive), "/find" );
+
+			server.getListener("grizzly").registerAddOn(new WebSocketAddOn());
+			
+			// initialize websocket chat application
+			final WebSocketApplication chatApplication = new ChatApplication();
+			
+			// register the application
+			WebSocketEngine.getEngine().register("/grizzly-websockets-chat", "/chat", chatApplication);
+			
 			server.start();
+			
+//			final WebSocketApplication chatApplication = new FoobarSocketApp();
+//			WebSocketEngine.getEngine().register("", "foobar", chatApplication);
+			
+			
+			
+
 			
 			// start the websocket server
 			StatusServer statusServer = new StatusServer( new InetSocketAddress(8887) );
