@@ -73,10 +73,10 @@ public class Main {
 			server.getListener("grizzly").registerAddOn(new WebSocketAddOn());
 			
 			// initialize websocket chat application
-			final WebSocketApplication chatApplication = new ChatApplication();
+			final WebSocketApplication chatApplication = new JobResultsApplication();
 			
 			// register the application
-			WebSocketEngine.getEngine().register("/grizzly-websockets-chat", "/chat", chatApplication);
+			WebSocketEngine.getEngine().register("/grizzly-websockets-chat", "/chat/*", chatApplication);
 			
 			server.start();
 			

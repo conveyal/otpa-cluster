@@ -44,43 +44,46 @@ import java.util.logging.Logger;
 
 import org.glassfish.grizzly.Grizzly;
 import org.glassfish.grizzly.http.HttpRequestPacket;
-import org.glassfish.grizzly.websockets.DefaultWebSocket;
+import org.glassfish.grizzly.websockets.DataFrame;
 import org.glassfish.grizzly.websockets.ProtocolHandler;
 import org.glassfish.grizzly.websockets.WebSocket;
+import org.glassfish.grizzly.websockets.WebSocketApplication;
 import org.glassfish.grizzly.websockets.WebSocketListener;
 
-/**
- * Customize {@link WebSocket} implementation, which contains chat application
- * specific properties and logic.
- *
- * @author Alexey Stashok
- * @author Justin Lee
- */
-public class ChatWebSocket extends DefaultWebSocket {
-    private static final Logger logger = Grizzly.logger(ChatWebSocket.class);
-    
-    // chat user name
-    private volatile String user;
+public class JobResultsApplication extends WebSocketApplication {
+    private static final Logger logger = Grizzly.logger(JobResultsApplication.class);
 
-    public ChatWebSocket(ProtocolHandler protocolHandler,
-                         HttpRequestPacket request,
-                         WebSocketListener... listeners) {
-        super(protocolHandler, request, listeners);
+    @Override
+    public WebSocket createSocket(ProtocolHandler handler,
+                                  HttpRequestPacket request,
+                                  WebSocketListener... listeners) {
+    	String uri = request.getRequestURI();
+    	String[] uri_parts = uri.split("/");
+    	String jobIdStr = uri_parts[uri_parts.length-1];
+    	int jobId = Integer.parseInt( jobIdStr );
+    	
+        return new JobResultsWebSocket(jobId, handler, request, listeners);
     }
 
-    /**
-     * Get the user name
-     * @return the user name
-     */
-    public String getUser() {
-        return user;
+    @Override
+    public void onMessage(WebSocket websocket, String data) {
+    	
+    	websocket.send( data );
+    	
     }
 
-    /**
-     * Set the user name
-     * @param user the user name
-     */
-    public void setUser(String user) {
-        this.user = user;
+    @Override
+    public void onConnect(WebSocket socket) {
+    	if( socket instanceof JobResultsWebSocket ) {
+    		JobResultsWebSocket rslt = (JobResultsWebSocket)socket;
+    		System.out.println( "socket connected for job: "+rslt.jobId );
+    	}
     }
+
+    @Override
+    public void onClose(WebSocket websocket, DataFrame frame) {
+
+    }
+
 }
+
