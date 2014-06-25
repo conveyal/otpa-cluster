@@ -59,27 +59,12 @@ public class Main {
 			// start the executive actor
 			System.out.println("setting up master");
 			ActorRef executive = system.actorOf(Props.create(Executive.class));
-
-//			// start the web server
-//			HttpServer server = HttpServer.create(new InetSocketAddress(8000), 5);
-//			server.createContext("/", new StartPrimeSearchHandler(executive, system));
-//			server.setExecutor(null); // creates a default executor
-//			server.start();
 			
 			HttpServer server = HttpServer.createSimpleServer("static");
 			ServerConfiguration svCfg = server.getServerConfiguration();
 			svCfg.addHttpHandler( new AddWorkerHandler(executive, system), "/addworker" );
 			svCfg.addHttpHandler( new GetJobResultHandler(executive), "/getstatus" );
 			svCfg.addHttpHandler( new FindHandler(executive), "/find" );
-			server.getServerConfiguration().addHttpHandler( new HttpHandler(){
-
-				@Override
-				public void service(Request request, Response response) throws Exception {
-					System.out.println( request.getRequestURI() );
-					response.getWriter().write("hello world");
-				}
-				
-			}, "/hiworld");
 			server.start();
 			
 			// start the websocket server
@@ -88,9 +73,7 @@ public class Main {
 			
 			executive.tell(new SetStatusServer(statusServer), ActorRef.noSender());
 		} else {
-			// start a manager
-			Props greeterProps = Props.create(Manager.class);
-			ActorRef manager = system.actorOf(greeterProps, "manager");
+			ActorRef manager = system.actorOf(Props.create(Manager.class), "manager");
 			System.out.println("spinning up actor with path: " + manager.path());
 		}
 
