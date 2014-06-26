@@ -1,0 +1,10 @@
+/bin
+.classpath
+.gradle
+.project
+.settings
+cache
+graphsource
+*.DS_Store
+temp
+build
