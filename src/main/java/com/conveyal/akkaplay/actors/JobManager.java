@@ -83,7 +83,7 @@ public class JobManager extends UntypedActor {
 				ActorSelection manager = managers.get(i);
 				
 				workersOut+=1;
-				manager.tell(new JobSliceSpec(fromSplit,toPts,js.bucket,date), getSelf());
+				manager.tell(new JobSliceSpec(fromSplit,toPts,js.graphId,date), getSelf());
 			}
 		} else if(msg instanceof WorkResult){
 			WorkResult res = (WorkResult)msg;
