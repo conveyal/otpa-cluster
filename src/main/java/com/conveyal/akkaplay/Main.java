@@ -82,6 +82,8 @@ public class Main {
 
 			// register the application
 			WebSocketEngine.getEngine().register("/grizzly-websockets-chat", "/chat/*", chatApplication);
+			
+			server.getListener("grizzly").getFileCache().setEnabled(false);
 
 			server.start();
 
