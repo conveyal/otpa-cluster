@@ -1,12 +1,12 @@
 package com.conveyal.akkaplay.message;
 
-import com.conveyal.akkaplay.StatusServer;
+import com.conveyal.akkaplay.JobResultsApplication;
 
 public class SetStatusServer {
-	public StatusServer statusServer;
+	public JobResultsApplication statusServer;
 
-	public SetStatusServer(StatusServer statusServer) {
-		this.statusServer = statusServer;
+	public SetStatusServer(JobResultsApplication app) {
+		this.statusServer = app;
 	}
 
 }

@@ -40,6 +40,10 @@
 
 package com.conveyal.akkaplay;
 
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 import java.util.logging.Logger;
 
 import org.glassfish.grizzly.Grizzly;
@@ -50,8 +54,16 @@ import org.glassfish.grizzly.websockets.WebSocket;
 import org.glassfish.grizzly.websockets.WebSocketApplication;
 import org.glassfish.grizzly.websockets.WebSocketListener;
 
+import com.conveyal.akkaplay.message.WorkResult;
+
 public class JobResultsApplication extends WebSocketApplication {
     private static final Logger logger = Grizzly.logger(JobResultsApplication.class);
+    
+    Map<Integer,Set<JobResultsWebSocket>> clients;
+    
+    JobResultsApplication(){
+    	clients = new HashMap<Integer,Set<JobResultsWebSocket>>();
+    }
 
     @Override
     public WebSocket createSocket(ProtocolHandler handler,
@@ -63,6 +75,15 @@ public class JobResultsApplication extends WebSocketApplication {
     	int jobId = Integer.parseInt( jobIdStr );
     	
         return new JobResultsWebSocket(jobId, handler, request, listeners);
+    }
+    
+    public void onWorkResult(WorkResult wr){
+    	Set<JobResultsWebSocket> jobClients = clients.get(wr.jobId);
+    	if(jobClients!=null){
+    		for( JobResultsWebSocket sock : jobClients ){
+    			sock.send( wr.toString() );
+    		}
+    	}
     }
 
     @Override
@@ -77,12 +98,27 @@ public class JobResultsApplication extends WebSocketApplication {
     	if( socket instanceof JobResultsWebSocket ) {
     		JobResultsWebSocket rslt = (JobResultsWebSocket)socket;
     		System.out.println( "socket connected for job: "+rslt.jobId );
+    		
+    		if( !clients.containsKey(rslt.jobId) ){
+    			clients.put(rslt.jobId, new HashSet<JobResultsWebSocket>());
+    		}
+    		
+    		clients.get(rslt.jobId).add(rslt);
     	}
     }
 
     @Override
     public void onClose(WebSocket websocket, DataFrame frame) {
-
+    	if(!(websocket instanceof JobResultsWebSocket)){
+    		return;
+    	}
+    	
+    	JobResultsWebSocket rslt = (JobResultsWebSocket)websocket;
+    	Set<JobResultsWebSocket> jobClients = clients.get(rslt.jobId);
+    	jobClients.remove(rslt);
+    	if( jobClients.size()==0 ){
+    		clients.remove(rslt.jobId);
+    	}
     }
 
 }

@@ -73,7 +73,9 @@ public class Main {
 			server.getListener("grizzly").registerAddOn(new WebSocketAddOn());
 			
 			// initialize websocket chat application
-			final WebSocketApplication chatApplication = new JobResultsApplication();
+			JobResultsApplication chatApplication = new JobResultsApplication();
+			
+			executive.tell( new SetStatusServer(chatApplication), ActorRef.noSender() );
 			
 			// register the application
 			WebSocketEngine.getEngine().register("/grizzly-websockets-chat", "/chat/*", chatApplication);
@@ -87,11 +89,11 @@ public class Main {
 			
 
 			
-			// start the websocket server
-			StatusServer statusServer = new StatusServer( new InetSocketAddress(8887) );
-			statusServer.start();
-			
-			executive.tell(new SetStatusServer(statusServer), ActorRef.noSender());
+//			// start the websocket server
+//			StatusServer statusServer = new StatusServer( new InetSocketAddress(8887) );
+//			statusServer.start();
+//			
+//			executive.tell(new SetStatusServer(statusServer), ActorRef.noSender());
 		} else {
 			ActorRef manager = system.actorOf(Props.create(Manager.class), "manager");
 			System.out.println("spinning up actor with path: " + manager.path());

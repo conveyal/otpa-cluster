@@ -5,6 +5,9 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import org.glassfish.grizzly.websockets.WebSocketApplication;
+
+import com.conveyal.akkaplay.JobResultsApplication;
 import com.conveyal.akkaplay.StatusServer;
 import com.conveyal.akkaplay.message.*;
 
@@ -28,7 +31,7 @@ public class Executive extends UntypedActor {
 	Map<Integer, ArrayList<WorkResult>> jobResults;
 	Map<ActorSelection,Integer> managers;
 	Map<Integer, ActorRef> jobManagers;
-	StatusServer statusServer = null;
+	JobResultsApplication statusServer = null;
 	
 	LoggingAdapter log = Logging.getLogger(getContext().system(), this);
 
