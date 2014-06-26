@@ -7,7 +7,7 @@ public class JobSpec implements Serializable{
 
 	private static final long serialVersionUID = 6683822607915423812L;
 	
-	public String bucket;
+	public String graphId;
 	public int jobId;
 	public String fromPtsLoc;
 	public String toPtsLoc;
@@ -16,8 +16,8 @@ public class JobSpec implements Serializable{
 	public String time;
 	public String tz;
 
-	public JobSpec(String bucket, String fromPtsLoc, String toPtsLoc, String date, String time, String tz) {
-		this.bucket = bucket;
+	public JobSpec(String graphId, String fromPtsLoc, String toPtsLoc, String date, String time, String tz) {
+		this.graphId = graphId;
 		this.fromPtsLoc = fromPtsLoc;
 		this.toPtsLoc = toPtsLoc;
 		this.date = date;

@@ -1,10 +1,10 @@
 package com.conveyal.akkaplay.message;
 
 public class BuildGraph {
-	public String bucket;
+	public String graphId;
 
-	public BuildGraph(String bucket) {
-		this.bucket = bucket;
+	public BuildGraph(String graphId) {
+		this.graphId = graphId;
 	}
 
 }

@@ -8,8 +8,14 @@ import java.io.OutputStream;
 import java.net.URL;
 import java.nio.channels.Channels;
 import java.nio.channels.ReadableByteChannel;
+import java.util.Enumeration;
 import java.util.UUID;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
 
+import org.apache.commons.compress.archivers.zip.ZipUtil;
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.IOUtils;
 import org.opentripplanner.graph_builder.GraphBuilderTask;
 import org.opentripplanner.routing.graph.Graph;
 
@@ -23,6 +29,7 @@ import com.amazonaws.services.s3.model.S3ObjectSummary;
 import com.conveyal.akkaplay.AnalystGraphBuilder;
 import com.conveyal.akkaplay.Util;
 import com.conveyal.akkaplay.message.BuildGraph;
+import com.google.common.io.Files;
 
 import akka.actor.UntypedActor;
 import akka.event.Logging;
@@ -32,6 +39,9 @@ public class GraphBuilder extends UntypedActor {
 
 	AmazonS3 s3;
 	static String sourceDir="graphsource";
+	
+	// TODO fix hard coded bucket name (config on boot? add to message?) 
+	static String graphBucket="otpac-graphs";
 	LoggingAdapter log = Logging.getLogger(getContext().system(), this);
 
 	GraphBuilder() {
@@ -46,26 +56,26 @@ public class GraphBuilder extends UntypedActor {
 		if (msg instanceof BuildGraph) {
 			BuildGraph bg = (BuildGraph) msg;
 
-			if( !bucketCached(bg.bucket) ) {
+			if( !bucketCached(bg.graphId) ) {
 				log.debug( "downloading graph sources" );
-				downloadGraphSourceFiles(bg.bucket,sourceDir);
+				downloadGraphSourceFiles(bg.graphId,sourceDir);
 			} else {
 				log.debug( "graph sources already cached" );
 			}
 			
-			Graph gg = buildGraphToMemory(bg.bucket);
+			Graph gg = buildGraphToMemory(bg.graphId);
 			
 			getSender().tell(gg, getSelf());
 		}
 	}
 
-	private boolean bucketCached(String bucket) {
-		File bucketDir = new File(sourceDir+"/"+bucket);
-		return bucketDir.exists();
+	private boolean bucketCached(String graphId) {
+		File graphData = new File(sourceDir+"/"+graphId);
+		return graphData.exists() && graphData.isDirectory();
 	}
 
-	private Graph buildGraphToMemory(String bucket) {
-		GraphBuilderTask gbt = AnalystGraphBuilder.createBuilder(new File(sourceDir+"/"+bucket) );
+	private Graph buildGraphToMemory(String graphId) {
+		GraphBuilderTask gbt = AnalystGraphBuilder.createBuilder(new File(sourceDir+"/" + graphId) );
 		gbt.setSerializeGraph(false);
 		gbt.setPath(new File("bogus")); //will never be used, because serialize set to false
 		gbt.run();
@@ -73,19 +83,57 @@ public class GraphBuilder extends UntypedActor {
 		return gg;
 	}
 
-	private void downloadGraphSourceFiles(String bucket, String dirName) throws IOException {
-		ObjectListing ol = s3.listObjects(bucket);
-		for (S3ObjectSummary os : ol.getObjectSummaries()) {
-			log.debug("getting {}",os.getKey());
-			S3Object obj = s3.getObject(bucket, os.getKey());
-			InputStream objectData = obj.getObjectContent();
-
-			String key = os.getKey();
-			if (key.charAt(key.length() - 1) != '/') {
-				String filename = dirName + "/" + bucket + "/" + key;
-				Util.saveFile(filename, objectData, os.getSize(), true);
-			}
+	private void downloadGraphSourceFiles(String graphId, String dirName) throws IOException {
+		
+		File graphCacheDir  = new File(dirName);
+		if(!graphCacheDir.exists())
+			graphCacheDir.mkdirs();
+	
+		File graphZipFile = new File(graphCacheDir, graphId + ".zip");
+	
+		File extractedGraphDir = new File (graphCacheDir, dirName);
+		
+		if(extractedGraphDir.exists()) {
+			FileUtils.deleteDirectory(extractedGraphDir);
 		}
+		
+		extractedGraphDir.mkdirs();
+		
+		S3Object graphZip = s3.getObject(graphBucket, graphId);
+		
+		InputStream zipFileIn = graphZip.getObjectContent();
+		
+		OutputStream zipFileOut = new FileOutputStream(graphZipFile);
+		
+		IOUtils.copy(zipFileIn, zipFileOut);
+		IOUtils.closeQuietly(zipFileIn);
+		IOUtils.closeQuietly(zipFileOut);
+		
+		ZipFile zipFile = new ZipFile(graphZipFile);
+	    
+		Enumeration<? extends ZipEntry> entries = zipFile.entries();
+    	
+        while (entries.hasMoreElements()) {
+        	
+            ZipEntry entry = entries.nextElement();
+            File entryDestination = new File(extractedGraphDir,  entry.getName());
+            
+            entryDestination.getParentFile().mkdirs();
+            
+            if (entry.isDirectory())
+                entryDestination.mkdirs();
+            else {
+                InputStream entryFileIn = zipFile.getInputStream(entry);
+                OutputStream entryFileOut = new FileOutputStream(entryDestination);
+                IOUtils.copy(entryFileIn, entryFileOut);
+                IOUtils.closeQuietly(entryFileIn);
+                IOUtils.closeQuietly(entryFileOut);
+            }
+        }
+        
+        zipFile.close();
+        
+        graphZipFile.delete();
 	}
 
 
