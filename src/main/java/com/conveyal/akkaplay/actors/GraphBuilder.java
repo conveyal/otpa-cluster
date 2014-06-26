@@ -92,7 +92,7 @@ public class GraphBuilder extends UntypedActor {
 
 		File graphZipFile = new File(graphCacheDir, graphId + ".zip");
 
-		File extractedGraphDir = new File(graphCacheDir, dirName);
+		File extractedGraphDir = new File(graphCacheDir, graphId);
 
 		if (extractedGraphDir.exists()) {
 			FileUtils.deleteDirectory(extractedGraphDir);
@@ -100,7 +100,7 @@ public class GraphBuilder extends UntypedActor {
 
 		extractedGraphDir.mkdirs();
 
-		S3Object graphZip = s3.getObject(graphBucket, graphId);
+		S3Object graphZip = s3.getObject(graphBucket, graphId+".zip");
 
 		InputStream zipFileIn = graphZip.getObjectContent();
 
