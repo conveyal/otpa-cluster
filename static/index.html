@@ -18,6 +18,25 @@
         attribution: 'Map data &copy; <a href="http://openstreetmap.org">OpenStreetMap</a> contributors, <a href="http://creativecommons.org/licenses/by-sa/2.0/">CC-BY-SA</a>, Imagery © <a href="http://mapbox.com">Mapbox</a>',
         maxZoom: 18
       }).addTo(map);
+
+      $( "#startjob" ).submit(function( event ) {
+        console.log( event );
+
+        var graphid = $("#graphid").val();
+        var origins = $("#origins").val();
+        var dests = $("#dests").val();
+        var date = $("#date").val();
+        var time = $("#time").val();
+        var timezone = $("#timezone").val();
+        var url = "/find?graphid="+graphid+"&from="+origins+"&to="+dests+"&date="+date+"&time="+time+"&tz="+timezone;
+
+        console.log( "getting: "+url );
+        $.get( url, function( data ){
+          console.log( data );
+        });
+
+        event.preventDefault();
+      });
  
     });
   </script>
@@ -25,7 +44,15 @@
   <body>
     <div id="map"></div>
     <div id="controlpanel">
-      control panel stuff goes here
+      <form id="startjob"
+        <span>graph id:</span><input id="graphid" type="text" value="otpac"><br>
+        <span>origins:</span><input id="origins" type="text" value="austin.csv"><br>
+        <span>destinations:</span><input id="dests" type="text" value="austin.csv"><br>
+        <span>date:</span><input id="date" type="text" value="2014-06-09"><br>
+        <span>time:</span><input id="time" type="text" value="8:05 AM"><br>
+        <span>timezone:</span><input id="timezone" type="text" value="America/Chicago"><br>
+        <input type="submit">
+      </form>
     </div>
   </body>
 </html>
