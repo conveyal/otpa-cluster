@@ -5,10 +5,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
 
-import org.glassfish.grizzly.websockets.WebSocketApplication;
-
 import com.conveyal.akkaplay.JobResultsApplication;
-import com.conveyal.akkaplay.StatusServer;
 import com.conveyal.akkaplay.message.*;
 
 import scala.concurrent.Await;

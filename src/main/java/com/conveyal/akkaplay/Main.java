@@ -42,14 +42,16 @@ import akka.japi.Creator;
 public class Main {
 
 	public static void main(String[] args) throws IOException {
-		
-//		AWSCredentials creds = new ProfileCredentialsProvider().getCredentials(); //grab credentials from "~.aws/credentials"
-//		AmazonS3 s3 = new AmazonS3Client(creds);
-//		ObjectListing ol = s3.listObjects("otpac");
-//		for( S3ObjectSummary os : ol.getObjectSummaries() ){
-//			System.out.println( os.getKey() );
-//		}
-				
+
+		// AWSCredentials creds = new
+		// ProfileCredentialsProvider().getCredentials(); //grab credentials
+		// from "~.aws/credentials"
+		// AmazonS3 s3 = new AmazonS3Client(creds);
+		// ObjectListing ol = s3.listObjects("otpac");
+		// for( S3ObjectSummary os : ol.getObjectSummaries() ){
+		// System.out.println( os.getKey() );
+		// }
+
 		Config config = ConfigFactory.load();
 		String hostname = config.getString("akka.remote.netty.tcp.hostname");
 		int port = config.getInt("akka.remote.netty.tcp.port");
@@ -63,37 +65,26 @@ public class Main {
 			// start the executive actor
 			System.out.println("setting up master");
 			ActorRef executive = system.actorOf(Props.create(Executive.class));
-			
+
 			HttpServer server = HttpServer.createSimpleServer("static");
 			ServerConfiguration svCfg = server.getServerConfiguration();
-			svCfg.addHttpHandler( new AddWorkerHandler(executive, system), "/addworker" );
-			svCfg.addHttpHandler( new GetJobResultHandler(executive), "/getstatus" );
-			svCfg.addHttpHandler( new FindHandler(executive), "/find" );
+			svCfg.addHttpHandler(new AddWorkerHandler(executive, system), "/addworker");
+			svCfg.addHttpHandler(new GetJobResultHandler(executive), "/getstatus");
+			svCfg.addHttpHandler(new FindHandler(executive), "/find");
 
 			server.getListener("grizzly").registerAddOn(new WebSocketAddOn());
-			
+
 			// initialize websocket chat application
 			JobResultsApplication chatApplication = new JobResultsApplication();
-			
-			executive.tell( new SetStatusServer(chatApplication), ActorRef.noSender() );
-			
+
+			// link executive up with socket server
+			executive.tell(new SetStatusServer(chatApplication), ActorRef.noSender());
+
 			// register the application
 			WebSocketEngine.getEngine().register("/grizzly-websockets-chat", "/chat/*", chatApplication);
-			
-			server.start();
-			
-//			final WebSocketApplication chatApplication = new FoobarSocketApp();
-//			WebSocketEngine.getEngine().register("", "foobar", chatApplication);
-			
-			
-			
 
-			
-//			// start the websocket server
-//			StatusServer statusServer = new StatusServer( new InetSocketAddress(8887) );
-//			statusServer.start();
-//			
-//			executive.tell(new SetStatusServer(statusServer), ActorRef.noSender());
+			server.start();
+
 		} else {
 			ActorRef manager = system.actorOf(Props.create(Manager.class), "manager");
 			System.out.println("spinning up actor with path: " + manager.path());
