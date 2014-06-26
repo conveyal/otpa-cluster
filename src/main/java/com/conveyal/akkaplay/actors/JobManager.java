@@ -83,7 +83,7 @@ public class JobManager extends UntypedActor {
 				ActorSelection manager = managers.get(i);
 				
 				workersOut+=1;
-				manager.tell(new JobSliceSpec(fromSplit,toPts,js.graphId,date), getSelf());
+				manager.tell(new JobSliceSpec(fromSplit, jtoPtsLoc,js.graphId,date), getSelf());
 			}
 		} else if(msg instanceof WorkResult){
 			WorkResult res = (WorkResult)msg;
@@ -129,10 +129,6 @@ public class JobManager extends UntypedActor {
 
 	}
 
-	private boolean isCsv(String ptsLoc) {
-		String[] parts = ptsLoc.split("\\.");
-		String formatPart = parts[parts.length-1];
-		return formatPart.equals("csv");
-	}
+
 
 }

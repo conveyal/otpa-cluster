@@ -3,7 +3,7 @@ package com.conveyal.akkaplay.message;
 import java.util.Date;
 
 import com.conveyal.akkaplay.Point;
-import com.conveyal.akkaplay.Pointset;
+import org.opentripplanner.analyst.PointSet;
 
 public class OneToManyRequest {
 

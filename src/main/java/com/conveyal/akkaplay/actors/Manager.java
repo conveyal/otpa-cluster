@@ -92,6 +92,10 @@ public class Manager extends UntypedActor {
 			
 			log.debug( "got job slice: {}", jobSpec );
 			
+			Pointset toPts = getPointset( jobSpec.toPtsLoc );
+			log.debug( "got destination pointset: {}",toPts.size() );
+			
+			
 			// if the current graph isn't the graph specified by the job, kick the graph builder into action
 			if(graph==null || !curGraphId.equals(jobSpec.bucket)){
 				curGraphId = jobSpec.bucket;
