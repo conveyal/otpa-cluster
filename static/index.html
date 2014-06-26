@@ -31,8 +31,29 @@
         var url = "/find?graphid="+graphid+"&from="+origins+"&to="+dests+"&date="+date+"&time="+time+"&tz="+timezone;
 
         console.log( "getting: "+url );
-        $.get( url, function( data ){
-          console.log( data );
+        $.getJSON( url, function( data ){
+          var jobId = data["jobId"];
+
+          $("#readout").html("jobId:"+jobId);
+          if(jobId==-1){
+            return;
+          }
+
+          console.log( "opening up socket for jobId:"+jobId);
+
+          ws = new WebSocket("ws://localhost:8080/grizzly-websockets-chat/chat/"+jobId);
+          ws.onopen = function() {
+            console.log( "socket open" );
+          }
+          ws.onmessage = function(e) {
+            console.log( e );
+            ws.close();
+              //$("#readout").html( e.data );
+          }
+          ws.onclose = function() {
+              console.log( "socket close" );
+              ws = null;
+          }
         });
 
         event.preventDefault();
@@ -53,6 +74,7 @@
         <span>timezone:</span><input id="timezone" type="text" value="America/Chicago"><br>
         <input type="submit">
       </form>
+      <div id="readout"></div>
     </div>
   </body>
 </html>

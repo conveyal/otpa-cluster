@@ -81,7 +81,7 @@ public class JobResultsApplication extends WebSocketApplication {
     	Set<JobResultsWebSocket> jobClients = clients.get(wr.jobId);
     	if(jobClients!=null){
     		for( JobResultsWebSocket sock : jobClients ){
-    			sock.send( wr.toString() );
+    			sock.send( wr.toJsonString() );
     		}
     	}
     }

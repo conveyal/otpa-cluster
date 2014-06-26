@@ -2,10 +2,13 @@ package com.conveyal.akkaplay;
 
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+
+import org.json.JSONObject;
 
 public class Point implements Serializable {
 
@@ -54,6 +57,13 @@ public class Point implements Serializable {
 		for(Entry<String,Float> entry : this.props.entrySet()){
 			ret += entry.getKey()+":"+entry.getValue()+" ";
 		}
+		return ret;
+	}
+
+	public JSONObject toJSONObject() {
+		JSONObject ret = new JSONObject();
+		float[] coord = {this.lat,this.lon};
+		ret.put("coord", coord);
 		return ret;
 	}
 

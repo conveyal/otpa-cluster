@@ -4,6 +4,8 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.json.JSONObject;
+
 import com.conveyal.akkaplay.Histogram;
 import com.conveyal.akkaplay.Point;
 
@@ -26,6 +28,14 @@ public class WorkResult implements Serializable{
 
 	public void addHistogram(String key, List<Float> value) {
 		this.histograms.add( new Histogram(key,value) );
+	}
+
+	public String toJsonString() {
+		JSONObject ret = new JSONObject();
+		ret.put("jobId", jobId);
+		ret.put("success", success);
+		ret.put("point", point.toJSONObject());
+		return ret.toString();
 	}
 
 }

@@ -72,8 +72,7 @@ public class FindHandler extends HttpHandler{
 					timeStr, timezoneStr), timeout);
 			JobId result = (JobId) Await.result(future, timeout.duration());
 			
-			response.setStatus( 200, "jobId:" + result.jobId);
-			response.getWriter().write( "jobId:" + result.jobId );
+			response.getWriter().write( "{\"jobId\":" + result.jobId+"}" );
 		} catch (TimeoutException e) {
 			response.setStatus( 500);
 			response.getWriter().write("request timed out");
