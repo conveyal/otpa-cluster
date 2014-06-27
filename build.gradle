@@ -45,5 +45,5 @@ dependencies {
   compile group: 'org.json', name: 'json', version:'20140107'
   compile group: 'commons-io', name: 'commons-io', version: '2.4'
 
-  compile files('libs/otpwithouthttp.jar')
+  compile files('libs/otp.jar')
 }
