@@ -4,6 +4,9 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
+import org.opentripplanner.analyst.PointFeature;
+import org.opentripplanner.analyst.PointSet;
+import org.opentripplanner.analyst.PointSet.AttributeData;
 import org.opentripplanner.common.model.GenericLocation;
 import org.opentripplanner.routing.algorithm.EarliestArrivalSPTService;
 import org.opentripplanner.routing.core.RoutingRequest;
@@ -15,7 +18,6 @@ import org.opentripplanner.routing.spt.ShortestPathTree;
 
 import com.conveyal.akkaplay.Indicator;
 import com.conveyal.akkaplay.Point;
-import com.conveyal.akkaplay.Pointset;
 import com.conveyal.akkaplay.WorkResultCompiler;
 import com.conveyal.akkaplay.message.*;
 
@@ -26,7 +28,7 @@ import akka.event.LoggingAdapter;
 public class SPTWorker extends UntypedActor {
 
 	private Graph graph;
-	private Pointset to;
+	private PointSet to;
 	private List<Vertex> toVertices;
 	
 	LoggingAdapter log = Logging.getLogger(getContext().system(), this);
@@ -46,7 +48,8 @@ public class SPTWorker extends UntypedActor {
 			
 			toVertices = new ArrayList<Vertex>();
 			RoutingRequest options = new RoutingRequest();
-			for(Point pt : to.getPoints() ){
+			for(int i=0; i<to.featureCount(); i++){
+				PointFeature pt = to.getFeature(i);
 				GenericLocation loc = new GenericLocation(pt.getLat(), pt.getLon());
 				Vertex vtx = graph.streetIndex.getVertexForLocation( loc, options );
 				toVertices.add( vtx );
@@ -79,8 +82,9 @@ public class SPTWorker extends UntypedActor {
 			log.debug("got spt, vertexcount={} in {} ms", spt.getVertexCount(), d1-d0 );
 			
 			WorkResultCompiler comp = new WorkResultCompiler();
-			for(int i=0; i<this.to.size(); i++){
-				Point loc = this.to.get(i);
+			//TODO make the pointset api do this
+			for(int i=0; i<this.to.featureCount(); i++){
+				PointFeature loc = this.to.getFeature(i);
 				Vertex vtx = this.toVertices.get(i);
 				
 				if(vtx==null){
@@ -94,7 +98,7 @@ public class SPTWorker extends UntypedActor {
 				
 				int dur = path.getDuration();
 				
-				for( Indicator ind : loc.getIndicators() ){
+				for( AttributeData ind : loc.getAttributes() ){
 					comp.put( ind, dur );
 				}
 				

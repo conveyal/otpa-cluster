@@ -3,6 +3,7 @@ package com.conveyal.akkaplay.actors;
 import java.util.ArrayList;
 import java.util.HashMap;
 
+import org.opentripplanner.analyst.PointFeature;
 import org.opentripplanner.routing.graph.Graph;
 
 import scala.concurrent.Await;
@@ -14,7 +15,6 @@ import com.amazonaws.auth.profile.ProfileCredentialsProvider;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3Client;
 import com.conveyal.akkaplay.Point;
-import com.conveyal.akkaplay.Pointset;
 import com.conveyal.akkaplay.message.AssignExecutive;
 import com.conveyal.akkaplay.message.BuildGraph;
 import com.conveyal.akkaplay.message.JobSliceDone;
@@ -121,7 +121,8 @@ public class Manager extends UntypedActor {
 			
 			this.jobSize = 0;
 			this.jobsReturned=0;
-			for( Point from : this.jobSpec.from.getPoints() ) {
+			for(int i=0; i<this.jobSpec.from.featureCount(); i++){
+				PointFeature from = this.jobSpec.from.getFeature(i);
 				router.route(new OneToManyRequest(from, this.jobSpec.date), getSelf());
 				this.jobSize += 1;
 			}

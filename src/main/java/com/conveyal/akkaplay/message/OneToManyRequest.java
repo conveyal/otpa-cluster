@@ -2,15 +2,16 @@ package com.conveyal.akkaplay.message;
 
 import java.util.Date;
 
+import org.opentripplanner.analyst.PointFeature;
+
 import com.conveyal.akkaplay.Point;
-import com.conveyal.akkaplay.Pointset;
 
 public class OneToManyRequest {
 
-	public Point from;
+	public PointFeature from;
 	public Date date;
 
-	public OneToManyRequest(Point from, Date date) {
+	public OneToManyRequest(PointFeature from, Date date) {
 		this.from = from;
 		this.date = date;
 	}

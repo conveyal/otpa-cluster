@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.TimeZone;
 
+import org.opentripplanner.analyst.PointSet;
 import org.opentripplanner.util.DateUtils;
 
 import com.amazonaws.auth.AWSCredentials;
@@ -18,8 +19,6 @@ import com.amazonaws.services.s3.model.ObjectListing;
 import com.amazonaws.services.s3.model.ObjectMetadata;
 import com.amazonaws.services.s3.model.S3Object;
 import com.amazonaws.services.s3.model.S3ObjectSummary;
-import com.conveyal.akkaplay.CsvPointset;
-import com.conveyal.akkaplay.Pointset;
 import com.conveyal.akkaplay.Util;
 import com.conveyal.akkaplay.message.AddManager;
 import com.conveyal.akkaplay.message.JobDone;
@@ -67,19 +66,23 @@ public class JobManager extends UntypedActor {
 			this.executive = getSender();
 			
 			log.debug( "get origin pointset: {}",js.fromPtsLoc );
-			Pointset fromPts = getPointset( js.fromPtsLoc );
-			log.debug( "got origin pointset: {}",fromPts.size() );
+			PointSet fromPts = getPointset( js.fromPtsLoc );
+			log.debug( "got origin pointset: {}",fromPts.featureCount() );
 			
 			log.debug( "get destination pointset: {}",js.toPtsLoc );
-			Pointset toPts = getPointset( js.toPtsLoc );
-			log.debug( "got destination pointset: {}",toPts.size() );
+			PointSet toPts = getPointset( js.toPtsLoc );
+			log.debug( "got destination pointset: {}",toPts.featureCount() );
 			
 			TimeZone tz = TimeZone.getTimeZone(js.tz);
 			Date date = DateUtils.toDate(js.date, js.time, tz);
 
 			// split the job evenly between managers
-			for(int i=0;i<managers.size(); i++){
-				Pointset fromSplit = fromPts.split(managers.size(), i);
+			float seglen = fromPts.featureCount() / ((float) managers.size());
+			for(int i=0;i<managers.size(); i++){				
+				int start = Math.round(seglen * i);
+				int end = Math.round(seglen * (i + 1));
+				
+				PointSet fromSplit = fromPts.slice(start, end);
 				ActorSelection manager = managers.get(i);
 				
 				workersOut+=1;
@@ -102,7 +105,7 @@ public class JobManager extends UntypedActor {
 		}
 	}
 
-	private Pointset getPointset(String ptsLoc) throws Exception {
+	private PointSet getPointset(String ptsLoc) throws Exception {
 
 		// get pointset metadata from S3
 		S3Object obj = s3.getObject("pointsets",ptsLoc);
@@ -119,9 +122,9 @@ public class JobManager extends UntypedActor {
 		// grab it from the cache
 		InputStream objectData = new FileInputStream( cachedFile );
 		
-		Pointset ret=null;
+		PointSet ret=null;
 		if( isCsv(ptsLoc) ){
-			ret = CsvPointset.fromStream( objectData );
+			ret = PointSet.fromCsv( "cache/"+objEtag+"-"+ptsLoc );
 		}
 		
 		objectData.close();

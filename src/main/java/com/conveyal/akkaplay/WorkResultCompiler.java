@@ -6,6 +6,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import org.opentripplanner.analyst.PointSet.AttributeData;
+
 import com.conveyal.akkaplay.message.WorkResult;
 
 public class WorkResultCompiler {
@@ -21,11 +23,11 @@ public class WorkResultCompiler {
 
 	Map<String, List<Float>> histograms = new HashMap<String, List<Float>>();
 
-	public void put(Indicator ind, int dur) {
-		if (!histograms.containsKey(ind.name)) {
-			histograms.put(ind.name, new ArrayList<Float>());
+	public void put(AttributeData ind, int dur) {
+		if (!histograms.containsKey(ind.category+":"+ind.attribute)) {
+			histograms.put(ind.category+":"+ind.attribute, new ArrayList<Float>());
 		}
-		List<Float> histogram = histograms.get(ind.name);
+		List<Float> histogram = histograms.get(ind.category+":"+ind.attribute);
 		
 		//expand the histogram if necessary
 		if(histogram.size()<(dur+1)){
@@ -36,7 +38,7 @@ public class WorkResultCompiler {
 			}
 		}
 		
-		histogram.set(dur, histogram.get(dur)+ind.val);
+		histogram.set(dur, histogram.get(dur)+ind.value);
 	}
 
 	public WorkResult getWorkResult() {

@@ -100,6 +100,7 @@ public class GraphBuilder extends UntypedActor {
 
 		extractedGraphDir.mkdirs();
 
+		log.info( "downloading s3 object bucket:{} key:{}", graphBucket, graphId+".zip");
 		S3Object graphZip = s3.getObject(graphBucket, graphId+".zip");
 
 		InputStream zipFileIn = graphZip.getObjectContent();

@@ -5,16 +5,16 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.json.JSONObject;
+import org.opentripplanner.analyst.PointFeature;
 
 import com.conveyal.akkaplay.Histogram;
-import com.conveyal.akkaplay.Point;
 
 public class WorkResult implements Serializable{
 
 	private static final long serialVersionUID = 1701318134569347393L;
 	public boolean success;
 	public List<Histogram> histograms;
-	public Point point=null;
+	public PointFeature point=null;
 	public int jobId;
 
 	public WorkResult(boolean success) {
@@ -34,7 +34,7 @@ public class WorkResult implements Serializable{
 		JSONObject ret = new JSONObject();
 		ret.put("jobId", jobId);
 		ret.put("success", success);
-		ret.put("point", point.toJSONObject());
+		ret.put("point", "stub");
 		return ret.toString();
 	}
 
