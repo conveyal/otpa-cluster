@@ -4,6 +4,7 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.geotools.filter.expression.ThisPropertyAccessorFactory;
 import org.json.JSONObject;
 import org.opentripplanner.analyst.PointFeature;
 
@@ -34,7 +35,8 @@ public class WorkResult implements Serializable{
 		JSONObject ret = new JSONObject();
 		ret.put("jobId", jobId);
 		ret.put("success", success);
-		ret.put("point", "stub");
+		ret.put("lat", this.point.getLat());
+		ret.put("lon", this.point.getLon());
 		return ret.toString();
 	}
 

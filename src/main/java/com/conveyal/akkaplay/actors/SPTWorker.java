@@ -17,7 +17,6 @@ import org.opentripplanner.routing.spt.GraphPath;
 import org.opentripplanner.routing.spt.ShortestPathTree;
 
 import com.conveyal.akkaplay.Indicator;
-import com.conveyal.akkaplay.Point;
 import com.conveyal.akkaplay.WorkResultCompiler;
 import com.conveyal.akkaplay.message.*;
 

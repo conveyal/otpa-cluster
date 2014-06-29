@@ -4,8 +4,6 @@ import java.util.Date;
 
 import org.opentripplanner.analyst.PointFeature;
 
-import com.conveyal.akkaplay.Point;
-
 public class OneToManyRequest {
 
 	public PointFeature from;

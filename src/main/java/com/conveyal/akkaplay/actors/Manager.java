@@ -14,7 +14,6 @@ import com.amazonaws.auth.AWSCredentials;
 import com.amazonaws.auth.profile.ProfileCredentialsProvider;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3Client;
-import com.conveyal.akkaplay.Point;
 import com.conveyal.akkaplay.message.AssignExecutive;
 import com.conveyal.akkaplay.message.BuildGraph;
 import com.conveyal.akkaplay.message.JobSliceDone;
