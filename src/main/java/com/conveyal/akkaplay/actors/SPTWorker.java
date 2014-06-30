@@ -76,35 +76,7 @@ public class SPTWorker extends UntypedActor {
 		
 		TimeSurface ts = new TimeSurface( spt );
 		
-		log.debug( "the pset lugged around by the sampleset is {}", this.to.pset );
-		for( Category category : this.to.pset.categories.values() ){
-			System.out.println( "category id is: "+category.getId() );
-		}
-		
 		IndicatorLite ind = new IndicatorLite(this.to, ts, false);
-		
-//			WorkResultCompiler comp = new WorkResultCompiler();
-//			//TODO make the pointset api do this
-//			for(int i=0; i<this.to.featureCount(); i++){
-//				PointFeature loc = this.to.getFeature(i);
-//				Vertex vtx = this.toVertices.get(i);
-//				
-//				if(vtx==null){
-//					continue;
-//				}
-//				
-//				GraphPath path = spt.getPath(vtx, true);
-//				if(path==null){
-//					continue;
-//				}
-//				
-//				int dur = path.getDuration();
-//				
-//				for( AttributeData ind : loc.getAttributes() ){
-//					comp.put( ind, dur );
-//				}
-//				
-//			}
 		
 		WorkResult res = new WorkResult(true, ind);
 		res.point = req.from;
