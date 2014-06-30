@@ -41,20 +41,24 @@
 
           console.log( "opening up socket for jobId:"+jobId);
 
+          var circleGroup = new L.LayerGroup();
+          map.addLayer( circleGroup );
+
           ws = new WebSocket("ws://localhost:8080/grizzly-websockets-chat/chat/"+jobId);
           ws.onopen = function() {
             console.log( "socket open" );
           }
           ws.onmessage = function(e) {
             var workResult = $.parseJSON( e.data );
-            // var latlng = L.latLng(workResult.point.coord[0],workResult.point.coord[1]);
-            // var marker = L.circleMarker( latlng );
 
-            // map.addLayer( marker );
+            var radius = workResult.categories["NONE"]["mag"][0][5]/1000.0;
+
+            var latlng = L.latLng(workResult.lat,workResult.lon);
+            var marker = L.circleMarker( latlng, {"radius":radius} );
+
+            circleGroup.addLayer( marker );
 
             $("#readout").html( e.data );
-            // console.log( latlng );
-            // ws.close();
           }
           ws.onclose = function() {
               console.log( "socket close" );

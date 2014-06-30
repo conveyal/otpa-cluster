@@ -7,6 +7,7 @@ import java.util.Map.Entry;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.opentripplanner.analyst.Histogram;
 import org.opentripplanner.analyst.Indicator;
 import org.opentripplanner.analyst.IndicatorLite;
 import org.opentripplanner.analyst.PointFeature;
@@ -70,8 +71,8 @@ public class WorkResult implements Serializable{
 	private JSONArray getAttributeJson(Attribute attr) {
 		JSONArray ret = new JSONArray();
 		
-		for(Quantiles qq: attr.getQuantiles()){
-			ret.put( qq.breaks );
+		for(Histogram hist: attr.getHistogram()){
+			ret.put( hist.sums );
 		}
 		
 		return ret;
