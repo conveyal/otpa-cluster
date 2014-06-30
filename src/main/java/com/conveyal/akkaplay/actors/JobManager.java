@@ -9,6 +9,7 @@ import java.util.Date;
 import java.util.TimeZone;
 
 import org.opentripplanner.analyst.PointSet;
+import org.opentripplanner.analyst.PointSet.Category;
 import org.opentripplanner.util.DateUtils;
 
 import com.amazonaws.auth.AWSCredentials;
@@ -83,6 +84,7 @@ public class JobManager extends UntypedActor {
 				int end = Math.round(seglen * (i + 1));
 				
 				PointSet fromSplit = fromPts.slice(start, end);
+				
 				ActorSelection manager = managers.get(i);
 				
 				workersOut+=1;

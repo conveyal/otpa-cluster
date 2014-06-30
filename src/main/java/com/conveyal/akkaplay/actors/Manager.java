@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 
 import org.opentripplanner.analyst.PointFeature;
+import org.opentripplanner.analyst.PointSet.Category;
 import org.opentripplanner.analyst.SampleSet;
 import org.opentripplanner.routing.graph.Graph;
 
@@ -85,69 +86,85 @@ public class Manager extends UntypedActor {
 	@Override
 	public void onReceive(Object message) throws Exception {
 		if (message instanceof JobSliceSpec) {
-			JobSliceSpec jobSpec = (JobSliceSpec) message;
-			
-			// bond to the jobmanager that sent this message
-			this.jobManager = getSender();
-			
-			log.debug( "got job slice: {}", jobSpec );
-			
-			// if the current graph isn't the graph specified by the job, kick the graph builder into action
-			if(graph==null || !curGraphId.equals(jobSpec.bucket)){
-				curGraphId = jobSpec.bucket;
-				graphBuilder.tell(new BuildGraph(jobSpec.bucket), getSelf());
-				status = Status.BUILDING_GRAPH;
-			} else {
-				getSelf().tell(new StartWorkers(), getSelf());
-			}
-			
-			this.jobSpec = jobSpec;
+			onJobSliceSpec(message);
 		} else if (message instanceof Graph){
-			log.debug("got graph: {}", (Graph)message );
-			
-			this.graph = (Graph)message;
-			status = Status.READY;
-			getSelf().tell(new StartWorkers(), getSelf());
+			onGetGraph(message);
 		} else if (message instanceof StartWorkers){
-			log.debug( "set the workers doing their thing" );
-			
-			SampleSet sampleSet = new SampleSet(this.jobSpec.to, this.graph.getSampleFactory());
-			
-			//send graph to all workers
-			for( ActorRef worker : workers ){
-				
-				Timeout timeout = new Timeout(Duration.create(10, "seconds"));
-				Future<Object> future = Patterns.ask(worker, new SetOneToManyContext(this.graph,sampleSet), timeout);
-				Boolean result = (Boolean) Await.result(future, timeout.duration());
-			}
-			
-			this.jobSize = 0;
-			this.jobsReturned=0;
-			for(int i=0; i<this.jobSpec.from.featureCount(); i++){
-				PointFeature from = this.jobSpec.from.getFeature(i);
-				router.route(new OneToManyRequest(from, this.jobSpec.date), getSelf());
-				this.jobSize += 1;
-			}
-			
+			onStartWorkers();
 		} else if (message instanceof WorkResult) {
-			WorkResult res = (WorkResult) message;
-
-			jobsReturned += 1;
-			log.debug("got: {}", res);
-			log.debug("{}/{} jobs returned", jobsReturned, jobSize);
-			
-			if(res.success){
-				jobManager.forward(res, getContext());;
-			}
-			
-			if(jobsReturned==jobSize){
-				jobManager.tell(new JobSliceDone(), getSelf());
-			}
+			onWorkResult(message);
 		} else if (message instanceof JobStatusQuery) {
 			getSender().tell(new JobStatus(getSelf(), curJobId, jobsReturned / (float) jobSize), getSelf());
 		} else {
 			unhandled(message);
 		}
+	}
+
+	private void onWorkResult(Object message) {
+		WorkResult res = (WorkResult) message;
+
+		jobsReturned += 1;
+		log.debug("got: {}", res);
+		log.debug("{}/{} jobs returned", jobsReturned, jobSize);
+		
+		if(res.success){
+			jobManager.forward(res, getContext());;
+		}
+		
+		if(jobsReturned==jobSize){
+			jobManager.tell(new JobSliceDone(), getSelf());
+		}
+	}
+
+	private void onStartWorkers() throws Exception {
+		log.debug( "set the workers doing their thing" );
+		
+		SampleSet sampleSet = new SampleSet(this.jobSpec.to, this.graph.getSampleFactory());
+		
+		//send graph to all workers
+		for( ActorRef worker : workers ){
+			
+			Timeout timeout = new Timeout(Duration.create(10, "seconds"));
+			Future<Object> future = Patterns.ask(worker, new SetOneToManyContext(this.graph,sampleSet), timeout);
+			Boolean result = (Boolean) Await.result(future, timeout.duration());
+		}
+		
+		this.jobSize = 0;
+		this.jobsReturned=0;
+		for(int i=0; i<this.jobSpec.from.featureCount(); i++){
+			PointFeature from = this.jobSpec.from.getFeature(i);
+			router.route(new OneToManyRequest(from, this.jobSpec.date), getSelf());
+			this.jobSize += 1;
+		}
+	}
+
+	private void onGetGraph(Object message) {
+		log.debug("got graph: {}", (Graph)message );
+		
+		this.graph = (Graph)message;
+		status = Status.READY;
+		getSelf().tell(new StartWorkers(), getSelf());
+	}
+
+	private void onJobSliceSpec(Object message) {
+		JobSliceSpec jobSpec = (JobSliceSpec) message;
+		
+		// bond to the jobmanager that sent this message
+		this.jobManager = getSender();
+		
+		log.debug( "got job slice: {}", jobSpec );
+		
+		this.jobSpec = jobSpec;
+		
+		// if the current graph isn't the graph specified by the job, kick the graph builder into action
+		if(graph==null || !curGraphId.equals(jobSpec.bucket)){
+			curGraphId = jobSpec.bucket;
+			graphBuilder.tell(new BuildGraph(jobSpec.bucket), getSelf());
+			status = Status.BUILDING_GRAPH;
+		} else {
+			getSelf().tell(new StartWorkers(), getSelf());
+		}
+		
 	}
 
 }

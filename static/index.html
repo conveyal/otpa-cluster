@@ -47,10 +47,10 @@
           }
           ws.onmessage = function(e) {
             var workResult = $.parseJSON( e.data );
-            var latlng = L.latLng(workResult.point.coord[0],workResult.point.coord[1]);
-            var marker = L.circleMarker( latlng );
+            // var latlng = L.latLng(workResult.point.coord[0],workResult.point.coord[1]);
+            // var marker = L.circleMarker( latlng );
 
-            map.addLayer( marker );
+            // map.addLayer( marker );
 
             $("#readout").html( e.data );
             // console.log( latlng );
@@ -72,7 +72,7 @@
     <div id="map"></div>
     <div id="controlpanel">
       <form id="startjob"
-        <span>graph id:</span><input id="graphid" type="text" value="otpac"><br>
+        <span>graph id:</span><input id="graphid" type="text" value="austin"><br>
         <span>origins:</span><input id="origins" type="text" value="austin.csv"><br>
         <span>destinations:</span><input id="dests" type="text" value="austin.csv"><br>
         <span>date:</span><input id="date" type="text" value="2014-06-09"><br>
