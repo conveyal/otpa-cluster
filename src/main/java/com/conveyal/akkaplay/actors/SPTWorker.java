@@ -1,15 +1,7 @@
 package com.conveyal.akkaplay.actors;
 
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
 
-import org.opentripplanner.analyst.Indicator;
 import org.opentripplanner.analyst.IndicatorLite;
-import org.opentripplanner.analyst.PointFeature;
-import org.opentripplanner.analyst.PointSet;
-import org.opentripplanner.analyst.PointSet.AttributeData;
-import org.opentripplanner.analyst.PointSet.Category;
 import org.opentripplanner.analyst.SampleSet;
 import org.opentripplanner.analyst.TimeSurface;
 import org.opentripplanner.common.model.GenericLocation;
@@ -17,11 +9,8 @@ import org.opentripplanner.routing.algorithm.EarliestArrivalSPTService;
 import org.opentripplanner.routing.core.RoutingRequest;
 import org.opentripplanner.routing.error.VertexNotFoundException;
 import org.opentripplanner.routing.graph.Graph;
-import org.opentripplanner.routing.graph.Vertex;
-import org.opentripplanner.routing.spt.GraphPath;
 import org.opentripplanner.routing.spt.ShortestPathTree;
 
-import com.conveyal.akkaplay.WorkResultCompiler;
 import com.conveyal.akkaplay.message.*;
 
 import akka.actor.UntypedActor;
@@ -43,13 +32,13 @@ public class SPTWorker extends UntypedActor {
 		if( message instanceof SetOneToManyContext ) {
 			onSetContext(message);
 		} else if( message instanceof OneToManyRequest ){
-			onRequest(message);
+			onSptRequest(message);
 		} else {
 			unhandled(message);
 		}
 	}
 
-	private void onRequest(Object message) {
+	private void onSptRequest(Object message) {
 		OneToManyRequest req = (OneToManyRequest)message;
 		log.debug("got req {}", req);
 		
