@@ -1,11 +1,18 @@
 package com.conveyal.akkaplay.message;
 
 import java.io.Serializable;
+import java.util.Collection;
+import java.util.Map;
+import java.util.Map.Entry;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
 import org.opentripplanner.analyst.Indicator;
 import org.opentripplanner.analyst.IndicatorLite;
 import org.opentripplanner.analyst.PointFeature;
+import org.opentripplanner.analyst.PointSet.Attribute;
+import org.opentripplanner.analyst.PointSet.Category;
+import org.opentripplanner.analyst.Quantiles;
 
 
 public class WorkResult implements Serializable{
@@ -35,8 +42,39 @@ public class WorkResult implements Serializable{
 		if(success){
 			ret.put("lat", this.point.getLat());
 			ret.put("lon", this.point.getLon());
+			ret.put("categories", getCategoriesJson(this.indicator.categories));
 		}
 		return ret.toString();
+	}
+
+	private JSONObject getCategoriesJson(Map<String, Category> categories) {
+		JSONObject ret = new JSONObject();
+		
+		for(Entry<String,Category> entry : categories.entrySet()){
+			ret.put(entry.getKey(), getCategoryJson(entry.getValue()));
+		}
+		
+		return ret;
+	}
+
+	private JSONObject getCategoryJson(Category value) {
+		JSONObject ret = new JSONObject();
+		
+		for(Entry<String,Attribute> entry : value.getAttributes().entrySet()){
+			ret.put(entry.getKey(), getAttributeJson(entry.getValue()));
+		}
+		
+		return ret;
+	}
+
+	private JSONArray getAttributeJson(Attribute attr) {
+		JSONArray ret = new JSONArray();
+		
+		for(Quantiles qq: attr.getQuantiles()){
+			ret.put( qq.breaks );
+		}
+		
+		return ret;
 	}
 
 }
