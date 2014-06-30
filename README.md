@@ -7,8 +7,8 @@
     $ java -jar -Dconfig.resource=worker.conf ./build/libs/otpa-cluster-all.jar
 
    	register worker with master
-   	http://localhost:8080/addworker/MySystem@127.0.0.1:2553/user/tester
-
+   	http://localhost:8080/addworker/?path=MySystem@127.0.0.1:2553/user/tester
+   	
    	start a job
    	http://localhost:8080/find?gtfs=/otpac/austin/capitalmetro.zip&osm=/otpac/austin/austin.osm.pbf
 
