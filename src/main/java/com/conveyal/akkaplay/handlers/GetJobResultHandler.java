@@ -50,14 +50,6 @@ public class GetJobResultHandler extends HttpHandler{
 				StringBuilder sb = new StringBuilder();
 				sb.append( "WorkResult\n" );
 				sb.append( wr.point+"\n" );
-				for(Histogram hist : wr.histograms){
-					sb.append( hist.name+" " );
-					sb.append("[");
-					for(int i=0; i<hist.bins.length; i++){
-						sb.append( hist.bins[i]+"," );
-					}
-					sb.append("]\n");
-				}
 				response.getWriter().write( sb.toString() );
 				return;
 			} else {

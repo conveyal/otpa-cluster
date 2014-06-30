@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 
 import org.opentripplanner.analyst.PointFeature;
+import org.opentripplanner.analyst.SampleSet;
 import org.opentripplanner.routing.graph.Graph;
 
 import scala.concurrent.Await;
@@ -110,11 +111,13 @@ public class Manager extends UntypedActor {
 		} else if (message instanceof StartWorkers){
 			log.debug( "set the workers doing their thing" );
 			
+			SampleSet sampleSet = new SampleSet(this.jobSpec.to, this.graph.getSampleFactory());
+			
 			//send graph to all workers
 			for( ActorRef worker : workers ){
 				
 				Timeout timeout = new Timeout(Duration.create(10, "seconds"));
-				Future<Object> future = Patterns.ask(worker, new SetOneToManyContext(this.graph,this.jobSpec.to), timeout);
+				Future<Object> future = Patterns.ask(worker, new SetOneToManyContext(this.graph,sampleSet), timeout);
 				Boolean result = (Boolean) Await.result(future, timeout.duration());
 			}
 			

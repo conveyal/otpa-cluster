@@ -42,11 +42,7 @@ public class WorkResultCompiler {
 	}
 
 	public WorkResult getWorkResult() {
-		WorkResult ret = new WorkResult(true);
-		for(Entry<String, List<Float>> entry : histograms.entrySet() ){
-			ret.addHistogram( entry.getKey(), entry.getValue() );
-		}
-		return ret;
+		return null;
 	}
 
 }
