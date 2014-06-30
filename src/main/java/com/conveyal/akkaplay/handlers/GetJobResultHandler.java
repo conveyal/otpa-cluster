@@ -8,7 +8,6 @@ import scala.concurrent.Await;
 import scala.concurrent.Future;
 import scala.concurrent.duration.Duration;
 
-import com.conveyal.akkaplay.Histogram;
 import com.conveyal.akkaplay.message.JobResult;
 import com.conveyal.akkaplay.message.JobResultQuery;
 import com.conveyal.akkaplay.message.WorkResult;
