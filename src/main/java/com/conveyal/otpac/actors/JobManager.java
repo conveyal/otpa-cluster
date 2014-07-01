@@ -55,56 +55,66 @@ public class JobManager extends UntypedActor {
 	@Override
 	public void onReceive(Object msg) throws Exception {
 		if (msg instanceof AddManager) {
-			AddManager am = (AddManager) msg;
-			managers.add(am.remote);
-			getSender().tell(new Boolean(true), getSelf());
+			onMsgAddManager((AddManager) msg);
 		} else if (msg instanceof JobSpec) {
-			JobSpec js = (JobSpec)msg;
-			
-			this.jobId = js.jobId;
-			
-			// bond to the executive that sent this
-			this.executive = getSender();
-			
-			log.debug( "get origin pointset: {}",js.fromPtsLoc );
-			PointSet fromPts = getPointset( js.fromPtsLoc );
-			log.debug( "got origin pointset: {}",fromPts.featureCount() );
-			
-			log.debug( "get destination pointset: {}",js.toPtsLoc );
-			PointSet toPts = getPointset( js.toPtsLoc );
-			log.debug( "got destination pointset: {}",toPts.featureCount() );
-			
-			TimeZone tz = TimeZone.getTimeZone(js.tz);
-			Date date = DateUtils.toDate(js.date, js.time, tz);
-
-			// split the job evenly between managers
-			float seglen = fromPts.featureCount() / ((float) managers.size());
-			for(int i=0;i<managers.size(); i++){				
-				int start = Math.round(seglen * i);
-				int end = Math.round(seglen * (i + 1));
-				
-				PointSet fromSplit = fromPts.slice(start, end);
-				
-				ActorSelection manager = managers.get(i);
-				
-				workersOut+=1;
-				manager.tell(new JobSliceSpec(fromSplit,toPts,js.graphId,date), getSelf());
-			}
+			onMsgJobSpec((JobSpec) msg);
 		} else if(msg instanceof WorkResult){
-			WorkResult res = (WorkResult)msg;
-			res.jobId = jobId;
-						
-			executive.tell(res, getSelf());
-		} else if(msg instanceof JobSliceDone){
-			JobSliceDone doneMsg = (JobSliceDone)msg;
-			
-			workersOut-=1;
-			log.debug("worker {} is done", getSender());
-			
-			if (workersOut==0){
-				executive.tell(new JobDone(jobId, managers), getSelf());
-			}
+			onMsgWorkResult((WorkResult) msg);
+		} else if(msg instanceof JobSliceDone){			
+			onMsgJobSliceDone();
 		}
+	}
+
+	private void onMsgJobSliceDone() {
+		workersOut-=1;
+		log.debug("worker {} is done", getSender());
+		
+		if (workersOut==0){
+			executive.tell(new JobDone(jobId, managers), getSelf());
+		}
+	}
+
+	private void onMsgWorkResult(WorkResult res) {
+		res.jobId = jobId;
+					
+		executive.tell(res, getSelf());
+	}
+
+	private void onMsgJobSpec(JobSpec js) throws Exception {		
+		this.jobId = js.jobId;
+		
+		// bond to the executive that sent this
+		this.executive = getSender();
+		
+		log.debug( "get origin pointset: {}",js.fromPtsLoc );
+		PointSet fromPts = getPointset( js.fromPtsLoc );
+		log.debug( "got origin pointset: {}",fromPts.featureCount() );
+		
+		log.debug( "get destination pointset: {}",js.toPtsLoc );
+		PointSet toPts = getPointset( js.toPtsLoc );
+		log.debug( "got destination pointset: {}",toPts.featureCount() );
+		
+		TimeZone tz = TimeZone.getTimeZone(js.tz);
+		Date date = DateUtils.toDate(js.date, js.time, tz);
+
+		// split the job evenly between managers
+		float seglen = fromPts.featureCount() / ((float) managers.size());
+		for(int i=0;i<managers.size(); i++){				
+			int start = Math.round(seglen * i);
+			int end = Math.round(seglen * (i + 1));
+			
+			PointSet fromSplit = fromPts.slice(start, end);
+			
+			ActorSelection manager = managers.get(i);
+			
+			workersOut+=1;
+			manager.tell(new JobSliceSpec(fromSplit,toPts,js.graphId,date), getSelf());
+		}
+	}
+
+	private void onMsgAddManager(AddManager am) {
+		managers.add(am.remote);
+		getSender().tell(new Boolean(true), getSelf());
 	}
 
 	private PointSet getPointset(String ptsLoc) throws Exception {

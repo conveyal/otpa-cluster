@@ -43,15 +43,6 @@ public class Main {
 
 	public static void main(String[] args) throws IOException {
 
-		// AWSCredentials creds = new
-		// ProfileCredentialsProvider().getCredentials(); //grab credentials
-		// from "~.aws/credentials"
-		// AmazonS3 s3 = new AmazonS3Client(creds);
-		// ObjectListing ol = s3.listObjects("otpac");
-		// for( S3ObjectSummary os : ol.getObjectSummaries() ){
-		// System.out.println( os.getKey() );
-		// }
-
 		Config config = ConfigFactory.load();
 		String hostname = config.getString("akka.remote.netty.tcp.hostname");
 		int port = config.getInt("akka.remote.netty.tcp.port");

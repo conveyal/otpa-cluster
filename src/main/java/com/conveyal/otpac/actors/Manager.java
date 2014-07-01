@@ -86,13 +86,13 @@ public class Manager extends UntypedActor {
 	@Override
 	public void onReceive(Object message) throws Exception {
 		if (message instanceof JobSliceSpec) {
-			onJobSliceSpec(message);
+			onMsgJobSliceSpec((JobSliceSpec) message);
 		} else if (message instanceof Graph){
-			onGetGraph(message);
+			onMsgGetGraph((Graph) message);
 		} else if (message instanceof StartWorkers){
-			onStartWorkers();
+			onMsgStartWorkers();
 		} else if (message instanceof WorkResult) {
-			onWorkResult(message);
+			onMsgWorkResult((WorkResult) message);
 		} else if (message instanceof JobStatusQuery) {
 			getSender().tell(new JobStatus(getSelf(), curJobId, jobsReturned / (float) jobSize), getSelf());
 		} else {
@@ -100,9 +100,7 @@ public class Manager extends UntypedActor {
 		}
 	}
 
-	private void onWorkResult(Object message) {
-		WorkResult res = (WorkResult) message;
-
+	private void onMsgWorkResult(WorkResult res) {
 		jobsReturned += 1;
 		log.debug("got: {}", res);
 		log.debug("{}/{} jobs returned", jobsReturned, jobSize);
@@ -116,7 +114,7 @@ public class Manager extends UntypedActor {
 		}
 	}
 
-	private void onStartWorkers() throws Exception {
+	private void onMsgStartWorkers() throws Exception {
 		log.debug( "set the workers doing their thing" );
 		
 		SampleSet sampleSet = new SampleSet(this.jobSpec.to, this.graph.getSampleFactory());
@@ -138,17 +136,15 @@ public class Manager extends UntypedActor {
 		}
 	}
 
-	private void onGetGraph(Object message) {
-		log.debug("got graph: {}", (Graph)message );
+	private void onMsgGetGraph(Graph graph) {
+		log.debug("got graph: {}", graph );
 		
-		this.graph = (Graph)message;
+		this.graph = graph;
 		status = Status.READY;
 		getSelf().tell(new StartWorkers(), getSelf());
 	}
 
-	private void onJobSliceSpec(Object message) {
-		JobSliceSpec jobSpec = (JobSliceSpec) message;
-		
+	private void onMsgJobSliceSpec(JobSliceSpec jobSpec) {		
 		// bond to the jobmanager that sent this message
 		this.jobManager = getSender();
 		

@@ -54,19 +54,21 @@ public class GraphBuilder extends UntypedActor {
 	@Override
 	public void onReceive(Object msg) throws Exception {
 		if (msg instanceof BuildGraph) {
-			BuildGraph bg = (BuildGraph) msg;
-
-			if (!bucketCached(bg.graphId)) {
-				log.debug("downloading graph sources");
-				downloadGraphSourceFiles(bg.graphId, sourceDir);
-			} else {
-				log.debug("graph sources already cached");
-			}
-
-			Graph gg = buildGraphToMemory(bg.graphId);
-
-			getSender().tell(gg, getSelf());
+			onMsgBuildGraph((BuildGraph) msg);
 		}
+	}
+
+	private void onMsgBuildGraph(BuildGraph bg) throws IOException {
+		if (!bucketCached(bg.graphId)) {
+			log.debug("downloading graph sources");
+			downloadGraphSourceFiles(bg.graphId, sourceDir);
+		} else {
+			log.debug("graph sources already cached");
+		}
+
+		Graph gg = buildGraphToMemory(bg.graphId);
+
+		getSender().tell(gg, getSelf());
 	}
 
 	private boolean bucketCached(String graphId) {
