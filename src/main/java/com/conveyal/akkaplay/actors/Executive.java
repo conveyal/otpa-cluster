@@ -26,25 +26,25 @@ public class Executive extends UntypedActor {
 	int tasksOut;
 	int jobId = 0;
 	Map<Integer, ArrayList<WorkResult>> jobResults;
-	Map<ActorSelection,Integer> managers;
+	Map<ActorSelection, Integer> managers;
 	Map<Integer, ActorRef> jobManagers;
 	JobResultsApplication statusServer = null;
-	
+
 	LoggingAdapter log = Logging.getLogger(getContext().system(), this);
 
 	Executive() {
 		jobResults = new HashMap<Integer, ArrayList<WorkResult>>();
 
-		managers = new HashMap<ActorSelection,Integer>();
-		
-		jobManagers = new HashMap<Integer,ActorRef>();
+		managers = new HashMap<ActorSelection, Integer>();
+
+		jobManagers = new HashMap<Integer, ActorRef>();
 
 	}
 
 	@Override
 	public void onReceive(Object msg) throws Exception {
 		if (msg instanceof JobSpec) {
-			onMsgJobSpec((JobSpec)msg);
+			onMsgJobSpec((JobSpec) msg);
 		} else if (msg instanceof WorkResult) {
 			onMsgWorkResult((WorkResult) msg);
 		} else if (msg instanceof JobResultQuery) {
@@ -53,10 +53,10 @@ public class Executive extends UntypedActor {
 			onMsgAddManager((AddManager) msg);
 		} else if (msg instanceof JobStatusQuery) {
 			onMsgJobStatusQuery();
-		} else if (msg instanceof JobDone){
+		} else if (msg instanceof JobDone) {
 			onMsgJobDone((JobDone) msg);
-		} else if (msg instanceof SetStatusServer){
-			this.statusServer = ((SetStatusServer)msg).statusServer;
+		} else if (msg instanceof SetStatusServer) {
+			this.statusServer = ((SetStatusServer) msg).statusServer;
 		} else if (msg instanceof Terminated) {
 			// router = router.removeRoutee(((Terminated) msg).actor());
 			// ActorRef r = getContext().actorOf(Props.create(Manager.class));
@@ -65,16 +65,16 @@ public class Executive extends UntypedActor {
 		}
 	}
 
-	private void onMsgJobDone(JobDone jd) {		
+	private void onMsgJobDone(JobDone jd) {
 		// free up managers
-		for(ActorSelection manager : jd.managers){
+		for (ActorSelection manager : jd.managers) {
 			managers.put(manager, null);
 		}
-		
+
 		// deallocate job manager
 		jobManagers.put(jd.jobId, null);
 		getContext().system().stop(getSender());
-		
+
 		log.debug("{} says job done", getSender());
 	}
 
@@ -94,7 +94,7 @@ public class Executive extends UntypedActor {
 
 		aw.remote.tell(new AssignExecutive(), getSelf());
 
-		managers.put(aw.remote,null);
+		managers.put(aw.remote, null);
 	}
 
 	private void onMsgJobResultQuery(JobResultQuery jr) {
@@ -102,12 +102,12 @@ public class Executive extends UntypedActor {
 		getSender().tell(new JobResult(res), getSelf());
 	}
 
-	private void onMsgWorkResult(WorkResult wr) {		
+	private void onMsgWorkResult(WorkResult wr) {
 		jobResults.get(wr.jobId).add(wr);
 
-		//log.debug("work result got: {}", wr);
-		if(statusServer!=null){
-			statusServer.onWorkResult( wr );
+		// log.debug("work result got: {}", wr);
+		if (statusServer != null) {
+			statusServer.onWorkResult(wr);
 		}
 	}
 
@@ -126,18 +126,18 @@ public class Executive extends UntypedActor {
 
 		// send the job id to the client
 		getSender().tell(new JobId(jobId), getSelf());
-		
+
 		// create a job manager
-		ActorRef jobManager = getContext().actorOf(Props.create(JobManager.class), "jobmanager-"+jobId);
-		jobManagers.put( jobId, jobManager );
-		
+		ActorRef jobManager = getContext().actorOf(Props.create(JobManager.class), "jobmanager-" + jobId);
+		jobManagers.put(jobId, jobManager);
+
 		// assign some managers to the job manager
-		for(ActorSelection manager : freeManagers() ){
-			assignManager( jobId, manager );
+		for (ActorSelection manager : freeManagers()) {
+			assignManager(jobId, manager);
 		}
-		
+
 		// kick off the job
-		jobManager.tell( jobSpec, getSelf() );
+		jobManager.tell(jobSpec, getSelf());
 
 		jobId += 1;
 	}
@@ -145,29 +145,29 @@ public class Executive extends UntypedActor {
 	private boolean assignManager(int jobId, ActorSelection manager) throws Exception {
 		// get the job manager for this job id
 		ActorRef jobManager = jobManagers.get(jobId);
-		
+
 		// assign the manager to the job manager; blocking operation
 		Timeout timeout = new Timeout(Duration.create(1, "seconds"));
 		Future<Object> future = Patterns.ask(jobManager, new AddManager(manager), timeout);
 		Boolean success = (Boolean) Await.result(future, timeout.duration());
-		
+
 		// if it worked, register the manager as busy
-		if( success ){
+		if (success) {
 			this.managers.put(manager, jobId);
 		}
-		
+
 		return success;
 	}
 
 	private ArrayList<ActorSelection> freeManagers() {
 		ArrayList<ActorSelection> ret = new ArrayList<ActorSelection>();
-		
-		for( Entry<ActorSelection,Integer> entry : this.managers.entrySet() ){
-			if(entry.getValue()==null){
-				ret.add( entry.getKey() );
+
+		for (Entry<ActorSelection, Integer> entry : this.managers.entrySet()) {
+			if (entry.getValue() == null) {
+				ret.add(entry.getKey());
 			}
 		}
-		
+
 		return ret;
 	}
 
