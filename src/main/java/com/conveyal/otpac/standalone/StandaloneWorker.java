@@ -1,4 +1,4 @@
-package com.conveyal.otpa.standalone;
+package com.conveyal.otpac.standalone;
 
 import akka.actor.ActorPath;
 import akka.actor.ActorRef;

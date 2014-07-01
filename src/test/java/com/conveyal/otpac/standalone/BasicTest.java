@@ -1,10 +1,10 @@
-package com.conveyal.otpa.standalone;
+package com.conveyal.otpac.standalone;
 
 import java.util.ArrayList;
 
-import com.conveyal.otpa.standalone.StandaloneCluster;
-import com.conveyal.otpa.standalone.StandaloneExecutive;
-import com.conveyal.otpa.standalone.StandaloneWorker;
+import com.conveyal.otpac.standalone.StandaloneCluster;
+import com.conveyal.otpac.standalone.StandaloneExecutive;
+import com.conveyal.otpac.standalone.StandaloneWorker;
 import com.conveyal.otpac.message.JobStatus;
 
 import junit.framework.TestCase;

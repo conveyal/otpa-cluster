@@ -1,4 +1,4 @@
-package com.conveyal.otpa.standalone;
+package com.conveyal.otpac.standalone;
 
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
