@@ -30,16 +30,15 @@ public class SPTWorker extends UntypedActor {
 	@Override
 	public void onReceive(Object message) {
 		if( message instanceof SetOneToManyContext ) {
-			onSetContext(message);
+			onMsgSetOneToManyContext((SetOneToManyContext) message);
 		} else if( message instanceof OneToManyRequest ){
-			onSptRequest(message);
+			onMsgOneToManyRequest((OneToManyRequest) message);
 		} else {
 			unhandled(message);
 		}
 	}
 
-	private void onSptRequest(Object message) {
-		OneToManyRequest req = (OneToManyRequest)message;
+	private void onMsgOneToManyRequest(OneToManyRequest req) {
 		log.debug("got req {}", req);
 		
 		RoutingRequest rr = new RoutingRequest();
@@ -72,9 +71,7 @@ public class SPTWorker extends UntypedActor {
 		getSender().tell(res, getSelf());
 	}
 
-	private void onSetContext(Object message) {
-		SetOneToManyContext ctx = (SetOneToManyContext)message;
-		
+	private void onMsgSetOneToManyContext(SetOneToManyContext ctx) {		
 		log.debug("setting 1-many context: {}", ctx);
 		log.debug("setting context graph: {}", ctx.graph);
 		
