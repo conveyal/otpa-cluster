@@ -21,7 +21,7 @@ repositories {
  
 jar {
     manifest {
-        attributes 'Main-Class': 'com.conveyal.akkaplay.Main'
+        attributes 'Main-Class': 'com.conveyal.otpac.Main'
     }
 }
 
