@@ -95,6 +95,8 @@ public class Executive extends UntypedActor {
 		aw.remote.tell(new AssignExecutive(), getSelf());
 
 		managers.put(aw.remote, null);
+		
+		getSender().tell(new Boolean(true), getSelf());
 	}
 
 	private void onMsgJobResultQuery(JobResultQuery jr) {
