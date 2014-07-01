@@ -44,78 +44,17 @@ public class Executive extends UntypedActor {
 	@Override
 	public void onReceive(Object msg) throws Exception {
 		if (msg instanceof JobSpec) {
-			// if there are no workers to route to, bail
-			if (managers.size() == 0) {
-				getSender().tell(new JobId(-1), getSelf());
-				return;
-			}
-
-			// the executive gives jobs ids
-			JobSpec jobSpec = (JobSpec) msg;
-			jobSpec.jobId = jobId;
-
-			// make a place to catch the results of the job
-			jobResults.put(jobId, new ArrayList<WorkResult>());
-
-			// send the job id to the client
-			getSender().tell(new JobId(jobId), getSelf());
-			
-			// create a job manager
-			ActorRef jobManager = getContext().actorOf(Props.create(JobManager.class), "jobmanager-"+jobId);
-			jobManagers.put( jobId, jobManager );
-			
-			// assign some managers to the job manager
-			for(ActorSelection manager : freeManagers() ){
-				assignManager( jobId, manager );
-			}
-			
-			// kick off the job
-			jobManager.tell( jobSpec, getSelf() );
-
-			jobId += 1;
+			onMsgJobSpec((JobSpec)msg);
 		} else if (msg instanceof WorkResult) {
-			WorkResult wr = (WorkResult) msg;
-			
-			jobResults.get(wr.jobId).add(wr);
-
-			//log.debug("work result got: {}", wr);
-			if(statusServer!=null){
-				statusServer.onWorkResult( wr );
-			}
-
+			onMsgWorkResult((WorkResult) msg);
 		} else if (msg instanceof JobResultQuery) {
-			JobResultQuery jr = (JobResultQuery) msg;
-			ArrayList<WorkResult> res = jobResults.get(jr.jobId);
-			getSender().tell(new JobResult(res), getSelf());
+			onMsgJobResultQuery((JobResultQuery) msg);
 		} else if (msg instanceof AddManager) {
-			AddManager aw = (AddManager) msg;
-			System.out.println("add worker " + aw.remote);
-
-			aw.remote.tell(new AssignExecutive(), getSelf());
-
-			managers.put(aw.remote,null);
+			onMsgAddManager((AddManager) msg);
 		} else if (msg instanceof JobStatusQuery) {
-			ArrayList<JobStatus> ret = new ArrayList<JobStatus>();
-			for (ActorSelection manager : managers.keySet()) {
-				Timeout timeout = new Timeout(Duration.create(5, "seconds"));
-				Future<Object> future = Patterns.ask(manager, new JobStatusQuery(), timeout);
-				JobStatus result = (JobStatus) Await.result(future, timeout.duration());
-				ret.add(result);
-			}
-			getSender().tell(ret, getSelf());
+			onMsgJobStatusQuery();
 		} else if (msg instanceof JobDone){
-			JobDone jd = (JobDone)msg;
-			
-			// free up managers
-			for(ActorSelection manager : jd.managers){
-				managers.put(manager, null);
-			}
-			
-			// deallocate job manager
-			jobManagers.put(jd.jobId, null);
-			getContext().system().stop(getSender());
-			
-			log.debug("{} says job done", getSender());
+			onMsgJobDone((JobDone) msg);
 		} else if (msg instanceof SetStatusServer){
 			this.statusServer = ((SetStatusServer)msg).statusServer;
 		} else if (msg instanceof Terminated) {
@@ -124,6 +63,83 @@ public class Executive extends UntypedActor {
 			// getContext().watch(r);
 			// router = router.addRoutee(new ActorRefRoutee(r));
 		}
+	}
+
+	private void onMsgJobDone(JobDone jd) {		
+		// free up managers
+		for(ActorSelection manager : jd.managers){
+			managers.put(manager, null);
+		}
+		
+		// deallocate job manager
+		jobManagers.put(jd.jobId, null);
+		getContext().system().stop(getSender());
+		
+		log.debug("{} says job done", getSender());
+	}
+
+	private void onMsgJobStatusQuery() throws Exception {
+		ArrayList<JobStatus> ret = new ArrayList<JobStatus>();
+		for (ActorSelection manager : managers.keySet()) {
+			Timeout timeout = new Timeout(Duration.create(5, "seconds"));
+			Future<Object> future = Patterns.ask(manager, new JobStatusQuery(), timeout);
+			JobStatus result = (JobStatus) Await.result(future, timeout.duration());
+			ret.add(result);
+		}
+		getSender().tell(ret, getSelf());
+	}
+
+	private void onMsgAddManager(AddManager aw) {
+		System.out.println("add worker " + aw.remote);
+
+		aw.remote.tell(new AssignExecutive(), getSelf());
+
+		managers.put(aw.remote,null);
+	}
+
+	private void onMsgJobResultQuery(JobResultQuery jr) {
+		ArrayList<WorkResult> res = jobResults.get(jr.jobId);
+		getSender().tell(new JobResult(res), getSelf());
+	}
+
+	private void onMsgWorkResult(WorkResult wr) {		
+		jobResults.get(wr.jobId).add(wr);
+
+		//log.debug("work result got: {}", wr);
+		if(statusServer!=null){
+			statusServer.onWorkResult( wr );
+		}
+	}
+
+	private void onMsgJobSpec(JobSpec jobSpec) throws Exception {
+		// if there are no workers to route to, bail
+		if (managers.size() == 0) {
+			getSender().tell(new JobId(-1), getSelf());
+			return;
+		}
+
+		// the executive gives jobs ids
+		jobSpec.jobId = jobId;
+
+		// make a place to catch the results of the job
+		jobResults.put(jobId, new ArrayList<WorkResult>());
+
+		// send the job id to the client
+		getSender().tell(new JobId(jobId), getSelf());
+		
+		// create a job manager
+		ActorRef jobManager = getContext().actorOf(Props.create(JobManager.class), "jobmanager-"+jobId);
+		jobManagers.put( jobId, jobManager );
+		
+		// assign some managers to the job manager
+		for(ActorSelection manager : freeManagers() ){
+			assignManager( jobId, manager );
+		}
+		
+		// kick off the job
+		jobManager.tell( jobSpec, getSelf() );
+
+		jobId += 1;
 	}
 
 	private boolean assignManager(int jobId, ActorSelection manager) throws Exception {
