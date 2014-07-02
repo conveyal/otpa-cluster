@@ -20,51 +20,51 @@ import com.conveyal.otpac.message.WorkResult;
 import junit.framework.TestCase;
 
 public class BasicTest extends TestCase {
-    public void testBasicSetup() throws Exception {
-    	StandaloneCluster cluster = new StandaloneCluster();
-    	
-    	StandaloneExecutive exec = cluster.createExecutive();
-    	StandaloneWorker worker = cluster.createWorker();
-    	
-    	cluster.registerWorker(exec,worker);
-    	
-    	ArrayList<JobStatus> js = exec.getJobStatus();
-    	assertEquals( js.size(),  1 );
-    	assertEquals( js.get(0).curJobId, -1 );    	
-    }
-    
-    public void testJob() throws Exception {
-    	// start up cluster
-    	StandaloneCluster cluster = new StandaloneCluster();
-    	
-    	StandaloneExecutive exec = cluster.createExecutive();
-    	StandaloneWorker worker = cluster.createWorker();
-    	
-    	cluster.registerWorker(exec,worker);
-    	
-    	// build the request
-		JobSpec js = new JobSpec("austin", "austin.csv", "austin.csv", "2014-06-09",
-				"8:05 AM", "America/Chicago");
-		
+	public void testBasicSetup() throws Exception {
+		StandaloneCluster cluster = new StandaloneCluster();
+
+		StandaloneExecutive exec = cluster.createExecutive();
+		StandaloneWorker worker = cluster.createWorker();
+
+		cluster.registerWorker(exec, worker);
+
+		ArrayList<JobStatus> js = exec.getJobStatus();
+		assertEquals(js.size(), 1);
+		assertEquals(js.get(0).curJobId, -1);
+	}
+
+	public void testJob() throws Exception {
+		// start up cluster
+		StandaloneCluster cluster = new StandaloneCluster();
+
+		StandaloneExecutive exec = cluster.createExecutive();
+		StandaloneWorker worker = cluster.createWorker();
+
+		cluster.registerWorker(exec, worker);
+
+		// build the request
+		JobSpec js = new JobSpec("austin", "austin.csv", "austin.csv", "2014-06-09", "8:05 AM", "America/Chicago");
+
 		// plus a callback that registers how many work items have returned
 		class CounterCallback implements JobItemCallback {
-			int jobsBack=0;
+			int jobsBack = 0;
 
 			@Override
 			public void onWorkResult(WorkResult res) {
-				System.out.println( "got callback");
+				System.out.println("got callback");
 				jobsBack += 1;
 			}
-		};
+		}
+		;
 		CounterCallback callback = new CounterCallback();
-		js.setCallback( callback );
-		
+		js.setCallback(callback);
+
 		// start the job
-    	exec.find(js);
-    	
-    	// stall until a work item returns
-    	while(callback.jobsBack==0){
-    		Thread.sleep(100);
-    	}
-    }
+		exec.find(js);
+
+		// stall until a work item returns
+		while (callback.jobsBack == 0) {
+			Thread.sleep(100);
+		}
+	}
 }
