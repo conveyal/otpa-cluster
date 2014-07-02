@@ -28,7 +28,6 @@ public class Executive extends UntypedActor {
 	Map<Integer, ArrayList<WorkResult>> jobResults;
 	Map<ActorSelection, Integer> managers;
 	Map<Integer, ActorRef> jobManagers;
-	JobResultsApplication statusServer = null;
 
 	LoggingAdapter log = Logging.getLogger(getContext().system(), this);
 
@@ -55,8 +54,6 @@ public class Executive extends UntypedActor {
 			onMsgJobStatusQuery();
 		} else if (msg instanceof JobDone) {
 			onMsgJobDone((JobDone) msg);
-		} else if (msg instanceof SetStatusServer) {
-			this.statusServer = ((SetStatusServer) msg).statusServer;
 		} else if (msg instanceof Terminated) {
 			// router = router.removeRoutee(((Terminated) msg).actor());
 			// ActorRef r = getContext().actorOf(Props.create(Manager.class));
@@ -106,11 +103,6 @@ public class Executive extends UntypedActor {
 
 	private void onMsgWorkResult(WorkResult wr) {
 		jobResults.get(wr.jobId).add(wr);
-
-		// log.debug("work result got: {}", wr);
-		if (statusServer != null) {
-			statusServer.onWorkResult(wr);
-		}
 	}
 
 	private void onMsgJobSpec(JobSpec jobSpec) throws Exception {

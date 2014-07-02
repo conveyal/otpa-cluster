@@ -10,8 +10,11 @@ import scala.concurrent.Await;
 import scala.concurrent.Future;
 import scala.concurrent.duration.Duration;
 
+import com.conveyal.otpac.JobItemCallback;
+import com.conveyal.otpac.JobResultsApplication;
 import com.conveyal.otpac.message.JobId;
 import com.conveyal.otpac.message.JobSpec;
+import com.conveyal.otpac.message.WorkResult;
 
 import akka.actor.ActorRef;
 import akka.pattern.Patterns;
@@ -20,9 +23,11 @@ import akka.util.Timeout;
 public class FindHandler extends HttpHandler{
 
 	private ActorRef executive;
+	private JobResultsApplication statusServer;
 
-	public FindHandler(ActorRef executive) {
+	public FindHandler(ActorRef executive, JobResultsApplication statusServer) {
 		this.executive = executive;
+		this.statusServer = statusServer;
 	}
 
 	@Override
@@ -67,9 +72,19 @@ public class FindHandler extends HttpHandler{
 		}
 
 		try {
+			JobSpec js = new JobSpec(bucket, fromPtsLoc, toPtsLoc, dateStr,
+					timeStr, timezoneStr);
+			
+			js.setCallback( new JobItemCallback(){
+
+				@Override
+				public void onWorkResult(WorkResult res) {
+					statusServer.onWorkResult( res );
+				}
+			});
+			
 			Timeout timeout = new Timeout(Duration.create(5, "seconds"));
-			Future<Object> future = Patterns.ask(executive, new JobSpec(bucket, fromPtsLoc, toPtsLoc, dateStr,
-					timeStr, timezoneStr), timeout);
+			Future<Object> future = Patterns.ask(executive, js, timeout);
 			JobId result = (JobId) Await.result(future, timeout.duration());
 			
 			response.getWriter().write( "{\"jobId\":" + result.jobId+"}" );

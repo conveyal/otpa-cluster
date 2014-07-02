@@ -29,7 +29,6 @@ import com.conveyal.otpac.actors.SPTWorker;
 import com.conveyal.otpac.handlers.AddWorkerHandler;
 import com.conveyal.otpac.handlers.FindHandler;
 import com.conveyal.otpac.handlers.GetJobResultHandler;
-import com.conveyal.otpac.message.SetStatusServer;
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
 
@@ -58,23 +57,22 @@ public class Main {
 			ActorRef executive = system.actorOf(Props.create(Executive.class));
 
 			HttpServer server = HttpServer.createSimpleServer("static");
-			ServerConfiguration svCfg = server.getServerConfiguration();
-			svCfg.addHttpHandler(new AddWorkerHandler(executive, system), "/addworker");
-			svCfg.addHttpHandler(new GetJobResultHandler(executive), "/getstatus");
-			svCfg.addHttpHandler(new FindHandler(executive), "/find");
 
 			server.getListener("grizzly").registerAddOn(new WebSocketAddOn());
 
 			// initialize websocket chat application
 			JobResultsApplication chatApplication = new JobResultsApplication();
 
-			// link executive up with socket server
-			executive.tell(new SetStatusServer(chatApplication), ActorRef.noSender());
-
 			// register the application
 			WebSocketEngine.getEngine().register("/grizzly-websockets-chat", "/chat/*", chatApplication);
 			
 			server.getListener("grizzly").getFileCache().setEnabled(false);
+			
+			// set up webapp endpoints
+			ServerConfiguration svCfg = server.getServerConfiguration();
+			svCfg.addHttpHandler(new AddWorkerHandler(executive, system), "/addworker");
+			svCfg.addHttpHandler(new GetJobResultHandler(executive), "/getstatus");
+			svCfg.addHttpHandler(new FindHandler(executive, chatApplication), "/find");
 
 			server.start();
 
