@@ -3,7 +3,7 @@ package com.conveyal.otpac.message;
 import java.io.Serializable;
 import java.util.ArrayList;
 
-import com.conveyal.otpac.standalone.JobItemCallback;
+import com.conveyal.otpac.JobItemCallback;
 
 public class JobSpec implements Serializable{
 

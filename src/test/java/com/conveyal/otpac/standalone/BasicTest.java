@@ -8,6 +8,7 @@ import scala.concurrent.duration.Duration;
 import akka.pattern.Patterns;
 import akka.util.Timeout;
 
+import com.conveyal.otpac.JobItemCallback;
 import com.conveyal.otpac.standalone.StandaloneCluster;
 import com.conveyal.otpac.standalone.StandaloneExecutive;
 import com.conveyal.otpac.standalone.StandaloneWorker;

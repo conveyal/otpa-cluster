@@ -1,4 +1,4 @@
-package com.conveyal.otpac.standalone;
+package com.conveyal.otpac;
 
 import com.conveyal.otpac.message.WorkResult;
 

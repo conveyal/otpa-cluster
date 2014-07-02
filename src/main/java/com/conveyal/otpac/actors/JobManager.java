@@ -27,7 +27,7 @@ import com.conveyal.otpac.message.JobSliceDone;
 import com.conveyal.otpac.message.JobSliceSpec;
 import com.conveyal.otpac.message.JobSpec;
 import com.conveyal.otpac.message.WorkResult;
-import com.conveyal.otpac.standalone.JobItemCallback;
+import com.conveyal.otpac.JobItemCallback;
 
 import akka.actor.ActorRef;
 import akka.actor.ActorSelection;
