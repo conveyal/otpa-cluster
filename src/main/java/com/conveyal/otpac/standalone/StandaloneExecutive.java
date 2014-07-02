@@ -20,19 +20,9 @@ import com.conveyal.otpac.message.JobStatusQuery;
 
 public class StandaloneExecutive {
 	
-	StandaloneCluster cluster;
 	ActorRef executive;
 	
-	public StandaloneExecutive(StandaloneCluster cluster){
-		this.cluster = cluster;
-		executive = cluster.system.actorOf(Props.create(Executive.class));
-	}
-
-	public void registerWorker(StandaloneWorker worker) throws Exception {
-		ActorSelection remoteManager = cluster.system.actorSelection(worker.getPath());
-		
-		executive.tell(new AddManager(remoteManager), ActorRef.noSender());
-		
+	protected void registerWorker(ActorSelection remoteManager) throws Exception {				
 		// Block until success. We don't need the result; we're just preventing race conditions.
 		Timeout timeout = new Timeout(Duration.create(5, "seconds"));
 		Future<Object> future = Patterns.ask(executive, new AddManager(remoteManager), timeout);

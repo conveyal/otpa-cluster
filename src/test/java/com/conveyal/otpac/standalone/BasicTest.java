@@ -13,10 +13,10 @@ public class BasicTest extends TestCase {
     public void testBasicSetup() throws Exception {
     	StandaloneCluster cluster = new StandaloneCluster();
     	
-    	StandaloneExecutive exec = new StandaloneExecutive(cluster);
-    	StandaloneWorker worker = new StandaloneWorker(cluster);
-    	 
-    	exec.registerWorker(worker);
+    	StandaloneExecutive exec = cluster.createExecutive();
+    	StandaloneWorker worker = cluster.createWorker();
+    	
+    	cluster.registerWorker(exec,worker);
     	
     	ArrayList<JobStatus> js = exec.getJobStatus();
     	assertEquals( js.size(),  1 );
