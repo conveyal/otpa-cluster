@@ -27,6 +27,7 @@ import com.conveyal.otpac.message.JobSliceDone;
 import com.conveyal.otpac.message.JobSliceSpec;
 import com.conveyal.otpac.message.JobSpec;
 import com.conveyal.otpac.message.WorkResult;
+import com.conveyal.otpac.standalone.JobItemCallback;
 
 import akka.actor.ActorRef;
 import akka.actor.ActorSelection;
@@ -43,6 +44,7 @@ public class JobManager extends UntypedActor {
 	AmazonS3 s3;
 	private ActorRef executive;
 	private int jobId;
+	private JobItemCallback callback;
 
 	JobManager() {
 		// grab credentials from "~.aws/credentials"
@@ -76,12 +78,17 @@ public class JobManager extends UntypedActor {
 
 	private void onMsgWorkResult(WorkResult res) {
 		res.jobId = jobId;
+		
+		if(callback != null){
+			this.callback.onWorkResult( res );
+		}
 					
 		executive.tell(res, getSelf());
 	}
 
 	private void onMsgJobSpec(JobSpec js) throws Exception {		
 		this.jobId = js.jobId;
+		this.callback = js.callback;
 		
 		// bond to the executive that sent this
 		this.executive = getSender();

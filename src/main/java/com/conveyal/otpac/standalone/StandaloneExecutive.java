@@ -13,8 +13,10 @@ import akka.util.Timeout;
 
 import com.conveyal.otpac.actors.Executive;
 import com.conveyal.otpac.message.AddManager;
+import com.conveyal.otpac.message.JobId;
 import com.conveyal.otpac.message.JobResult;
 import com.conveyal.otpac.message.JobResultQuery;
+import com.conveyal.otpac.message.JobSpec;
 import com.conveyal.otpac.message.JobStatus;
 import com.conveyal.otpac.message.JobStatusQuery;
 
@@ -33,6 +35,14 @@ public class StandaloneExecutive {
 		Timeout timeout = new Timeout(Duration.create(5, "seconds"));
 		Future<Object> future = Patterns.ask(executive, new JobStatusQuery(), timeout);
 		ArrayList<JobStatus> result = (ArrayList<JobStatus>) Await.result(future, timeout.duration());
+		
+		return result;
+	}
+
+	public JobId find(JobSpec js) throws Exception {
+		Timeout timeout = new Timeout(Duration.create(5, "seconds"));
+		Future<Object> future = Patterns.ask(executive, js, timeout);
+		JobId result = (JobId) Await.result(future, timeout.duration());
 		
 		return result;
 	}
