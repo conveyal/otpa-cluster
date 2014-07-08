@@ -26,6 +26,14 @@ public class StandaloneCluster {
 		return ret;
 	}
 
+	public StandaloneWorker createWorker(int nWorkers) {
+		StandaloneWorker ret = new StandaloneWorker();
+		
+		ret.manager = system.actorOf(Props.create(Manager.class, nWorkers), "manager");
+		
+		return ret;
+	}
+	
 	public StandaloneWorker createWorker() {
 		StandaloneWorker ret = new StandaloneWorker();
 		
@@ -38,6 +46,10 @@ public class StandaloneCluster {
 		ActorSelection remoteManager = system.actorSelection(worker.getPath());
 		
 		exec.registerWorker(remoteManager);
+	}
+
+	public void stop(StandaloneWorker worker) {
+		system.stop(worker.manager);
 	}
 	
 	
