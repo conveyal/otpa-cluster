@@ -1,5 +1,6 @@
 package com.conveyal.otpac.standalone;
 
+import java.io.IOException;
 import java.util.ArrayList;
 
 import scala.concurrent.Await;
@@ -38,7 +39,7 @@ public class BasicTest extends TestCase {
 		StandaloneCluster cluster = new StandaloneCluster();
 
 		StandaloneExecutive exec = cluster.createExecutive();
-		StandaloneWorker worker = cluster.createWorker();
+		StandaloneWorker worker = cluster.createWorker(1);
 
 		cluster.registerWorker(exec, worker);
 
@@ -66,6 +67,8 @@ public class BasicTest extends TestCase {
 		while (callback.jobsBack == 0) {
 			Thread.sleep(100);
 		}
+		
+		cluster.stop(worker);
 	}
 	
 	public void testShapefile() throws Exception {
@@ -73,7 +76,7 @@ public class BasicTest extends TestCase {
 		StandaloneCluster cluster = new StandaloneCluster();
 
 		StandaloneExecutive exec = cluster.createExecutive();
-		StandaloneWorker worker = cluster.createWorker();
+		StandaloneWorker worker = cluster.createWorker(1);
 
 		cluster.registerWorker(exec, worker);
 
@@ -83,10 +86,21 @@ public class BasicTest extends TestCase {
 		// plus a callback that registers how many work items have returned
 		class CounterCallback implements JobItemCallback {
 			int jobsBack = 0;
+			String jsonBack = null;
 
 			@Override
-			public void onWorkResult(WorkResult res) {
-				System.out.println("got callback");
+			public synchronized void onWorkResult(WorkResult res) {
+				try {
+					jsonBack =  res.toJsonString();
+				} catch (IOException e) {
+					jsonBack = null;
+				}
+				
+				assertNotNull(jsonBack);
+				if(jsonBack!=null){
+					assertEquals(jsonBack.substring(0,10), "{\"jobId\":0");
+				}
+
 				jobsBack += 1;
 			}
 		}
@@ -101,5 +115,7 @@ public class BasicTest extends TestCase {
 		while (callback.jobsBack == 0) {
 			Thread.sleep(100);
 		}
+		
+		cluster.stop(worker);
 	}
 }

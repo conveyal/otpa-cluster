@@ -1,17 +1,20 @@
 package com.conveyal.otpac.message;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.io.Serializable;
-import java.util.Collection;
 import java.util.Map;
 import java.util.Map.Entry;
 
-import org.geotools.geojson.geom.GeometryJSON;
-import org.json.JSONArray;
-import org.json.JSONObject;
 import org.opentripplanner.analyst.Histogram;
 import org.opentripplanner.analyst.PointFeature;
 import org.opentripplanner.analyst.ResultFeature;
 
+import com.bedatadriven.geojson.GeometrySerializer;
+import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.core.JsonGenerationException;
+import com.fasterxml.jackson.core.JsonGenerator;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.vividsolutions.jts.geom.Geometry;
 
 
@@ -35,32 +38,50 @@ public class WorkResult implements Serializable{
 			return "<Job success:"+success+">";
 	}
 
-	public String toJsonString() {
-		JSONObject ret = new JSONObject();
-		ret.put("jobId", jobId);
-		ret.put("success", success);
-		if(success){
-			ret.put("lat", this.point.getLat());
-			ret.put("lon", this.point.getLon());
-			ret.put("histograms", getPropertiesJson(this.feat.histograms));
-			Geometry geom = this.point.getGeom();
-			if(geom!=null){
-				GeometryJSON gj = new GeometryJSON();
-				ret.put("geom", gj.toString(geom));
+	public String toJsonString() throws IOException {
+		
+		JsonFactory jsonFactory = new JsonFactory();
+		
+		ByteArrayOutputStream out = new ByteArrayOutputStream();
+		JsonGenerator jgen = jsonFactory.createGenerator(out);
+		jgen.setCodec(new ObjectMapper());
+		
+		jgen.writeStartObject();
+		{
+			jgen.writeNumberField("jobId", jobId);
+			jgen.writeBooleanField("success", success);
+			if(success){
+				jgen.writeNumberField("lat", this.point.getLat());
+				jgen.writeNumberField("lon", this.point.getLon());
+				writeHistogramsJson(jgen,this.feat.histograms);
+				Geometry geom = this.point.getGeom();
+				if(geom!=null){
+					GeometrySerializer gs = new GeometrySerializer();
+					jgen.writeFieldName("geom");
+					gs.writeGeometry(jgen, geom);
+				}
 			}
-			
 		}
-		return ret.toString();
+		jgen.writeEndObject();
+		
+		return out.toString();
 	}
 
-	private JSONObject getPropertiesJson(Map<String, Histogram> categories) {
-		JSONObject ret = new JSONObject();
-		
-		for(Entry<String,Histogram> entry : categories.entrySet()){
-			ret.put(entry.getKey(), entry.getValue().sums);
+	private void writeHistogramsJson(JsonGenerator jgen, Map<String, Histogram> histograms) throws JsonGenerationException, IOException {
+		jgen.writeObjectFieldStart("histograms");
+		{
+			for(Entry<String,Histogram> entry : histograms.entrySet()){
+				jgen.writeArrayFieldStart( entry.getKey() );
+				{
+					int[] sums = entry.getValue().sums;
+					for(int i=0; i<sums.length; i++){
+						jgen.writeNumber(sums[i]);
+					}
+				}
+				jgen.writeEndArray();
+			}
 		}
-		
-		return ret;
+		jgen.writeEndObject();
 	}
 
 }

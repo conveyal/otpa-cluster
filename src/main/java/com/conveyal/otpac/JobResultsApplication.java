@@ -40,6 +40,7 @@
 
 package com.conveyal.otpac;
 
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -77,7 +78,7 @@ public class JobResultsApplication extends WebSocketApplication {
         return new JobResultsWebSocket(jobId, handler, request, listeners);
     }
     
-    public void onWorkResult(WorkResult wr){
+    public void onWorkResult(WorkResult wr) throws IOException{
     	Set<JobResultsWebSocket> jobClients = clients.get(wr.jobId);
     	if(jobClients!=null){
     		for( JobResultsWebSocket sock : jobClients ){

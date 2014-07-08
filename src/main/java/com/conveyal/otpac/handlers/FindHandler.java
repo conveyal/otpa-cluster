@@ -1,5 +1,6 @@
 package com.conveyal.otpac.handlers;
 
+import java.io.IOException;
 import java.util.concurrent.TimeoutException;
 
 import org.glassfish.grizzly.http.server.HttpHandler;
@@ -79,7 +80,11 @@ public class FindHandler extends HttpHandler{
 
 				@Override
 				public void onWorkResult(WorkResult res) {
-					statusServer.onWorkResult( res );
+					try {
+						statusServer.onWorkResult( res );
+					} catch (IOException e) {
+						e.printStackTrace();
+					}
 				}
 			});
 			
