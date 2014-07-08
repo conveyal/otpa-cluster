@@ -60,16 +60,19 @@ public class Manager extends UntypedActor {
 	
 	AmazonS3 s3;
 	private JobSliceSpec jobSpec=null;
+	
+	Manager(){
+		this( Runtime.getRuntime().availableProcessors() );
+	}
 
-	Manager() {
+	Manager(int nWorkers) {
 		// grab credentials from "~.aws/credentials"
 		AWSCredentials creds = new ProfileCredentialsProvider().getCredentials();
 		s3 = new AmazonS3Client(creds);
 
 		ArrayList<Routee> routees = new ArrayList<Routee>();
 		workers = new ArrayList<ActorRef>();
-		int cores = Runtime.getRuntime().availableProcessors();
-		for (int i = 0; i < cores; i++) {
+		for (int i = 0; i < nWorkers; i++) {
 			ActorRef worker = getContext().actorOf(Props.create(SPTWorker.class), "worker-" + i);
 			routees.add(new ActorRefRoutee(worker));
 			workers.add( worker );
@@ -78,7 +81,7 @@ public class Manager extends UntypedActor {
 		
 		graphBuilder = getContext().actorOf(Props.create(GraphBuilder.class), "builder");
 
-		System.out.println("starting manager with " + cores + " workers");
+		System.out.println("starting manager with " + nWorkers + " workers");
 		status = Status.READY;
 	}
 
