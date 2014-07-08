@@ -24,7 +24,7 @@ import com.amazonaws.services.s3.AmazonS3Client;
 import com.amazonaws.services.s3.model.ObjectListing;
 import com.amazonaws.services.s3.model.S3ObjectSummary;
 import com.conveyal.otpac.actors.Executive;
-import com.conveyal.otpac.actors.Manager;
+import com.conveyal.otpac.actors.WorkerManager;
 import com.conveyal.otpac.actors.SPTWorker;
 import com.conveyal.otpac.handlers.AddWorkerHandler;
 import com.conveyal.otpac.handlers.FindHandler;
@@ -77,7 +77,7 @@ public class Main {
 			server.start();
 
 		} else {
-			ActorRef manager = system.actorOf(Props.create(Manager.class), "manager");
+			ActorRef manager = system.actorOf(Props.create(WorkerManager.class), "manager");
 			System.out.println("spinning up actor with path: " + manager.path());
 		}
 

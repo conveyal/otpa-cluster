@@ -40,7 +40,7 @@ import akka.routing.Routee;
 import akka.routing.Router;
 import akka.util.Timeout;
 
-public class Manager extends UntypedActor {
+public class WorkerManager extends UntypedActor {
 	LoggingAdapter log = Logging.getLogger(getContext().system(), this);
 	
 	public enum Status {READY,BUILDING_GRAPH,WORKING};
@@ -61,11 +61,11 @@ public class Manager extends UntypedActor {
 	AmazonS3 s3;
 	private JobSliceSpec jobSpec=null;
 	
-	Manager(){
+	WorkerManager(){
 		this( Runtime.getRuntime().availableProcessors() );
 	}
 
-	Manager(int nWorkers) {
+	WorkerManager(int nWorkers) {
 		// grab credentials from "~.aws/credentials"
 		AWSCredentials creds = new ProfileCredentialsProvider().getCredentials();
 		s3 = new AmazonS3Client(creds);

@@ -1,7 +1,7 @@
 package com.conveyal.otpac.standalone;
 
 import com.conveyal.otpac.actors.Executive;
-import com.conveyal.otpac.actors.Manager;
+import com.conveyal.otpac.actors.WorkerManager;
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
 
@@ -29,7 +29,7 @@ public class StandaloneCluster {
 	public StandaloneWorker createWorker(int nWorkers) {
 		StandaloneWorker ret = new StandaloneWorker();
 		
-		ret.manager = system.actorOf(Props.create(Manager.class, nWorkers), "manager");
+		ret.manager = system.actorOf(Props.create(WorkerManager.class, nWorkers), "manager");
 		
 		return ret;
 	}
@@ -37,7 +37,7 @@ public class StandaloneCluster {
 	public StandaloneWorker createWorker() {
 		StandaloneWorker ret = new StandaloneWorker();
 		
-		ret.manager = system.actorOf(Props.create(Manager.class), "manager");
+		ret.manager = system.actorOf(Props.create(WorkerManager.class), "manager");
 		
 		return ret;
 	}
