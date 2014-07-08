@@ -4,7 +4,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 
 import org.opentripplanner.analyst.PointFeature;
-import org.opentripplanner.analyst.PointSet.Category;
 import org.opentripplanner.analyst.SampleSet;
 import org.opentripplanner.routing.graph.Graph;
 

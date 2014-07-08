@@ -9,7 +9,6 @@ import java.util.Date;
 import java.util.TimeZone;
 
 import org.opentripplanner.analyst.PointSet;
-import org.opentripplanner.analyst.PointSet.Category;
 import org.opentripplanner.util.DateUtils;
 
 import com.amazonaws.auth.AWSCredentials;

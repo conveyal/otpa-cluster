@@ -51,7 +51,10 @@
           ws.onmessage = function(e) {
             var workResult = $.parseJSON( e.data );
 
-            var radius = workResult.categories["NONE"]["mag"][0][5]/1000.0;
+            var radius=0;
+            for(var i=0; i<15; i++){
+              radius += workResult.histograms["mag"][i]/10000.0
+            }
 
             var latlng = L.latLng(workResult.lat,workResult.lon);
             var marker = L.circleMarker( latlng, {"radius":radius} );

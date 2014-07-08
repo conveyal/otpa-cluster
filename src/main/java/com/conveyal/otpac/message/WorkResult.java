@@ -8,12 +8,8 @@ import java.util.Map.Entry;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.opentripplanner.analyst.Histogram;
-import org.opentripplanner.analyst.Indicator;
-import org.opentripplanner.analyst.IndicatorLite;
 import org.opentripplanner.analyst.PointFeature;
-import org.opentripplanner.analyst.PointSet.Attribute;
-import org.opentripplanner.analyst.PointSet.Category;
-import org.opentripplanner.analyst.Quantiles;
+import org.opentripplanner.analyst.ResultFeature;
 
 
 public class WorkResult implements Serializable{
@@ -22,16 +18,16 @@ public class WorkResult implements Serializable{
 	public boolean success;
 	public PointFeature point=null;
 	public int jobId;
-	private IndicatorLite indicator;
+	private ResultFeature feat;
 
-	public WorkResult(boolean success, IndicatorLite ind) {
+	public WorkResult(boolean success, ResultFeature feat) {
 		this.success = success;
-		this.indicator = ind;
+		this.feat = feat;
 	}
 	
 	public String toString(){
 		if(success)
-			return "<Job success:"+success+" point:"+point+" histograms.size:"+indicator.featureCount()+">";
+			return "<Job success:"+success+" point:"+point+" histograms.size:"+feat.histograms.size()+">";
 		else
 			return "<Job success:"+success+">";
 	}
@@ -43,36 +39,16 @@ public class WorkResult implements Serializable{
 		if(success){
 			ret.put("lat", this.point.getLat());
 			ret.put("lon", this.point.getLon());
-			ret.put("categories", getCategoriesJson(this.indicator.categories));
+			ret.put("histograms", getPropertiesJson(this.feat.histograms));
 		}
 		return ret.toString();
 	}
 
-	private JSONObject getCategoriesJson(Map<String, Category> categories) {
+	private JSONObject getPropertiesJson(Map<String, Histogram> categories) {
 		JSONObject ret = new JSONObject();
 		
-		for(Entry<String,Category> entry : categories.entrySet()){
-			ret.put(entry.getKey(), getCategoryJson(entry.getValue()));
-		}
-		
-		return ret;
-	}
-
-	private JSONObject getCategoryJson(Category value) {
-		JSONObject ret = new JSONObject();
-		
-		for(Entry<String,Attribute> entry : value.getAttributes().entrySet()){
-			ret.put(entry.getKey(), getAttributeJson(entry.getValue()));
-		}
-		
-		return ret;
-	}
-
-	private JSONArray getAttributeJson(Attribute attr) {
-		JSONArray ret = new JSONArray();
-		
-		for(Histogram hist: attr.getHistogram()){
-			ret.put( hist.sums );
+		for(Entry<String,Histogram> entry : categories.entrySet()){
+			ret.put(entry.getKey(), entry.getValue().sums);
 		}
 		
 		return ret;

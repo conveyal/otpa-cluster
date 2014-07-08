@@ -1,7 +1,7 @@
 package com.conveyal.otpac.actors;
 
 
-import org.opentripplanner.analyst.IndicatorLite;
+import org.opentripplanner.analyst.ResultFeature;
 import org.opentripplanner.analyst.SampleSet;
 import org.opentripplanner.analyst.TimeSurface;
 import org.opentripplanner.common.model.GenericLocation;
@@ -64,7 +64,7 @@ public class SPTWorker extends UntypedActor {
 		
 		TimeSurface ts = new TimeSurface( spt );
 		
-		IndicatorLite ind = new IndicatorLite(this.to, ts, false);
+		ResultFeature ind = ResultFeature.eval(this.to, ts);
 		
 		WorkResult res = new WorkResult(true, ind);
 		res.point = req.from;
