@@ -5,11 +5,14 @@ import java.util.Collection;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import org.geotools.geojson.geom.GeometryJSON;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.opentripplanner.analyst.Histogram;
 import org.opentripplanner.analyst.PointFeature;
 import org.opentripplanner.analyst.ResultFeature;
+
+import com.vividsolutions.jts.geom.Geometry;
 
 
 public class WorkResult implements Serializable{
@@ -40,6 +43,12 @@ public class WorkResult implements Serializable{
 			ret.put("lat", this.point.getLat());
 			ret.put("lon", this.point.getLon());
 			ret.put("histograms", getPropertiesJson(this.feat.histograms));
+			Geometry geom = this.point.getGeom();
+			if(geom!=null){
+				GeometryJSON gj = new GeometryJSON();
+				ret.put("geom", gj.toString(geom));
+			}
+			
 		}
 		return ret.toString();
 	}
