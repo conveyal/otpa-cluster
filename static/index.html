@@ -41,9 +41,6 @@
 
           console.log( "opening up socket for jobId:"+jobId);
 
-          var circleGroup = new L.LayerGroup();
-          map.addLayer( circleGroup );
-
           ws = new WebSocket("ws://localhost:8080/grizzly-websockets-chat/chat/"+jobId);
           ws.onopen = function() {
             console.log( "socket open" );
@@ -51,15 +48,31 @@
           ws.onmessage = function(e) {
             var workResult = $.parseJSON( e.data );
 
-            var radius=0;
-            for(var i=0; i<15; i++){
-              radius += workResult.histograms["mag"][i]/10000.0
+            if( 'geom' in workResult ){
+              var geom = $.parseJSON( workResult.geom );
+              var geojson = {"type":"Feature","geometry":geom};
+
+              var mag=0;
+              for(var i=0; i<15; i++){
+                mag += workResult.histograms["DEC_10_S_2"][i];
+              }
+
+              //map 0 to 10k as white to blue, then 10k to 20k as blue to red
+              var red;
+              var blue;
+              if(mag<10000){
+                blue = (mag/10000.0)*255;
+                red = 0.0;
+              } else if(mag>10000 && mag<20000){
+                blue = 255;
+                red = ((mag-10000)/10000.0)*255;
+              }
+              var redstr = ("00" + Math.round(red).toString(16)).slice(-2);
+              var bluestr = ("00" +Math.round(blue).toString(16)).slice(-2);
+              var color = "#"+redstr+"00"+bluestr;
+
+              L.geoJson( geojson, {style:{"stroke":false,opacity:0.8,color:color}} ).addTo( map );
             }
-
-            var latlng = L.latLng(workResult.lat,workResult.lon);
-            var marker = L.circleMarker( latlng, {"radius":radius} );
-
-            circleGroup.addLayer( marker );
 
             $("#readout").html( e.data );
           }
@@ -80,8 +93,8 @@
     <div id="controlpanel">
       <form id="startjob"
         <span>graph id:</span><input id="graphid" type="text" value="austin"><br>
-        <span>origins:</span><input id="origins" type="text" value="austin.csv"><br>
-        <span>destinations:</span><input id="dests" type="text" value="austin.csv"><br>
+        <span>origins:</span><input id="origins" type="text" value="austin.shp.zip"><br>
+        <span>destinations:</span><input id="dests" type="text" value="austin.shp.zip"><br>
         <span>date:</span><input id="date" type="text" value="2014-06-09"><br>
         <span>time:</span><input id="time" type="text" value="8:05 AM"><br>
         <span>timezone:</span><input id="timezone" type="text" value="America/Chicago"><br>
