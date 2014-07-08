@@ -2,12 +2,18 @@ package com.conveyal.otpac.actors;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.Enumeration;
 import java.util.TimeZone;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
 
+import org.apache.commons.io.IOUtils;
 import org.opentripplanner.analyst.PointSet;
 import org.opentripplanner.util.DateUtils;
 
@@ -27,6 +33,7 @@ import com.conveyal.otpac.message.JobSliceSpec;
 import com.conveyal.otpac.message.JobSpec;
 import com.conveyal.otpac.message.WorkResult;
 import com.conveyal.otpac.JobItemCallback;
+import com.google.common.io.Files;
 
 import akka.actor.ActorRef;
 import akka.actor.ActorSelection;
@@ -143,11 +150,63 @@ public class JobManager extends UntypedActor {
 		PointSet ret=null;
 		if( isCsv(ptsLoc) ){
 			ret = PointSet.fromCsv( "cache/"+objEtag+"-"+ptsLoc );
+		} else if( isZippedShapefile(ptsLoc) ){
+			File tempDir = Files.createTempDir();
+			String shapefileName = unzipShapefile( tempDir, "cache/"+objEtag+"-"+ptsLoc );
+			if(shapefileName == null){
+				objectData.close();
+				throw new Exception( "Zip does no contain a shapefile" );
+			}
+			
+			ret = PointSet.fromShapefile( tempDir.getPath()+"/"+shapefileName);
+			tempDir.delete();
 		}
 		
 		objectData.close();
 		return ret;
 
+	}
+
+	/**
+	 * 
+	 * @param Directory to unzip into.
+	 * @param File to unzip.
+	 * @return The name of the shapefile.
+	 * @throws IOException
+	 */
+	private String unzipShapefile(File dir, String file) throws IOException {
+		String retval=null;
+		
+		ZipFile zipFile = new ZipFile(file);
+	    Enumeration<? extends ZipEntry> entries = zipFile.entries();
+	    while (entries.hasMoreElements()) {
+	        ZipEntry entry = entries.nextElement();
+	        
+	        String name = entry.getName();
+	        if(name.endsWith(".shp")){
+	        	retval = name;
+	        }
+	        
+	        File entryDestination = new File(dir,  name);
+	        entryDestination.getParentFile().mkdirs();
+	        if (entry.isDirectory())
+	            entryDestination.mkdirs();
+	        else {
+	            InputStream in = zipFile.getInputStream(entry);
+	            OutputStream out = new FileOutputStream(entryDestination);
+	            IOUtils.copy(in, out);
+	            IOUtils.closeQuietly(in);
+	            IOUtils.closeQuietly(out);
+	        }
+	    }
+	    zipFile.close();
+	    
+	    return retval;
+	}
+
+	private boolean isZippedShapefile(String ptsLoc) {
+		String[] parts = ptsLoc.split("\\.");
+		return parts[parts.length-2].equals("shp") && parts[parts.length-1].equals("zip");
 	}
 
 	private boolean isCsv(String ptsLoc) {
