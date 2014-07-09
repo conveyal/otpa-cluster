@@ -45,9 +45,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
-import java.util.logging.Logger;
 
-import org.glassfish.grizzly.Grizzly;
 import org.glassfish.grizzly.http.HttpRequestPacket;
 import org.glassfish.grizzly.websockets.DataFrame;
 import org.glassfish.grizzly.websockets.ProtocolHandler;
@@ -58,7 +56,6 @@ import org.glassfish.grizzly.websockets.WebSocketListener;
 import com.conveyal.otpac.message.WorkResult;
 
 public class JobResultsApplication extends WebSocketApplication {
-    private static final Logger logger = Grizzly.logger(JobResultsApplication.class);
     
     Map<Integer,Set<JobResultsWebSocket>> clients;
     

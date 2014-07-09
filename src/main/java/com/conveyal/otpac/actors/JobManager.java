@@ -1,32 +1,14 @@
 package com.conveyal.otpac.actors;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Date;
-import java.util.Enumeration;
 import java.util.TimeZone;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipFile;
 
-import org.apache.commons.io.IOUtils;
 import org.opentripplanner.analyst.PointSet;
 import org.opentripplanner.util.DateUtils;
 
-import com.amazonaws.auth.AWSCredentials;
-import com.amazonaws.auth.profile.ProfileCredentialsProvider;
-import com.amazonaws.services.s3.AmazonS3;
-import com.amazonaws.services.s3.AmazonS3Client;
-import com.amazonaws.services.s3.model.ObjectListing;
-import com.amazonaws.services.s3.model.ObjectMetadata;
-import com.amazonaws.services.s3.model.S3Object;
-import com.amazonaws.services.s3.model.S3ObjectSummary;
 import com.conveyal.otpac.S3Datastore;
-import com.conveyal.otpac.Util;
 import com.conveyal.otpac.message.AddManager;
 import com.conveyal.otpac.message.JobDone;
 import com.conveyal.otpac.message.JobSliceDone;
@@ -34,7 +16,6 @@ import com.conveyal.otpac.message.JobSliceSpec;
 import com.conveyal.otpac.message.JobSpec;
 import com.conveyal.otpac.message.WorkResult;
 import com.conveyal.otpac.JobItemCallback;
-import com.google.common.io.Files;
 
 import akka.actor.ActorRef;
 import akka.actor.ActorSelection;

@@ -3,22 +3,13 @@ package com.conveyal.otpac.standalone;
 import java.io.IOException;
 import java.util.ArrayList;
 
-import scala.concurrent.Await;
-import scala.concurrent.Future;
-import scala.concurrent.duration.Duration;
-import akka.pattern.Patterns;
-import akka.util.Timeout;
-
 import com.conveyal.otpac.JobItemCallback;
 import com.conveyal.otpac.standalone.StandaloneCluster;
 import com.conveyal.otpac.standalone.StandaloneExecutive;
 import com.conveyal.otpac.standalone.StandaloneWorker;
-import com.conveyal.otpac.message.JobId;
 import com.conveyal.otpac.message.JobSpec;
 import com.conveyal.otpac.message.JobStatus;
 import com.conveyal.otpac.message.WorkResult;
-import com.fasterxml.jackson.core.JsonParseException;
-import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import junit.framework.TestCase;
@@ -104,8 +95,8 @@ public class BasicTest extends TestCase {
 					ObjectMapper mapper = new ObjectMapper();
 					try {
 						Object back = mapper.readValue(jsonBack.getBytes(), Object.class);
+						assertNotNull(back);
 					} catch (IOException e) {
-						// TODO Auto-generated catch block
 						e.printStackTrace();
 						assertTrue(false);
 					}

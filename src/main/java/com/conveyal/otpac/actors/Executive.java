@@ -5,7 +5,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
 
-import com.conveyal.otpac.JobResultsApplication;
 import com.conveyal.otpac.message.*;
 
 import scala.concurrent.Await;

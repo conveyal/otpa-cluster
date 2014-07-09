@@ -7,15 +7,11 @@ import scala.concurrent.Future;
 import scala.concurrent.duration.Duration;
 import akka.actor.ActorRef;
 import akka.actor.ActorSelection;
-import akka.actor.Props;
 import akka.pattern.Patterns;
 import akka.util.Timeout;
 
-import com.conveyal.otpac.actors.Executive;
 import com.conveyal.otpac.message.AddManager;
 import com.conveyal.otpac.message.JobId;
-import com.conveyal.otpac.message.JobResult;
-import com.conveyal.otpac.message.JobResultQuery;
 import com.conveyal.otpac.message.JobSpec;
 import com.conveyal.otpac.message.JobStatus;
 import com.conveyal.otpac.message.JobStatusQuery;
@@ -28,9 +24,10 @@ public class StandaloneExecutive {
 		// Block until success. We don't need the result; we're just preventing race conditions.
 		Timeout timeout = new Timeout(Duration.create(5, "seconds"));
 		Future<Object> future = Patterns.ask(executive, new AddManager(remoteManager), timeout);
-		Boolean result = (Boolean) Await.result(future, timeout.duration());
+		Await.result(future, timeout.duration());
 	}
 
+	@SuppressWarnings("unchecked")
 	public ArrayList<JobStatus> getJobStatus() throws Exception {
 		Timeout timeout = new Timeout(Duration.create(5, "seconds"));
 		Future<Object> future = Patterns.ask(executive, new JobStatusQuery(), timeout);

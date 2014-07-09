@@ -23,7 +23,6 @@ public class AnalystGraphBuilder {
 		GraphBuilderTask graphBuilder = new GraphBuilderTask();
 		List<File> gtfsFiles = new ArrayList<File>();
 		List<File> osmFiles = new ArrayList<File>();
-		File configFile = null;
 		/*
 		 * For now this is adding files from all directories listed, rather than
 		 * building multiple graphs.
@@ -45,6 +44,8 @@ public class AnalystGraphBuilder {
 				break;
 			case OTHER:
 				System.out.println("Skipping file ''" + file);
+			default:
+				break;
 			}
 		}
 

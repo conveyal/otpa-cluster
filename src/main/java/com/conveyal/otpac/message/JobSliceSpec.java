@@ -3,8 +3,6 @@ package com.conveyal.otpac.message;
 import java.io.Serializable;
 import java.util.Date;
 
-import org.opentripplanner.analyst.PointSet;
-
 public class JobSliceSpec implements Serializable {
 
 	private static final long serialVersionUID = -2994498856080149222L;

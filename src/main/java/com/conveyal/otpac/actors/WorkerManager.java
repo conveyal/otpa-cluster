@@ -2,7 +2,6 @@ package com.conveyal.otpac.actors;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashMap;
 
 import org.opentripplanner.analyst.PointFeature;
 import org.opentripplanner.analyst.PointSet;
@@ -13,20 +12,13 @@ import scala.concurrent.Await;
 import scala.concurrent.Future;
 import scala.concurrent.duration.Duration;
 
-import com.amazonaws.auth.AWSCredentials;
-import com.amazonaws.auth.profile.ProfileCredentialsProvider;
-import com.amazonaws.services.s3.AmazonS3;
-import com.amazonaws.services.s3.AmazonS3Client;
 import com.conveyal.otpac.S3Datastore;
-import com.conveyal.otpac.message.AssignExecutive;
 import com.conveyal.otpac.message.BuildGraph;
 import com.conveyal.otpac.message.JobSliceDone;
 import com.conveyal.otpac.message.JobSliceSpec;
-import com.conveyal.otpac.message.JobSpec;
 import com.conveyal.otpac.message.JobStatus;
 import com.conveyal.otpac.message.JobStatusQuery;
 import com.conveyal.otpac.message.OneToManyRequest;
-import com.conveyal.otpac.message.PrimeCandidate;
 import com.conveyal.otpac.message.SetOneToManyContext;
 import com.conveyal.otpac.message.StartWorkers;
 import com.conveyal.otpac.message.WorkResult;
@@ -132,7 +124,7 @@ public class WorkerManager extends UntypedActor {
 			
 			Timeout timeout = new Timeout(Duration.create(10, "seconds"));
 			Future<Object> future = Patterns.ask(worker, new SetOneToManyContext(this.graph,sampleSet), timeout);
-			Boolean result = (Boolean) Await.result(future, timeout.duration());
+			Await.result(future, timeout.duration());
 		}
 		
 		this.jobSize = 0;

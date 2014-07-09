@@ -1,7 +1,6 @@
 package com.conveyal.otpac.message;
 
 import java.io.Serializable;
-import java.util.ArrayList;
 
 import com.conveyal.otpac.JobItemCallback;
 
