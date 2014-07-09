@@ -21,16 +21,23 @@ import akka.actor.Props;
 
 public class Main {
 
-	public static void main(String[] args) throws IOException {
-
-		Config config = ConfigFactory.load();
+	public static void main(String[] args) throws IOException {		
+		Config config;
+		if(args.length > 0){
+			String hostname = args[0];
+			System.out.println( hostname );
+			config = ConfigFactory.parseString("akka.remote.netty.tcp.hostname=\""+hostname+"\"")
+		    .withFallback(ConfigFactory.load());
+		} else {
+			config = ConfigFactory.load();
+		}
 		String hostname = config.getString("akka.remote.netty.tcp.hostname");
 		int port = config.getInt("akka.remote.netty.tcp.port");
 		System.out.println("running on " + hostname + ":" + port);
 		String role = config.getString("role");
 		System.out.println("role: " + role);
 
-		ActorSystem system = ActorSystem.create("MySystem");
+		ActorSystem system = ActorSystem.create("MySystem", config);
 
 		if (role.equals("taskmaster")) {
 			// start the executive actor
