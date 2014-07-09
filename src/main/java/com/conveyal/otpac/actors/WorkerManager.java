@@ -1,9 +1,11 @@
 package com.conveyal.otpac.actors;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 
 import org.opentripplanner.analyst.PointFeature;
+import org.opentripplanner.analyst.PointSet;
 import org.opentripplanner.analyst.SampleSet;
 import org.opentripplanner.routing.graph.Graph;
 
@@ -15,6 +17,7 @@ import com.amazonaws.auth.AWSCredentials;
 import com.amazonaws.auth.profile.ProfileCredentialsProvider;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3Client;
+import com.conveyal.otpac.S3Datastore;
 import com.conveyal.otpac.message.AssignExecutive;
 import com.conveyal.otpac.message.BuildGraph;
 import com.conveyal.otpac.message.JobSliceDone;
@@ -58,17 +61,15 @@ public class WorkerManager extends UntypedActor {
 	private Graph graph=null;
 	private Status status;
 	
-	AmazonS3 s3;
 	private JobSliceSpec jobSpec=null;
+	private S3Datastore s3Datastore;
 	
 	WorkerManager(){
 		this( Runtime.getRuntime().availableProcessors() );
 	}
 
 	WorkerManager(int nWorkers) {
-		// grab credentials from "~.aws/credentials"
-		AWSCredentials creds = new ProfileCredentialsProvider().getCredentials();
-		s3 = new AmazonS3Client(creds);
+		s3Datastore = new S3Datastore();
 
 		ArrayList<Routee> routees = new ArrayList<Routee>();
 		workers = new ArrayList<ActorRef>();
@@ -102,10 +103,10 @@ public class WorkerManager extends UntypedActor {
 		}
 	}
 
-	private void onMsgWorkResult(WorkResult res) {
+	private void onMsgWorkResult(WorkResult res) throws IOException {
 		jobsReturned += 1;
 		log.debug("got: {}", res);
-		log.debug("{}/{} jobs returned", jobsReturned, jobSize);
+		log.debug("{}/{} jobs returned", jobsReturned, jobSize);		
 		
 		if(res.success){
 			jobManager.forward(res, getContext());;
@@ -119,7 +120,12 @@ public class WorkerManager extends UntypedActor {
 	private void onMsgStartWorkers() throws Exception {
 		log.debug( "set the workers doing their thing" );
 		
-		SampleSet sampleSet = new SampleSet(this.jobSpec.to, this.graph.getSampleFactory());
+		PointSet fromAll = s3Datastore.getPointset(this.jobSpec.fromPtsLoc);
+		PointSet fromPts = fromAll.slice(this.jobSpec.fromPtsStart, this.jobSpec.fromPtsEnd);
+		
+		PointSet toPts = s3Datastore.getPointset(this.jobSpec.toPtsLoc);
+		
+		SampleSet sampleSet = new SampleSet(toPts, this.graph.getSampleFactory());
 		
 		//send graph to all workers
 		for( ActorRef worker : workers ){
@@ -131,8 +137,8 @@ public class WorkerManager extends UntypedActor {
 		
 		this.jobSize = 0;
 		this.jobsReturned=0;
-		for(int i=0; i<this.jobSpec.from.featureCount(); i++){
-			PointFeature from = this.jobSpec.from.getFeature(i);
+		for(int i=0; i<fromPts.featureCount(); i++){
+			PointFeature from = fromPts.getFeature(i);
 			router.route(new OneToManyRequest(from, this.jobSpec.date), getSelf());
 			this.jobSize += 1;
 		}

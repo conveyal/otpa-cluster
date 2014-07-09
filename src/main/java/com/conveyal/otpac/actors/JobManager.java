@@ -25,6 +25,7 @@ import com.amazonaws.services.s3.model.ObjectListing;
 import com.amazonaws.services.s3.model.ObjectMetadata;
 import com.amazonaws.services.s3.model.S3Object;
 import com.amazonaws.services.s3.model.S3ObjectSummary;
+import com.conveyal.otpac.S3Datastore;
 import com.conveyal.otpac.Util;
 import com.conveyal.otpac.message.AddManager;
 import com.conveyal.otpac.message.JobDone;
@@ -47,15 +48,14 @@ public class JobManager extends UntypedActor {
 	LoggingAdapter log = Logging.getLogger(getContext().system(), this);
 	int workersOut=0;
 	
-	AmazonS3 s3;
 	private ActorRef executive;
 	private int jobId;
 	private JobItemCallback callback;
+	private S3Datastore s3Store;
 
 	JobManager() {
-		// grab credentials from "~.aws/credentials"
-		AWSCredentials creds = new ProfileCredentialsProvider().getCredentials();
-		s3 = new AmazonS3Client(creds);
+		
+		s3Store = new S3Datastore();
 		
 		managers = new ArrayList<ActorSelection>();
 	}
@@ -82,7 +82,7 @@ public class JobManager extends UntypedActor {
 		}
 	}
 
-	private void onMsgWorkResult(WorkResult res) {
+	private void onMsgWorkResult(WorkResult res) throws IOException {
 		res.jobId = jobId;
 		
 		if(callback != null){
@@ -100,12 +100,8 @@ public class JobManager extends UntypedActor {
 		this.executive = getSender();
 		
 		log.debug( "get origin pointset: {}",js.fromPtsLoc );
-		PointSet fromPts = getPointset( js.fromPtsLoc );
+		PointSet fromPts = s3Store.getPointset( js.fromPtsLoc );
 		log.debug( "got origin pointset: {}",fromPts.featureCount() );
-		
-		log.debug( "get destination pointset: {}",js.toPtsLoc );
-		PointSet toPts = getPointset( js.toPtsLoc );
-		log.debug( "got destination pointset: {}",toPts.featureCount() );
 		
 		TimeZone tz = TimeZone.getTimeZone(js.tz);
 		Date date = DateUtils.toDate(js.date, js.time, tz);
@@ -115,13 +111,11 @@ public class JobManager extends UntypedActor {
 		for(int i=0;i<managers.size(); i++){				
 			int start = Math.round(seglen * i);
 			int end = Math.round(seglen * (i + 1));
-			
-			PointSet fromSplit = fromPts.slice(start, end);
-			
+						
 			ActorSelection manager = managers.get(i);
 			
 			workersOut+=1;
-			manager.tell(new JobSliceSpec(fromSplit,toPts,js.graphId,date), getSelf());
+			manager.tell(new JobSliceSpec(js.fromPtsLoc,start,end,js.toPtsLoc,js.graphId,date), getSelf());
 		}
 	}
 
@@ -130,89 +124,6 @@ public class JobManager extends UntypedActor {
 		getSender().tell(new Boolean(true), getSelf());
 	}
 
-	private PointSet getPointset(String ptsLoc) throws Exception {
 
-		// get pointset metadata from S3
-		S3Object obj = s3.getObject("pointsets",ptsLoc);
-		ObjectMetadata objMet = obj.getObjectMetadata();
-		
-		// if it's not already cached, do so
-		String objEtag = objMet.getETag();
-		File cachedFile = new File("cache/"+objEtag+"-"+ptsLoc);
-		if(!cachedFile.exists()){
-			log.debug("caching pointset: {}", ptsLoc);
-			Util.saveFile( cachedFile, obj.getObjectContent(), objMet.getContentLength(), true);
-		}
-		
-		// grab it from the cache
-		InputStream objectData = new FileInputStream( cachedFile );
-		
-		PointSet ret=null;
-		if( isCsv(ptsLoc) ){
-			ret = PointSet.fromCsv( "cache/"+objEtag+"-"+ptsLoc );
-		} else if( isZippedShapefile(ptsLoc) ){
-			File tempDir = Files.createTempDir();
-			String shapefileName = unzipShapefile( tempDir, "cache/"+objEtag+"-"+ptsLoc );
-			if(shapefileName == null){
-				objectData.close();
-				throw new Exception( "Zip does no contain a shapefile" );
-			}
-			
-			ret = PointSet.fromShapefile( tempDir.getPath()+"/"+shapefileName);
-			tempDir.delete();
-		}
-		
-		objectData.close();
-		return ret;
-
-	}
-
-	/**
-	 * 
-	 * @param Directory to unzip into.
-	 * @param File to unzip.
-	 * @return The name of the shapefile.
-	 * @throws IOException
-	 */
-	private String unzipShapefile(File dir, String file) throws IOException {
-		String retval=null;
-		
-		ZipFile zipFile = new ZipFile(file);
-	    Enumeration<? extends ZipEntry> entries = zipFile.entries();
-	    while (entries.hasMoreElements()) {
-	        ZipEntry entry = entries.nextElement();
-	        
-	        String name = entry.getName();
-	        if(name.endsWith(".shp")){
-	        	retval = name;
-	        }
-	        
-	        File entryDestination = new File(dir,  name);
-	        entryDestination.getParentFile().mkdirs();
-	        if (entry.isDirectory())
-	            entryDestination.mkdirs();
-	        else {
-	            InputStream in = zipFile.getInputStream(entry);
-	            OutputStream out = new FileOutputStream(entryDestination);
-	            IOUtils.copy(in, out);
-	            IOUtils.closeQuietly(in);
-	            IOUtils.closeQuietly(out);
-	        }
-	    }
-	    zipFile.close();
-	    
-	    return retval;
-	}
-
-	private boolean isZippedShapefile(String ptsLoc) {
-		String[] parts = ptsLoc.split("\\.");
-		return parts[parts.length-2].equals("shp") && parts[parts.length-1].equals("zip");
-	}
-
-	private boolean isCsv(String ptsLoc) {
-		String[] parts = ptsLoc.split("\\.");
-		String formatPart = parts[parts.length-1];
-		return formatPart.equals("csv");
-	}
 
 }

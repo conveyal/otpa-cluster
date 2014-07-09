@@ -46,11 +46,11 @@
             console.log( "socket open" );
           }
           ws.onmessage = function(e) {
+
             var workResult = $.parseJSON( e.data );
 
             if( 'geom' in workResult ){
-              var geom = $.parseJSON( workResult.geom );
-              var geojson = {"type":"Feature","geometry":geom};
+              var geojson = {"type":"Feature","geometry":workResult.geom};
 
               var mag=0;
               for(var i=0; i<15; i++){

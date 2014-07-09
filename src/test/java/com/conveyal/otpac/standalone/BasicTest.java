@@ -17,6 +17,9 @@ import com.conveyal.otpac.message.JobId;
 import com.conveyal.otpac.message.JobSpec;
 import com.conveyal.otpac.message.JobStatus;
 import com.conveyal.otpac.message.WorkResult;
+import com.fasterxml.jackson.core.JsonParseException;
+import com.fasterxml.jackson.databind.JsonMappingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import junit.framework.TestCase;
 
@@ -98,6 +101,15 @@ public class BasicTest extends TestCase {
 				
 				assertNotNull(jsonBack);
 				if(jsonBack!=null){
+					ObjectMapper mapper = new ObjectMapper();
+					try {
+						Object back = mapper.readValue(jsonBack.getBytes(), Object.class);
+					} catch (IOException e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
+						assertTrue(false);
+					}
+					
 					assertEquals(jsonBack.substring(0,10), "{\"jobId\":0");
 				}
 
