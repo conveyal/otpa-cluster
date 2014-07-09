@@ -64,6 +64,8 @@ public class WorkResult implements Serializable{
 		}
 		jgen.writeEndObject();
 		
+		jgen.flush();
+		
 		return out.toString();
 	}
 
