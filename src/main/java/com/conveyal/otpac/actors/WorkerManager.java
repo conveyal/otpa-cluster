@@ -22,6 +22,7 @@ import com.conveyal.otpac.message.OneToManyRequest;
 import com.conveyal.otpac.message.SetOneToManyContext;
 import com.conveyal.otpac.message.StartWorkers;
 import com.conveyal.otpac.message.WorkResult;
+import com.conveyal.otpac.message.AssignExecutive;
 
 import akka.actor.ActorRef;
 import akka.actor.Props;
@@ -48,6 +49,7 @@ public class WorkerManager extends UntypedActor {
 	private Router router;
 	private ActorRef jobManager;
 	private ActorRef graphBuilder;
+        private ActorRef executive;
 	
 	private String curGraphId=null;
 	private Graph graph=null;
@@ -82,6 +84,8 @@ public class WorkerManager extends UntypedActor {
 	public void onReceive(Object message) throws Exception {
 		if (message instanceof JobSliceSpec) {
 			onMsgJobSliceSpec((JobSliceSpec) message);
+                } else if (message instanceof AssignExecutive){
+                        onMsgAssignExecutive((AssignExecutive) message);
 		} else if (message instanceof Graph){
 			onMsgGetGraph((Graph) message);
 		} else if (message instanceof StartWorkers){
@@ -93,6 +97,12 @@ public class WorkerManager extends UntypedActor {
 		} else {
 			unhandled(message);
 		}
+	}
+
+	private void onMsgAssignExecutive(AssignExecutive exec){
+		this.executive = getSender();
+		log.debug( "assigned to executive: {}", this.executive );
+		this.executive.tell( new Boolean(true), getSelf());
 	}
 
 	private void onMsgWorkResult(WorkResult res) throws IOException {
