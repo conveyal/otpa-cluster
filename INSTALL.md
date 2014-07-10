@@ -41,8 +41,7 @@ $ cd otpa-cluster
 
 - install AWS credentials
 
-$ mkdir ~/.aws
-$ vim ~/.aws/credentials
+$ vim s3credentials
 
 the credentials file takes this form:
 
