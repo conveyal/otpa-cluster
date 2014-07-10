@@ -8,3 +8,4 @@ graphsource
 *.DS_Store
 temp
 build
+*.swp
