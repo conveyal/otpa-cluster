@@ -44,7 +44,7 @@ public class Main {
 			System.out.println("setting up master");
 			ActorRef executive = system.actorOf(Props.create(Executive.class));
 
-			HttpServer server = HttpServer.createSimpleServer("static");
+			HttpServer server = HttpServer.createSimpleServer("static", hostname, 80);
 
 			server.getListener("grizzly").registerAddOn(new WebSocketAddOn());
 

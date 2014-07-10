@@ -85,10 +85,13 @@ public class Executive extends UntypedActor {
 		getSender().tell(ret, getSelf());
 	}
 
-	private void onMsgAddManager(AddManager aw) {
+	private void onMsgAddManager(AddManager aw) throws Exception {
 		System.out.println("add worker " + aw.remote);
 
-		aw.remote.tell(new AssignExecutive(), getSelf());
+		// make sure we can reach the remote WorkerManager
+		Timeout timeout = new Timeout(Duration.create(5, "seconds"));
+		Future<Object> future = Patterns.ask(aw.remote, new AssignExecutive(), timeout);
+		Await.result( future, timeout.duration() );
 
 		managers.put(aw.remote, null);
 		
@@ -140,7 +143,7 @@ public class Executive extends UntypedActor {
 		ActorRef jobManager = jobManagers.get(jobId);
 
 		// assign the manager to the job manager; blocking operation
-		Timeout timeout = new Timeout(Duration.create(1, "seconds"));
+		Timeout timeout = new Timeout(Duration.create(5, "seconds"));
 		Future<Object> future = Patterns.ask(jobManager, new AddManager(manager), timeout);
 		Boolean success = (Boolean) Await.result(future, timeout.duration());
 
