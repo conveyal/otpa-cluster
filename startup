@@ -29,6 +29,7 @@ if __name__=='__main__':
   master_hostname = sys.argv[1]
   hostname = get_hostname()
 
+  # start up cluster worker
   wrk = sp.Popen(["java","-jar", "-Dconfig.resource=worker.conf", "./build/libs/otpa-cluster-all.jar", hostname],stdout=sp.PIPE)
   while True:
     line = wrk.stdout.readline()
@@ -36,14 +37,14 @@ if __name__=='__main__':
     if line.split()[:2]==["starting","manager"]:
       break
 
-  time.sleep(3)
-
+  # register cluster worker with master
   try:	
     register_self(master_hostname, hostname)
   except Exception, ex:
     wrk.terminate()
     raise ex
 
+  # let the worker run
   while True:
     line = wrk.stdout.readline()
     if len(line)==0:
