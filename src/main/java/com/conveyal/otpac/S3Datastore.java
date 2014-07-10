@@ -24,9 +24,9 @@ public class S3Datastore {
 	
 	private AmazonS3Client s3;
 
-	public S3Datastore(){
+	public S3Datastore(String filename){
 		// grab credentials from "~.aws/credentials"
-		AWSCredentials creds = new ProfileCredentialsProvider().getCredentials();
+		AWSCredentials creds = new ProfileCredentialsProvider(filename, "default").getCredentials();
 		s3 = new AmazonS3Client(creds);
 	}
 

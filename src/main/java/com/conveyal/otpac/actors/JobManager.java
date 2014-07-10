@@ -35,14 +35,15 @@ public class JobManager extends UntypedActor {
 	private S3Datastore s3Store;
 
 	JobManager() {
+		String s3ConfigFilename = context().system().settings().config().getString("s3.credentials.filename");
 		
-		s3Store = new S3Datastore();
+		s3Store = new S3Datastore(s3ConfigFilename);
 		
 		managers = new ArrayList<ActorSelection>();
 	}
 
 	@Override
-	public void onReceive(Object msg) throws Exception {
+	public void onReceive(Object msg) throws Exception {		
 		if (msg instanceof AddManager) {
 			onMsgAddManager((AddManager) msg);
 		} else if (msg instanceof JobSpec) {
