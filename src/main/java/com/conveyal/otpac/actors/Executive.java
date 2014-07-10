@@ -91,7 +91,12 @@ public class Executive extends UntypedActor {
 		// make sure we can reach the remote WorkerManager
 		Timeout timeout = new Timeout(Duration.create(5, "seconds"));
 		Future<Object> future = Patterns.ask(aw.remote, new AssignExecutive(), timeout);
-		Await.result( future, timeout.duration() );
+		Boolean result = (Boolean)Await.result( future, timeout.duration() );
+		if(result){
+			log.info("connected remote manager {}", aw.remote);
+		} else {
+			log.info("something went wrong connecting to manager {}", aw.remote);
+		}
 
 		managers.put(aw.remote, null);
 		
