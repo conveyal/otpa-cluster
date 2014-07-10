@@ -2,6 +2,8 @@
 
 import subprocess as sp
 import sys
+import urllib
+import time
 
 def get_instance_metadata():
   lines = sp.check_output("ec2metadata").split("\n")
@@ -13,36 +15,31 @@ def get_hostname():
   metadata = get_instance_metadata()
   return metadata['public-hostname']
 
-def register_self(hostname):
-
-  if len(sys.argv)<2:
-    exit("missing master hostname argument")
-
-  master_hostname = sys.argv[1]
-
+def register_self(master_hostname, hostname):
   url = "http://%s/addworker/?path=MySystem@%s:2553/user/manager"%(master_hostname, hostname)
-
-  import urllib
 
   print "registering worker using: %s"%url
   fp = urllib.urlopen( url )
   print fp.read()
 
 if __name__=='__main__':
+  if len(sys.argv)<2:
+    exit("usage: %s master_hostname"%sys.argv[0] )
+
+  master_hostname = sys.argv[1]
   hostname = get_hostname()
 
-  wrk = sp.Popen(["java","-jar", "-Dconfig.resource=worker.conf", "./otpa-cluster/build/libs/otpa-cluster-all.jar", hostname],stdout=sp.PIPE)
+  wrk = sp.Popen(["java","-jar", "-Dconfig.resource=worker.conf", "./build/libs/otpa-cluster-all.jar", hostname],stdout=sp.PIPE)
   while True:
     line = wrk.stdout.readline()
     print line,
     if line.split()[:2]==["starting","manager"]:
       break
 
-  import time
   time.sleep(3)
 
   try:	
-    register_self(hostname)
+    register_self(master_hostname, hostname)
   except Exception, ex:
     wrk.terminate()
     raise ex
