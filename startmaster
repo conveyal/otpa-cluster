@@ -16,4 +16,6 @@ if __name__=='__main__':
   hostname = get_hostname()
 
   # start up cluster worker
-  sp.Popen(["java","-jar", "./build/libs/otpa-cluster-all.jar", hostname])
+  pp = sp.Popen(["java","-jar", "./build/libs/otpa-cluster-all.jar", hostname])
+
+  pp.wait()
