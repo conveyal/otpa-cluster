@@ -85,6 +85,8 @@ public class WorkerManager extends UntypedActor {
 
 	@Override
 	public void onReceive(Object message) throws Exception {
+		log.info("got message {}", message);
+		
 		if (message instanceof JobSliceSpec) {
 			onMsgJobSliceSpec((JobSliceSpec) message);
 		} else if (message instanceof AssignExecutive) {
