@@ -29,19 +29,19 @@ public class S3Datastore {
 	private AmazonS3Client s3;
 	private Boolean workOffline = false;
 	
-	public S3Datastore() {
+	public S3Datastore(String filename) {
 		// don't work offline by default
-		this(false);
+		this(filename, false);
 	}
 	
-	public S3Datastore(Boolean workOffline){
+	public S3Datastore(String filename, Boolean workOffline){
 		
 		// allow the data store to work offline with cached data and skip S3 connection
 		this.workOffline = workOffline;
 		
 		if(!this.workOffline) {
 			// grab credentials from "~.aws/credentials"
-			AWSCredentials creds = new ProfileCredentialsProvider().getCredentials();
+			AWSCredentials creds = new ProfileCredentialsProvider(filename, "default").getCredentials();
 			s3 = new AmazonS3Client(creds);
 		}
 	}
@@ -58,6 +58,7 @@ public class S3Datastore {
 		else {
 			FileUtils.moveFileToDirectory(pointSetFile, new File(CACHE_DIR), true);
 		}
+
 	}
 
 	public PointSet getPointset(String ptsLoc) throws Exception {

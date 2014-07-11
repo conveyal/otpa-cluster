@@ -130,6 +130,7 @@ public class Executive extends UntypedActor {
 
 		// create a job manager
 		ActorRef jobManager = getContext().actorOf(Props.create(JobManager.class), "jobmanager-" + jobId);
+		
 		jobManagers.put(jobId, jobManager);
 
 		// assign some managers to the job manager

@@ -41,7 +41,7 @@
 
           console.log( "opening up socket for jobId:"+jobId);
 
-          ws = new WebSocket("ws://localhost:8080/grizzly-websockets-chat/chat/"+jobId);
+          ws = new WebSocket("ws://"+window.location.host+"/grizzly-websockets-chat/chat/"+jobId);
           ws.onopen = function() {
             console.log( "socket open" );
           }

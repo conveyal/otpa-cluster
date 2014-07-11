@@ -36,8 +36,8 @@ public class GraphBuilder extends UntypedActor {
 	LoggingAdapter log = Logging.getLogger(getContext().system(), this);
 
 	GraphBuilder() {
-		// grab credentials from "~.aws/credentials"
-		AWSCredentials creds = new ProfileCredentialsProvider().getCredentials();
+		String s3ConfigFilename = context().system().settings().config().getString("s3.credentials.filename");
+		AWSCredentials creds = new ProfileCredentialsProvider(s3ConfigFilename, "default").getCredentials();
 		s3 = new AmazonS3Client(creds);
 
 	}
