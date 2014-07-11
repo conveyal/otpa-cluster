@@ -12,8 +12,9 @@ import akka.actor.Props;
 public class StandaloneCluster {
 	ActorSystem system;
 	
-	public StandaloneCluster(){
-		Config config = ConfigFactory.defaultOverrides();
+	public StandaloneCluster(String s3configfilename){
+		Config config = ConfigFactory.parseString("s3.credentials.filename=\""+s3configfilename+"\"")
+			    .withFallback(ConfigFactory.defaultOverrides());
 		
 		this.system = ActorSystem.create("MySystem", config);
 	}
