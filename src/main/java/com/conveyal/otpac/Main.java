@@ -58,7 +58,7 @@ public class Main {
 			
 			// set up webapp endpoints
 			ServerConfiguration svCfg = server.getServerConfiguration();
-			svCfg.addHttpHandler(new AddWorkerHandler(executive, system), "/addworker");
+			svCfg.addHttpHandler(new AddWorkerHandler(executive), "/addworker");
 			svCfg.addHttpHandler(new GetJobResultHandler(executive), "/getstatus");
 			svCfg.addHttpHandler(new FindHandler(executive, chatApplication), "/find");
 

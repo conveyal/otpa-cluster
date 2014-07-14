@@ -86,19 +86,21 @@ public class Executive extends UntypedActor {
 	}
 
 	private void onMsgAddManager(AddManager aw) throws Exception {
-		System.out.println("add worker " + aw.remote);
+		ActorSelection remoteManager = context().system().actorSelection(aw.path);
+		
+		System.out.println("add worker " + remoteManager);
 
 		// make sure we can reach the remote WorkerManager
 		Timeout timeout = new Timeout(Duration.create(5, "seconds"));
-		Future<Object> future = Patterns.ask(aw.remote, new AssignExecutive(), timeout);
+		Future<Object> future = Patterns.ask(remoteManager, new AssignExecutive(), timeout);
 		Boolean result = (Boolean)Await.result( future, timeout.duration() );
 		if(result){
-			log.info("connected remote manager {}", aw.remote);
+			log.info("connected remote manager {}", remoteManager);
 		} else {
-			log.info("something went wrong connecting to manager {}", aw.remote);
+			log.info("something went wrong connecting to manager {}", remoteManager);
 		}
 
-		managers.put(aw.remote, null);
+		managers.put(remoteManager, null);
 		
 		getSender().tell(new Boolean(true), getSelf());
 	}

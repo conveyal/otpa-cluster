@@ -20,10 +20,10 @@ public class StandaloneExecutive {
 	
 	ActorRef executive;
 	
-	protected void registerWorker(ActorSelection remoteManager) throws Exception {				
+	protected void registerWorker(String path) throws Exception {				
 		// Block until success. We don't need the result; we're just preventing race conditions.
 		Timeout timeout = new Timeout(Duration.create(5, "seconds"));
-		Future<Object> future = Patterns.ask(executive, new AddManager(remoteManager), timeout);
+		Future<Object> future = Patterns.ask(executive, new AddManager(path), timeout);
 		Await.result(future, timeout.duration());
 	}
 

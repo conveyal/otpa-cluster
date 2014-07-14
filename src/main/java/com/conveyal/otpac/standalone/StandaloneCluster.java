@@ -43,10 +43,8 @@ public class StandaloneCluster {
 		return ret;
 	}
 
-	public void registerWorker(StandaloneExecutive exec, StandaloneWorker worker) throws Exception {
-		ActorSelection remoteManager = system.actorSelection(worker.getPath());
-		
-		exec.registerWorker(remoteManager);
+	public void registerWorker(StandaloneExecutive exec, StandaloneWorker worker) throws Exception {		
+		exec.registerWorker(worker.getPath().toString());
 	}
 
 	public void stop(StandaloneWorker worker) {
