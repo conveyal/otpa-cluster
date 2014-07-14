@@ -44,14 +44,16 @@ public class JobManager extends UntypedActor {
 
 	@Override
 	public void onReceive(Object msg) throws Exception {		
-		if (msg instanceof AddManager) {
-			onMsgAddManager((AddManager) msg);
+		if (msg instanceof ActorSelection) {
+			onMsgActorSelection((ActorSelection) msg);
 		} else if (msg instanceof JobSpec) {
 			onMsgJobSpec((JobSpec) msg);
 		} else if(msg instanceof WorkResult){
 			onMsgWorkResult((WorkResult) msg);
 		} else if(msg instanceof JobSliceDone){			
 			onMsgJobSliceDone();
+		} else {
+			unhandled(msg);
 		}
 	}
 
@@ -101,8 +103,8 @@ public class JobManager extends UntypedActor {
 		}
 	}
 
-	private void onMsgAddManager(AddManager am) {
-		managers.add(am.remote);
+	private void onMsgActorSelection(ActorSelection asel) {
+		managers.add(asel);
 		getSender().tell(new Boolean(true), getSelf());
 	}
 

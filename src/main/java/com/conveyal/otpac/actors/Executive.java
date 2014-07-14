@@ -150,7 +150,7 @@ public class Executive extends UntypedActor {
 
 		// assign the manager to the job manager; blocking operation
 		Timeout timeout = new Timeout(Duration.create(5, "seconds"));
-		Future<Object> future = Patterns.ask(jobManager, new AddManager(manager), timeout);
+		Future<Object> future = Patterns.ask(jobManager, manager, timeout);
 		Boolean success = (Boolean) Await.result(future, timeout.duration());
 
 		// if it worked, register the manager as busy
