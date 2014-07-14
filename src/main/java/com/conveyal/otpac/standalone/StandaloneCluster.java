@@ -27,10 +27,10 @@ public class StandaloneCluster {
 		return ret;
 	}
 
-	public StandaloneWorker createWorker(int nWorkers) {
+	public StandaloneWorker createWorker(int nWorkers, Boolean workOffline) {
 		StandaloneWorker ret = new StandaloneWorker();
 		
-		ret.manager = system.actorOf(Props.create(WorkerManager.class, nWorkers), "manager");
+		ret.manager = system.actorOf(Props.create(WorkerManager.class, nWorkers, workOffline), "manager");
 		
 		return ret;
 	}

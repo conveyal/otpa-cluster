@@ -61,12 +61,12 @@ public class WorkerManager extends UntypedActor {
 	private S3Datastore s3Datastore;
 
 	WorkerManager() {
-		this(Runtime.getRuntime().availableProcessors());
+		this(Runtime.getRuntime().availableProcessors(), false);
 	}
 
-	WorkerManager(int nWorkers) {
+	WorkerManager(int nWorkers, Boolean workOffline) {
 		String s3ConfigFilename = context().system().settings().config().getString("s3.credentials.filename");
-		s3Datastore = new S3Datastore(s3ConfigFilename);
+		s3Datastore = new S3Datastore(s3ConfigFilename, workOffline);
 
 		ArrayList<Routee> routees = new ArrayList<Routee>();
 		workers = new ArrayList<ActorRef>();
@@ -77,7 +77,7 @@ public class WorkerManager extends UntypedActor {
 		}
 		router = new Router(new RoundRobinRoutingLogic(), routees);
 
-		graphBuilder = getContext().actorOf(Props.create(GraphBuilder.class), "builder");
+		graphBuilder = getContext().actorOf(Props.create(GraphBuilder.class, workOffline), "builder");
 
 		System.out.println("starting manager with " + nWorkers + " workers");
 		status = Status.READY;

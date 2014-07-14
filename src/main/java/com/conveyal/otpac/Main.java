@@ -2,6 +2,11 @@ package com.conveyal.otpac;
 
 import java.io.IOException;
 
+import org.apache.commons.cli.BasicParser;
+import org.apache.commons.cli.CommandLine;
+import org.apache.commons.cli.CommandLineParser;
+import org.apache.commons.cli.Options;
+import org.apache.commons.cli.ParseException;
 import org.glassfish.grizzly.http.server.HttpServer;
 import org.glassfish.grizzly.http.server.ServerConfiguration;
 import org.glassfish.grizzly.websockets.WebSocketAddOn;
@@ -21,16 +26,31 @@ import akka.actor.Props;
 
 public class Main {
 
-	public static void main(String[] args) throws IOException {		
+	public static void main(String[] args) throws IOException, ParseException {
+		Options options = new Options();
+		options.addOption( "h", true, "hostname");
+		options.addOption( "p", true, "port" );
+		
+		CommandLineParser parser = new BasicParser();
+		CommandLine cmd = parser.parse(options, args);
+		
 		Config config;
-		if(args.length > 0){
-			String hostname = args[0];
+		if(cmd.hasOption('h')){
+			String hostname = cmd.getOptionValue('h');
 			System.out.println( hostname );
 			config = ConfigFactory.parseString("akka.remote.netty.tcp.hostname=\""+hostname+"\"")
 		    .withFallback(ConfigFactory.load());
 		} else {
 			config = ConfigFactory.load();
 		}
+		
+		int webPort;
+		if(cmd.hasOption('p')){
+			webPort = Integer.parseInt(cmd.getOptionValue('p'));
+		} else {
+			webPort = 8080;
+		}
+		
 		String hostname = config.getString("akka.remote.netty.tcp.hostname");
 		int port = config.getInt("akka.remote.netty.tcp.port");
 		System.out.println("running on " + hostname + ":" + port);
@@ -44,7 +64,7 @@ public class Main {
 			System.out.println("setting up master");
 			ActorRef executive = system.actorOf(Props.create(Executive.class));
 
-			HttpServer server = HttpServer.createSimpleServer("static", hostname, 8080);
+			HttpServer server = HttpServer.createSimpleServer("static", hostname, webPort);
 
 			server.getListener("grizzly").registerAddOn(new WebSocketAddOn());
 
