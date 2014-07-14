@@ -44,6 +44,10 @@ public class GraphBuilder extends UntypedActor {
 
 	Boolean workOffline = false;
 	
+	GraphBuilder() {
+		this(false);
+	}
+	
 	GraphBuilder(Boolean workOffline) {
 		
 		if(!workOffline) {

@@ -33,7 +33,7 @@ public class BasicTest extends TestCase {
 		StandaloneCluster cluster = new StandaloneCluster("s3credentials");
 
 		StandaloneExecutive exec = cluster.createExecutive();
-		StandaloneWorker worker = cluster.createWorker(1, true);
+		StandaloneWorker worker = cluster.createWorker(1, false);
 
 		cluster.registerWorker(exec, worker);
 
@@ -70,7 +70,7 @@ public class BasicTest extends TestCase {
 		StandaloneCluster cluster = new StandaloneCluster("s3credentials");
 
 		StandaloneExecutive exec = cluster.createExecutive();
-		StandaloneWorker worker = cluster.createWorker(1, true);
+		StandaloneWorker worker = cluster.createWorker(1, false);
 
 		cluster.registerWorker(exec, worker);
 

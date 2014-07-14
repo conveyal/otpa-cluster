@@ -77,7 +77,7 @@ public class WorkerManager extends UntypedActor {
 		}
 		router = new Router(new RoundRobinRoutingLogic(), routees);
 
-		graphBuilder = getContext().actorOf(Props.create(GraphBuilder.class), "builder");
+		graphBuilder = getContext().actorOf(Props.create(GraphBuilder.class, workOffline), "builder");
 
 		System.out.println("starting manager with " + nWorkers + " workers");
 		status = Status.READY;
