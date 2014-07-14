@@ -37,6 +37,10 @@ public class WorkResult implements Serializable{
 		else
 			return "<Job success:"+success+">";
 	}
+	
+	public ResultFeature getResult() {
+		return feat;
+	}
 
 	public String toJsonString() throws IOException {
 		

@@ -33,7 +33,7 @@ public class BasicTest extends TestCase {
 		StandaloneCluster cluster = new StandaloneCluster();
 
 		StandaloneExecutive exec = cluster.createExecutive();
-		StandaloneWorker worker = cluster.createWorker(1);
+		StandaloneWorker worker = cluster.createWorker(1, true);
 
 		cluster.registerWorker(exec, worker);
 
@@ -70,7 +70,7 @@ public class BasicTest extends TestCase {
 		StandaloneCluster cluster = new StandaloneCluster();
 
 		StandaloneExecutive exec = cluster.createExecutive();
-		StandaloneWorker worker = cluster.createWorker(1);
+		StandaloneWorker worker = cluster.createWorker(1, true);
 
 		cluster.registerWorker(exec, worker);
 
