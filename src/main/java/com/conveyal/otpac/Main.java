@@ -27,23 +27,25 @@ import akka.actor.Props;
 public class Main {
 
 	public static void main(String[] args) throws IOException, ParseException {
+		// set up command line parser
 		Options options = new Options();
 		options.addOption( "h", true, "hostname");
 		options.addOption( "p", true, "port" );
 		
+		// parse command line options
 		CommandLineParser parser = new BasicParser();
 		CommandLine cmd = parser.parse(options, args);
 		
-		Config config;
+		// get hostname for both akka-remoting and http interface
+		Config config = ConfigFactory.load();
+		String hostname;
 		if(cmd.hasOption('h')){
-			String hostname = cmd.getOptionValue('h');
-			System.out.println( hostname );
-			config = ConfigFactory.parseString("akka.remote.netty.tcp.hostname=\""+hostname+"\"")
-		    .withFallback(ConfigFactory.load());
+			hostname = cmd.getOptionValue('h');
 		} else {
-			config = ConfigFactory.load();
+			hostname = config.getString("akka.remote.netty.tcp.hostname");
 		}
 		
+		// get port for http interface
 		int webPort;
 		if(cmd.hasOption('p')){
 			webPort = Integer.parseInt(cmd.getOptionValue('p'));
@@ -51,9 +53,9 @@ public class Main {
 			webPort = 8080;
 		}
 		
-		String hostname = config.getString("akka.remote.netty.tcp.hostname");
-		int port = config.getInt("akka.remote.netty.tcp.port");
-		System.out.println("running on " + hostname + ":" + port);
+		// print some server info
+		int akkaPort = config.getInt("akka.remote.netty.tcp.port");
+		System.out.println("running on " + hostname + ":" + akkaPort);
 		String role = config.getString("role");
 		System.out.println("role: " + role);
 
@@ -64,8 +66,8 @@ public class Main {
 			System.out.println("setting up master");
 			ActorRef executive = system.actorOf(Props.create(Executive.class));
 
+			// start the http server
 			HttpServer server = HttpServer.createSimpleServer("static", hostname, webPort);
-
 			server.getListener("grizzly").registerAddOn(new WebSocketAddOn());
 
 			// initialize websocket chat application
@@ -74,6 +76,7 @@ public class Main {
 			// register the application
 			WebSocketEngine.getEngine().register("/grizzly-websockets-chat", "/chat/*", chatApplication);
 			
+			// turn off file caching. for development only. remove in production.
 			server.getListener("grizzly").getFileCache().setEnabled(false);
 			
 			// set up webapp endpoints
@@ -85,6 +88,7 @@ public class Main {
 			server.start();
 
 		} else {
+			// start up workermanager
 			ActorRef manager = system.actorOf(Props.create(WorkerManager.class), "manager");
 			System.out.println("spinning up actor with path: " + manager.path());
 		}
