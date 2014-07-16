@@ -68,7 +68,7 @@ public class Executive extends UntypedActor {
 	private void onMsgJobDone(JobDone jd) {
 		// free up WorkerManagers
 		for (ActorRef workerManager : jd.workerManagers) {
-			workerManagers.put(workerManager, null);
+			freeWorkerManager(workerManager);
 		}
 
 		// deallocate job manager
@@ -76,6 +76,10 @@ public class Executive extends UntypedActor {
 		getContext().system().stop(getSender());
 
 		log.debug("{} says job done", getSender());
+	}
+
+	private void freeWorkerManager(ActorRef workerManager) {
+		workerManagers.put(workerManager, null);
 	}
 
 	private void onMsgJobStatusQuery() throws Exception {
@@ -113,7 +117,7 @@ public class Executive extends UntypedActor {
 			log.info("something went wrong connecting to manager {}", remoteManager);
 		}
 
-		workerManagers.put(remoteManager, null);
+		freeWorkerManager(remoteManager);
 		
 		getSender().tell(new Boolean(true), getSelf());
 	}
@@ -150,7 +154,7 @@ public class Executive extends UntypedActor {
 
 		// assign some managers to the job manager
 		for (ActorRef manager : getFreeWorkerManagers()) {
-			assignManager(jobId, manager);
+			assignWorkerManager(jobId, manager);
 		}
 
 		// kick off the job
@@ -159,11 +163,11 @@ public class Executive extends UntypedActor {
 		jobId += 1;
 	}
 
-	private boolean assignManager(int jobId, ActorRef manager) throws Exception {
+	private boolean assignWorkerManager(int jobId, ActorRef manager) throws Exception {
 		// get the job manager for this job id
 		ActorRef jobManager = jobManagers.get(jobId);
 
-		// assign the manager to the job manager; blocking operation
+		// assign the workermanager to the jobmanager; blocking operation
 		Timeout timeout = new Timeout(Duration.create(5, "seconds"));
 		Future<Object> future = Patterns.ask(jobManager, manager, timeout);
 		Boolean success = (Boolean) Await.result(future, timeout.duration());
