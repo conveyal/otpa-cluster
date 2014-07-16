@@ -79,7 +79,7 @@ public class WorkerManager extends UntypedActor {
 
 		graphBuilder = getContext().actorOf(Props.create(GraphBuilder.class, workOffline), "builder");
 
-		System.out.println("starting manager with " + nWorkers + " workers");
+		System.out.println("starting worker-manager with " + nWorkers + " workers");
 		status = Status.READY;
 	}
 

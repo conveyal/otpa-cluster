@@ -27,7 +27,7 @@ public class Executive extends UntypedActor {
 	int tasksOut;
 	int jobId = 0;
 	Map<Integer, ArrayList<WorkResult>> jobResults;
-	Map<ActorRef, Integer> managers;
+	Map<ActorRef, Integer> workerManagers;
 	Map<Integer, ActorRef> jobManagers;
 
 	LoggingAdapter log = Logging.getLogger(getContext().system(), this);
@@ -35,7 +35,7 @@ public class Executive extends UntypedActor {
 	Executive() {
 		jobResults = new HashMap<Integer, ArrayList<WorkResult>>();
 
-		managers = new HashMap<ActorRef, Integer>();
+		workerManagers = new HashMap<ActorRef, Integer>();
 
 		jobManagers = new HashMap<Integer, ActorRef>();
 
@@ -49,8 +49,8 @@ public class Executive extends UntypedActor {
 			onMsgWorkResult((WorkResult) msg);
 		} else if (msg instanceof JobResultQuery) {
 			onMsgJobResultQuery((JobResultQuery) msg);
-		} else if (msg instanceof AddManager) {
-			onMsgAddManager((AddManager) msg);
+		} else if (msg instanceof AddWorkerManager) {
+			onMsgAddWorkerManager((AddWorkerManager) msg);
 		} else if (msg instanceof JobStatusQuery) {
 			onMsgJobStatusQuery();
 		} else if (msg instanceof JobDone) {
@@ -64,9 +64,9 @@ public class Executive extends UntypedActor {
 	}
 
 	private void onMsgJobDone(JobDone jd) {
-		// free up managers
-		for (ActorRef manager : jd.managers) {
-			managers.put(manager, null);
+		// free up WorkerManagers
+		for (ActorRef workerManager : jd.workerManagers) {
+			workerManagers.put(workerManager, null);
 		}
 
 		// deallocate job manager
@@ -78,18 +78,19 @@ public class Executive extends UntypedActor {
 
 	private void onMsgJobStatusQuery() throws Exception {
 		ArrayList<JobStatus> ret = new ArrayList<JobStatus>();
-		for (ActorRef manager : managers.keySet()) {
+		for (ActorRef workerManager : workerManagers.keySet()) {
 			Timeout timeout = new Timeout(Duration.create(5, "seconds"));
-			Future<Object> future = Patterns.ask(manager, new JobStatusQuery(), timeout);
+			Future<Object> future = Patterns.ask(workerManager, new JobStatusQuery(), timeout);
 			JobStatus result = (JobStatus) Await.result(future, timeout.duration());
 			ret.add(result);
 		}
 		getSender().tell(ret, getSelf());
 	}
 
-	private void onMsgAddManager(AddManager aw) throws Exception {
+	private void onMsgAddWorkerManager(AddWorkerManager aw) throws Exception {
 		ActorSelection remoteManagerSel = context().system().actorSelection(aw.path);
 		
+		// get ActorRef of remote WorkerManager
 		Timeout timeout = new Timeout(Duration.create(5, "seconds"));
 		Future<Object> future = Patterns.ask(remoteManagerSel, new Identify("1"), timeout);
 		ActorIdentity actorId = (ActorIdentity)Await.result( future, timeout.duration() );
@@ -107,7 +108,7 @@ public class Executive extends UntypedActor {
 			log.info("something went wrong connecting to manager {}", remoteManager);
 		}
 
-		managers.put(remoteManager, null);
+		workerManagers.put(remoteManager, null);
 		
 		getSender().tell(new Boolean(true), getSelf());
 	}
@@ -123,7 +124,7 @@ public class Executive extends UntypedActor {
 
 	private void onMsgJobSpec(JobSpec jobSpec) throws Exception {
 		// if there are no workers to route to, bail
-		if (managers.size() == 0) {
+		if (workerManagers.size() == 0) {
 			getSender().tell(new JobId(-1), getSelf());
 			return;
 		}
@@ -164,7 +165,7 @@ public class Executive extends UntypedActor {
 
 		// if it worked, register the manager as busy
 		if (success) {
-			this.managers.put(manager, jobId);
+			this.workerManagers.put(manager, jobId);
 		}
 
 		return success;
@@ -173,7 +174,7 @@ public class Executive extends UntypedActor {
 	private ArrayList<ActorRef> freeManagers() {
 		ArrayList<ActorRef> ret = new ArrayList<ActorRef>();
 
-		for (Entry<ActorRef, Integer> entry : this.managers.entrySet()) {
+		for (Entry<ActorRef, Integer> entry : this.workerManagers.entrySet()) {
 			if (entry.getValue() == null) {
 				ret.add(entry.getKey());
 			}

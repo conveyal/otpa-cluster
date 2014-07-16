@@ -23,7 +23,7 @@ import akka.event.LoggingAdapter;
 
 public class JobManager extends UntypedActor {
 
-	private ArrayList<ActorRef> managers;
+	private ArrayList<ActorRef> workerManagers;
 	LoggingAdapter log = Logging.getLogger(getContext().system(), this);
 	int workersOut=0;
 	
@@ -37,7 +37,7 @@ public class JobManager extends UntypedActor {
 		
 		s3Store = new S3Datastore(s3ConfigFilename);
 		
-		managers = new ArrayList<ActorRef>();
+		workerManagers = new ArrayList<ActorRef>();
 	}
 
 	@Override
@@ -60,7 +60,7 @@ public class JobManager extends UntypedActor {
 		log.debug("worker {} is done", getSender());
 		
 		if (workersOut==0){
-			executive.tell(new JobDone(jobId, managers), getSelf());
+			executive.tell(new JobDone(jobId, workerManagers), getSelf());
 		}
 	}
 
@@ -89,20 +89,20 @@ public class JobManager extends UntypedActor {
 		Date date = DateUtils.toDate(js.date, js.time, tz);
 
 		// split the job evenly between managers
-		float seglen = fromPts.featureCount() / ((float) managers.size());
-		for(int i=0;i<managers.size(); i++){				
+		float seglen = fromPts.featureCount() / ((float) workerManagers.size());
+		for(int i=0;i<workerManagers.size(); i++){				
 			int start = Math.round(seglen * i);
 			int end = Math.round(seglen * (i + 1));
 						
-			ActorRef manager = managers.get(i);
+			ActorRef workerManager = workerManagers.get(i);
 			
 			workersOut+=1;
-			manager.tell(new JobSliceSpec(js.fromPtsLoc,start,end,js.toPtsLoc,js.graphId,date), getSelf());
+			workerManager.tell(new JobSliceSpec(js.fromPtsLoc,start,end,js.toPtsLoc,js.graphId,date), getSelf());
 		}
 	}
 
 	private void onMsgActorSelection(ActorRef asel) {
-		managers.add(asel);
+		workerManagers.add(asel);
 		getSender().tell(new Boolean(true), getSelf());
 	}
 

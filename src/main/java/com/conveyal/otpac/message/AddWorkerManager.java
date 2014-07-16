@@ -1,9 +1,9 @@
 package com.conveyal.otpac.message;
 
-public class AddManager {
+public class AddWorkerManager {
 	public String path;
 
-	public AddManager(String path) {
+	public AddWorkerManager(String path) {
 		this.path = path;
 	}
 

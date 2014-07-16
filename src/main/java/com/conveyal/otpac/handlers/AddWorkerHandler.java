@@ -4,7 +4,7 @@ import org.glassfish.grizzly.http.server.HttpHandler;
 import org.glassfish.grizzly.http.server.Request;
 import org.glassfish.grizzly.http.server.Response;
 
-import com.conveyal.otpac.message.AddManager;
+import com.conveyal.otpac.message.AddWorkerManager;
 
 import akka.actor.ActorRef;
 
@@ -20,7 +20,7 @@ public class AddWorkerHandler extends HttpHandler{
 	public void service(Request request, Response response) throws Exception {
 		String path = request.getParameterMap().get("path")[0];
 
-		executive.tell(new AddManager("akka.tcp://" + path), ActorRef.noSender());
+		executive.tell(new AddWorkerManager("akka.tcp://" + path), ActorRef.noSender());
 
 		response.getWriter().write( "'" + path + "' added to worker pool" );
 	}
