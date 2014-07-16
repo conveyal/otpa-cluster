@@ -56,6 +56,8 @@ public class Executive extends UntypedActor {
 		} else if (msg instanceof JobDone) {
 			onMsgJobDone((JobDone) msg);
 		} else if (msg instanceof Terminated) {
+			System.out.println("#############EXECUTIVE: TERMINATED#############");
+			
 			// router = router.removeRoutee(((Terminated) msg).actor());
 			// ActorRef r = getContext().actorOf(Props.create(Manager.class));
 			// getContext().watch(r);
@@ -95,6 +97,9 @@ public class Executive extends UntypedActor {
 		Future<Object> future = Patterns.ask(remoteManagerSel, new Identify("1"), timeout);
 		ActorIdentity actorId = (ActorIdentity)Await.result( future, timeout.duration() );
 		ActorRef remoteManager = actorId.getRef();
+		
+		// watch for termination
+		//getContext().watch(remoteManager);
 		
 		System.out.println("add worker " + remoteManager);
 
@@ -144,7 +149,7 @@ public class Executive extends UntypedActor {
 		jobManagers.put(jobId, jobManager);
 
 		// assign some managers to the job manager
-		for (ActorRef manager : freeManagers()) {
+		for (ActorRef manager : getFreeWorkerManagers()) {
 			assignManager(jobId, manager);
 		}
 
@@ -171,7 +176,7 @@ public class Executive extends UntypedActor {
 		return success;
 	}
 
-	private ArrayList<ActorRef> freeManagers() {
+	private ArrayList<ActorRef> getFreeWorkerManagers() {
 		ArrayList<ActorRef> ret = new ArrayList<ActorRef>();
 
 		for (Entry<ActorRef, Integer> entry : this.workerManagers.entrySet()) {

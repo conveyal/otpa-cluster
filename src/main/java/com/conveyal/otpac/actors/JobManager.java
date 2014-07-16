@@ -17,6 +17,7 @@ import com.conveyal.otpac.message.WorkResult;
 import com.conveyal.otpac.JobItemCallback;
 
 import akka.actor.ActorRef;
+import akka.actor.Terminated;
 import akka.actor.UntypedActor;
 import akka.event.Logging;
 import akka.event.LoggingAdapter;
@@ -50,6 +51,8 @@ public class JobManager extends UntypedActor {
 			onMsgWorkResult((WorkResult) msg);
 		} else if(msg instanceof JobSliceDone){			
 			onMsgJobSliceDone();
+		} else if(msg instanceof Terminated){
+			System.out.println("#############JOBMANAGER: TERMINATED#############");
 		} else {
 			unhandled(msg);
 		}
@@ -102,6 +105,8 @@ public class JobManager extends UntypedActor {
 	}
 
 	private void onMsgActorSelection(ActorRef asel) {
+		getContext().watch(asel);
+		
 		workerManagers.add(asel);
 		getSender().tell(new Boolean(true), getSelf());
 	}
