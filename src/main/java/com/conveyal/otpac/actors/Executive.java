@@ -10,8 +10,10 @@ import com.conveyal.otpac.message.*;
 import scala.concurrent.Await;
 import scala.concurrent.Future;
 import scala.concurrent.duration.Duration;
+import akka.actor.ActorIdentity;
 import akka.actor.ActorRef;
 import akka.actor.ActorSelection;
+import akka.actor.Identify;
 import akka.actor.Props;
 import akka.actor.Terminated;
 import akka.actor.UntypedActor;
@@ -25,7 +27,7 @@ public class Executive extends UntypedActor {
 	int tasksOut;
 	int jobId = 0;
 	Map<Integer, ArrayList<WorkResult>> jobResults;
-	Map<ActorSelection, Integer> managers;
+	Map<ActorRef, Integer> managers;
 	Map<Integer, ActorRef> jobManagers;
 
 	LoggingAdapter log = Logging.getLogger(getContext().system(), this);
@@ -33,7 +35,7 @@ public class Executive extends UntypedActor {
 	Executive() {
 		jobResults = new HashMap<Integer, ArrayList<WorkResult>>();
 
-		managers = new HashMap<ActorSelection, Integer>();
+		managers = new HashMap<ActorRef, Integer>();
 
 		jobManagers = new HashMap<Integer, ActorRef>();
 
@@ -63,7 +65,7 @@ public class Executive extends UntypedActor {
 
 	private void onMsgJobDone(JobDone jd) {
 		// free up managers
-		for (ActorSelection manager : jd.managers) {
+		for (ActorRef manager : jd.managers) {
 			managers.put(manager, null);
 		}
 
@@ -76,7 +78,7 @@ public class Executive extends UntypedActor {
 
 	private void onMsgJobStatusQuery() throws Exception {
 		ArrayList<JobStatus> ret = new ArrayList<JobStatus>();
-		for (ActorSelection manager : managers.keySet()) {
+		for (ActorRef manager : managers.keySet()) {
 			Timeout timeout = new Timeout(Duration.create(5, "seconds"));
 			Future<Object> future = Patterns.ask(manager, new JobStatusQuery(), timeout);
 			JobStatus result = (JobStatus) Await.result(future, timeout.duration());
@@ -86,13 +88,18 @@ public class Executive extends UntypedActor {
 	}
 
 	private void onMsgAddManager(AddManager aw) throws Exception {
-		ActorSelection remoteManager = context().system().actorSelection(aw.path);
+		ActorSelection remoteManagerSel = context().system().actorSelection(aw.path);
+		
+		Timeout timeout = new Timeout(Duration.create(5, "seconds"));
+		Future<Object> future = Patterns.ask(remoteManagerSel, new Identify("1"), timeout);
+		ActorIdentity actorId = (ActorIdentity)Await.result( future, timeout.duration() );
+		ActorRef remoteManager = actorId.getRef();
 		
 		System.out.println("add worker " + remoteManager);
 
 		// make sure we can reach the remote WorkerManager
-		Timeout timeout = new Timeout(Duration.create(5, "seconds"));
-		Future<Object> future = Patterns.ask(remoteManager, new AssignExecutive(), timeout);
+		timeout = new Timeout(Duration.create(5, "seconds"));
+		future = Patterns.ask(remoteManager, new AssignExecutive(), timeout);
 		Boolean result = (Boolean)Await.result( future, timeout.duration() );
 		if(result){
 			log.info("connected remote manager {}", remoteManager);
@@ -136,7 +143,7 @@ public class Executive extends UntypedActor {
 		jobManagers.put(jobId, jobManager);
 
 		// assign some managers to the job manager
-		for (ActorSelection manager : freeManagers()) {
+		for (ActorRef manager : freeManagers()) {
 			assignManager(jobId, manager);
 		}
 
@@ -146,7 +153,7 @@ public class Executive extends UntypedActor {
 		jobId += 1;
 	}
 
-	private boolean assignManager(int jobId, ActorSelection manager) throws Exception {
+	private boolean assignManager(int jobId, ActorRef manager) throws Exception {
 		// get the job manager for this job id
 		ActorRef jobManager = jobManagers.get(jobId);
 
@@ -163,10 +170,10 @@ public class Executive extends UntypedActor {
 		return success;
 	}
 
-	private ArrayList<ActorSelection> freeManagers() {
-		ArrayList<ActorSelection> ret = new ArrayList<ActorSelection>();
+	private ArrayList<ActorRef> freeManagers() {
+		ArrayList<ActorRef> ret = new ArrayList<ActorRef>();
 
-		for (Entry<ActorSelection, Integer> entry : this.managers.entrySet()) {
+		for (Entry<ActorRef, Integer> entry : this.managers.entrySet()) {
 			if (entry.getValue() == null) {
 				ret.add(entry.getKey());
 			}

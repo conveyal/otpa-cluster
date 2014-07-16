@@ -9,7 +9,6 @@ import org.opentripplanner.analyst.PointSet;
 import org.opentripplanner.util.DateUtils;
 
 import com.conveyal.otpac.S3Datastore;
-import com.conveyal.otpac.message.AddManager;
 import com.conveyal.otpac.message.JobDone;
 import com.conveyal.otpac.message.JobSliceDone;
 import com.conveyal.otpac.message.JobSliceSpec;
@@ -18,14 +17,13 @@ import com.conveyal.otpac.message.WorkResult;
 import com.conveyal.otpac.JobItemCallback;
 
 import akka.actor.ActorRef;
-import akka.actor.ActorSelection;
 import akka.actor.UntypedActor;
 import akka.event.Logging;
 import akka.event.LoggingAdapter;
 
 public class JobManager extends UntypedActor {
 
-	private ArrayList<ActorSelection> managers;
+	private ArrayList<ActorRef> managers;
 	LoggingAdapter log = Logging.getLogger(getContext().system(), this);
 	int workersOut=0;
 	
@@ -39,13 +37,13 @@ public class JobManager extends UntypedActor {
 		
 		s3Store = new S3Datastore(s3ConfigFilename);
 		
-		managers = new ArrayList<ActorSelection>();
+		managers = new ArrayList<ActorRef>();
 	}
 
 	@Override
 	public void onReceive(Object msg) throws Exception {		
-		if (msg instanceof ActorSelection) {
-			onMsgActorSelection((ActorSelection) msg);
+		if (msg instanceof ActorRef) {
+			onMsgActorSelection((ActorRef) msg);
 		} else if (msg instanceof JobSpec) {
 			onMsgJobSpec((JobSpec) msg);
 		} else if(msg instanceof WorkResult){
@@ -96,14 +94,14 @@ public class JobManager extends UntypedActor {
 			int start = Math.round(seglen * i);
 			int end = Math.round(seglen * (i + 1));
 						
-			ActorSelection manager = managers.get(i);
+			ActorRef manager = managers.get(i);
 			
 			workersOut+=1;
 			manager.tell(new JobSliceSpec(js.fromPtsLoc,start,end,js.toPtsLoc,js.graphId,date), getSelf());
 		}
 	}
 
-	private void onMsgActorSelection(ActorSelection asel) {
+	private void onMsgActorSelection(ActorRef asel) {
 		managers.add(asel);
 		getSender().tell(new Boolean(true), getSelf());
 	}
