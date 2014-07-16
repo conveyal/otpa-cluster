@@ -56,13 +56,34 @@ public class Executive extends UntypedActor {
 		} else if (msg instanceof JobDone) {
 			onMsgJobDone((JobDone) msg);
 		} else if (msg instanceof Terminated) {
-			System.out.println("#############EXECUTIVE: TERMINATED#############");
-			
-			// router = router.removeRoutee(((Terminated) msg).actor());
-			// ActorRef r = getContext().actorOf(Props.create(Manager.class));
-			// getContext().watch(r);
-			// router = router.addRoutee(new ActorRefRoutee(r));
+			onMsgTerminated();
 		}
+	}
+
+	private void onMsgTerminated() {
+		ActorRef dead = getSender();
+		
+		// if the workermanager is assigned to a jobmanager, tell the jobmanager to remove it
+		Integer jobId = getWorkerManagerJob( dead );
+		if(jobId != null){
+			getJobManager(jobId).tell( new RemoveWorkerManager(dead), getSelf() );
+			freeWorkerManager(dead);
+		}
+		
+		// delete the workermanager from the roster
+		deleteWorkerManager(dead);
+	}
+
+	private void deleteWorkerManager(ActorRef dead) {
+		this.workerManagers.remove(dead);
+	}
+
+	private ActorRef getJobManager(Integer jobId) {
+		return this.jobManagers.get(jobId);
+	}
+
+	private Integer getWorkerManagerJob(ActorRef dead) {
+		return this.workerManagers.get(dead);
 	}
 
 	private void onMsgJobDone(JobDone jd) {
@@ -103,7 +124,7 @@ public class Executive extends UntypedActor {
 		ActorRef remoteManager = actorId.getRef();
 		
 		// watch for termination
-		//getContext().watch(remoteManager);
+		getContext().watch(remoteManager);
 		
 		System.out.println("add worker " + remoteManager);
 
