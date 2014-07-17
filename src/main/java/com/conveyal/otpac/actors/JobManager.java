@@ -45,7 +45,7 @@ public class JobManager extends UntypedActor {
 	@Override
 	public void onReceive(Object msg) throws Exception {		
 		if (msg instanceof ActorRef) {
-			onMsgActorSelection((ActorRef) msg);
+			onMsgActorRef((ActorRef) msg);
 		} else if (msg instanceof JobSpec) {
 			onMsgJobSpec((JobSpec) msg);
 		} else if(msg instanceof WorkResult){
@@ -111,7 +111,7 @@ public class JobManager extends UntypedActor {
 		}
 	}
 
-	private void onMsgActorSelection(ActorRef asel) {
+	private void onMsgActorRef(ActorRef asel) {
 		//getContext().watch(asel);
 		
 		workerManagers.add(asel);
