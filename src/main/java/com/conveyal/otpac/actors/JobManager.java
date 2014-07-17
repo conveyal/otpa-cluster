@@ -1,8 +1,9 @@
 package com.conveyal.otpac.actors;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.TimeZone;
 
 import org.opentripplanner.analyst.PointSet;
@@ -25,7 +26,7 @@ import akka.event.LoggingAdapter;
 
 public class JobManager extends UntypedActor {
 
-	private ArrayList<ActorRef> workerManagers;
+	private Set<ActorRef> workerManagers;
 	LoggingAdapter log = Logging.getLogger(getContext().system(), this);
 	int workerManagersOut=0;
 	
@@ -39,7 +40,7 @@ public class JobManager extends UntypedActor {
 		
 		s3Store = new S3Datastore(s3ConfigFilename);
 		
-		workerManagers = new ArrayList<ActorRef>();
+		workerManagers = new HashSet<ActorRef>();
 	}
 
 	@Override
@@ -104,14 +105,15 @@ public class JobManager extends UntypedActor {
 
 		// split the job evenly between managers
 		float seglen = fromPts.featureCount() / ((float) workerManagers.size());
-		for(int i=0;i<workerManagers.size(); i++){				
+		int i=0;
+		for(ActorRef workerManager : workerManagers){
 			int start = Math.round(seglen * i);
 			int end = Math.round(seglen * (i + 1));
-						
-			ActorRef workerManager = workerManagers.get(i);
-			
+									
 			workerManagersOut+=1;
 			workerManager.tell(new JobSliceSpec(js.fromPtsLoc,start,end,js.toPtsLoc,js.graphId,date), getSelf());
+			
+			i++;
 		}
 	}
 
