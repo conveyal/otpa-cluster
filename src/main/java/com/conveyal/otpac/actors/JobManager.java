@@ -55,14 +55,18 @@ public class JobManager extends UntypedActor {
 		} else if(msg instanceof RemoveWorkerManager){
 			onMsgRemoveWorkerManager((RemoveWorkerManager)msg);
 		} else if(msg instanceof Terminated){
-			System.out.println("#############JOBMANAGER: TERMINATED#############");
+			unhandled(msg);
 		} else {
 			unhandled(msg);
 		}
 	}
 
 	private void onMsgRemoveWorkerManager(RemoveWorkerManager msg) {
-		//stub
+		ActorRef dead = msg.workerManager;
+		
+		workerManagers.remove(dead);
+		
+		//TODO fail if the workerManager is out
 	}
 
 	private void onMsgJobSliceDone() {
