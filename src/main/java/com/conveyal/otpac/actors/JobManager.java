@@ -9,11 +9,18 @@ import java.util.TimeZone;
 import org.opentripplanner.analyst.PointSet;
 import org.opentripplanner.util.DateUtils;
 
+import scala.concurrent.Await;
+import scala.concurrent.Future;
+import scala.concurrent.duration.Duration;
+
 import com.conveyal.otpac.S3Datastore;
+import com.conveyal.otpac.message.CancelJob;
 import com.conveyal.otpac.message.JobDone;
 import com.conveyal.otpac.message.JobSliceDone;
 import com.conveyal.otpac.message.JobSliceSpec;
 import com.conveyal.otpac.message.JobSpec;
+import com.conveyal.otpac.message.JobStatus;
+import com.conveyal.otpac.message.JobStatusQuery;
 import com.conveyal.otpac.message.RemoveWorkerManager;
 import com.conveyal.otpac.message.WorkResult;
 import com.conveyal.otpac.JobItemCallback;
@@ -23,6 +30,8 @@ import akka.actor.Terminated;
 import akka.actor.UntypedActor;
 import akka.event.Logging;
 import akka.event.LoggingAdapter;
+import akka.pattern.Patterns;
+import akka.util.Timeout;
 
 public class JobManager extends UntypedActor {
 
@@ -63,7 +72,7 @@ public class JobManager extends UntypedActor {
 		}
 	}
 
-	private void onMsgRemoveWorkerManager(RemoveWorkerManager msg) {
+	private void onMsgRemoveWorkerManager(RemoveWorkerManager msg) throws Exception {
 		ActorRef dead = msg.workerManager;
 		
 		if( workerManagersOut.contains( dead ) ){
@@ -80,10 +89,23 @@ public class JobManager extends UntypedActor {
 		}	
 	}
 
-	private void cancelAndReturn() {
+	private void cancelAndReturn() throws Exception {
 		// cancel every WorkerManager still on a job
+		Timeout timeout = new Timeout(Duration.create(5, "seconds"));
+		Set<Future<Object>> futures = new HashSet<Future<Object>>();
+		for(ActorRef wm : workerManagersOut ){
+			futures.add( Patterns.ask(wm, new CancelJob(), timeout) );
+		}
+		for(Future<Object> future : futures){
+			Await.result(future, timeout.duration());
+		}
+		
 		// move them all the the ready set
+		workerManagersReady.addAll( workerManagersOut );
+		workerManagersOut.clear();
+		
 		// report to supervisor
+		executive.tell( new JobDone(JobDone.Status.CANCELLED, workerManagersReady), getSelf());
 	}
 
 	private void onMsgJobSliceDone() {
