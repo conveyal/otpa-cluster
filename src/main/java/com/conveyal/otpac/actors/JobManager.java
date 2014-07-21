@@ -26,9 +26,9 @@ import akka.event.LoggingAdapter;
 
 public class JobManager extends UntypedActor {
 
-	private Set<ActorRef> workerManagers;
+	private Set<ActorRef> workerManagersReady;
+	private Set<ActorRef> workerManagersOut;
 	LoggingAdapter log = Logging.getLogger(getContext().system(), this);
-	int workerManagersOut=0;
 	
 	private ActorRef executive;
 	private int jobId;
@@ -40,7 +40,8 @@ public class JobManager extends UntypedActor {
 		
 		s3Store = new S3Datastore(s3ConfigFilename);
 		
-		workerManagers = new HashSet<ActorRef>();
+		workerManagersReady = new HashSet<ActorRef>();
+		workerManagersOut = new HashSet<ActorRef>();
 	}
 
 	@Override
@@ -65,17 +66,33 @@ public class JobManager extends UntypedActor {
 	private void onMsgRemoveWorkerManager(RemoveWorkerManager msg) {
 		ActorRef dead = msg.workerManager;
 		
-		workerManagers.remove(dead);
+		if( workerManagersOut.contains( dead ) ){
+			workerManagersOut.remove( dead );
+			cancelAndReturn();
+			return;
+		}
 		
-		//TODO fail if the workerManager is out
+		boolean removedFromReady = workerManagersReady.remove(dead);
+		
+		if(!removedFromReady){
+			log.error("attepting to remove workermanager not on the jobmanager's roster");
+			//TODO raise error more sternly?
+		}	
+	}
+
+	private void cancelAndReturn() {
+		// cancel every WorkerManager still on a job
+		// move them all the the ready set
+		// report to supervisor
 	}
 
 	private void onMsgJobSliceDone() {
-		workerManagersOut-=1;
-		log.debug("worker {} is done", getSender());
+		ActorRef mng = getSender();
+		workerManagersOut.remove(mng);
+		workerManagersReady.add(mng);
 		
-		if (workerManagersOut==0){
-			executive.tell(new JobDone(jobId, workerManagers), getSelf());
+		if (workerManagersOut.isEmpty()){
+			executive.tell(new JobDone(jobId, workerManagersReady), getSelf());
 		}
 	}
 
@@ -104,23 +121,29 @@ public class JobManager extends UntypedActor {
 		Date date = DateUtils.toDate(js.date, js.time, tz);
 
 		// split the job evenly between managers
-		float seglen = fromPts.featureCount() / ((float) workerManagers.size());
+		float seglen = fromPts.featureCount() / ((float) workerManagersReady.size());
 		int i=0;
-		for(ActorRef workerManager : workerManagers){
+		
+		for(ActorRef workerManager : workerManagersReady){
 			int start = Math.round(seglen * i);
 			int end = Math.round(seglen * (i + 1));
 									
-			workerManagersOut+=1;
 			workerManager.tell(new JobSliceSpec(js.fromPtsLoc,start,end,js.toPtsLoc,js.graphId,date), getSelf());
+			
+			workerManagersOut.add( workerManager );
 			
 			i++;
 		}
+		
+		// since we added every WorkerManager in the ready set to the out set, we can empty it
+		workerManagersReady.clear();
+		
 	}
 
 	private void onMsgActorRef(ActorRef asel) {
 		//getContext().watch(asel);
 		
-		workerManagers.add(asel);
+		workerManagersReady.add(asel);
 		getSender().tell(new Boolean(true), getSelf());
 	}
 
