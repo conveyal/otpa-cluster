@@ -79,12 +79,14 @@ public class WorkerManager extends UntypedActor {
 
 		graphBuilder = getContext().actorOf(Props.create(GraphBuilder.class, workOffline), "builder");
 
-		System.out.println("starting manager with " + nWorkers + " workers");
+		System.out.println("starting worker-manager with " + nWorkers + " workers");
 		status = Status.READY;
 	}
 
 	@Override
 	public void onReceive(Object message) throws Exception {
+		log.info("got message {}", message);
+		
 		if (message instanceof JobSliceSpec) {
 			onMsgJobSliceSpec((JobSliceSpec) message);
 		} else if (message instanceof AssignExecutive) {

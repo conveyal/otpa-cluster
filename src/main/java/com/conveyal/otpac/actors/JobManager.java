@@ -9,25 +9,25 @@ import org.opentripplanner.analyst.PointSet;
 import org.opentripplanner.util.DateUtils;
 
 import com.conveyal.otpac.DataDatastore;
-import com.conveyal.otpac.message.AddManager;
 import com.conveyal.otpac.message.JobDone;
 import com.conveyal.otpac.message.JobSliceDone;
 import com.conveyal.otpac.message.JobSliceSpec;
 import com.conveyal.otpac.message.JobSpec;
+import com.conveyal.otpac.message.RemoveWorkerManager;
 import com.conveyal.otpac.message.WorkResult;
 import com.conveyal.otpac.JobItemCallback;
 
 import akka.actor.ActorRef;
-import akka.actor.ActorSelection;
+import akka.actor.Terminated;
 import akka.actor.UntypedActor;
 import akka.event.Logging;
 import akka.event.LoggingAdapter;
 
 public class JobManager extends UntypedActor {
 
-	private ArrayList<ActorSelection> managers;
+	private ArrayList<ActorRef> workerManagers;
 	LoggingAdapter log = Logging.getLogger(getContext().system(), this);
-	int workersOut=0;
+	int workerManagersOut=0;
 	
 	private ActorRef executive;
 	private int jobId;
@@ -39,28 +39,38 @@ public class JobManager extends UntypedActor {
 		
 		s3Store = new DataDatastore(s3ConfigFilename);
 		
-		managers = new ArrayList<ActorSelection>();
+		workerManagers = new ArrayList<ActorRef>();
 	}
 
 	@Override
 	public void onReceive(Object msg) throws Exception {		
-		if (msg instanceof AddManager) {
-			onMsgAddManager((AddManager) msg);
+		if (msg instanceof ActorRef) {
+			onMsgActorSelection((ActorRef) msg);
 		} else if (msg instanceof JobSpec) {
 			onMsgJobSpec((JobSpec) msg);
 		} else if(msg instanceof WorkResult){
 			onMsgWorkResult((WorkResult) msg);
 		} else if(msg instanceof JobSliceDone){			
 			onMsgJobSliceDone();
+		} else if(msg instanceof RemoveWorkerManager){
+			onMsgRemoveWorkerManager((RemoveWorkerManager)msg);
+		} else if(msg instanceof Terminated){
+			System.out.println("#############JOBMANAGER: TERMINATED#############");
+		} else {
+			unhandled(msg);
 		}
 	}
 
+	private void onMsgRemoveWorkerManager(RemoveWorkerManager msg) {
+		//stub
+	}
+
 	private void onMsgJobSliceDone() {
-		workersOut-=1;
+		workerManagersOut-=1;
 		log.debug("worker {} is done", getSender());
 		
-		if (workersOut==0){
-			executive.tell(new JobDone(jobId, managers), getSelf());
+		if (workerManagersOut==0){
+			executive.tell(new JobDone(jobId, workerManagers), getSelf());
 		}
 	}
 
@@ -89,20 +99,22 @@ public class JobManager extends UntypedActor {
 		Date date = DateUtils.toDate(js.date, js.time, tz);
 
 		// split the job evenly between managers
-		float seglen = fromPts.featureCount() / ((float) managers.size());
-		for(int i=0;i<managers.size(); i++){				
+		float seglen = fromPts.featureCount() / ((float) workerManagers.size());
+		for(int i=0;i<workerManagers.size(); i++){				
 			int start = Math.round(seglen * i);
 			int end = Math.round(seglen * (i + 1));
 						
-			ActorSelection manager = managers.get(i);
+			ActorRef workerManager = workerManagers.get(i);
 			
-			workersOut+=1;
-			manager.tell(new JobSliceSpec(js.fromPtsLoc,start,end,js.toPtsLoc,js.graphId,date), getSelf());
+			workerManagersOut+=1;
+			workerManager.tell(new JobSliceSpec(js.fromPtsLoc,start,end,js.toPtsLoc,js.graphId,date), getSelf());
 		}
 	}
 
-	private void onMsgAddManager(AddManager am) {
-		managers.add(am.remote);
+	private void onMsgActorSelection(ActorRef asel) {
+		//getContext().watch(asel);
+		
+		workerManagers.add(asel);
 		getSender().tell(new Boolean(true), getSelf());
 	}
 

@@ -10,8 +10,10 @@ import com.conveyal.otpac.message.*;
 import scala.concurrent.Await;
 import scala.concurrent.Future;
 import scala.concurrent.duration.Duration;
+import akka.actor.ActorIdentity;
 import akka.actor.ActorRef;
 import akka.actor.ActorSelection;
+import akka.actor.Identify;
 import akka.actor.Props;
 import akka.actor.Terminated;
 import akka.actor.UntypedActor;
@@ -25,7 +27,7 @@ public class Executive extends UntypedActor {
 	int tasksOut;
 	int jobId = 0;
 	Map<Integer, ArrayList<WorkResult>> jobResults;
-	Map<ActorSelection, Integer> managers;
+	Map<ActorRef, Integer> workerManagers;
 	Map<Integer, ActorRef> jobManagers;
 
 	LoggingAdapter log = Logging.getLogger(getContext().system(), this);
@@ -33,7 +35,7 @@ public class Executive extends UntypedActor {
 	Executive() {
 		jobResults = new HashMap<Integer, ArrayList<WorkResult>>();
 
-		managers = new HashMap<ActorSelection, Integer>();
+		workerManagers = new HashMap<ActorRef, Integer>();
 
 		jobManagers = new HashMap<Integer, ActorRef>();
 
@@ -47,24 +49,47 @@ public class Executive extends UntypedActor {
 			onMsgWorkResult((WorkResult) msg);
 		} else if (msg instanceof JobResultQuery) {
 			onMsgJobResultQuery((JobResultQuery) msg);
-		} else if (msg instanceof AddManager) {
-			onMsgAddManager((AddManager) msg);
+		} else if (msg instanceof AddWorkerManager) {
+			onMsgAddWorkerManager((AddWorkerManager) msg);
 		} else if (msg instanceof JobStatusQuery) {
 			onMsgJobStatusQuery();
 		} else if (msg instanceof JobDone) {
 			onMsgJobDone((JobDone) msg);
 		} else if (msg instanceof Terminated) {
-			// router = router.removeRoutee(((Terminated) msg).actor());
-			// ActorRef r = getContext().actorOf(Props.create(Manager.class));
-			// getContext().watch(r);
-			// router = router.addRoutee(new ActorRefRoutee(r));
+			onMsgTerminated();
 		}
 	}
 
+	private void onMsgTerminated() {
+		ActorRef dead = getSender();
+		
+		// if the workermanager is assigned to a jobmanager, tell the jobmanager to remove it
+		Integer jobId = getWorkerManagerJob( dead );
+		if(jobId != null){
+			getJobManager(jobId).tell( new RemoveWorkerManager(dead), getSelf() );
+			freeWorkerManager(dead);
+		}
+		
+		// delete the workermanager from the roster
+		deleteWorkerManager(dead);
+	}
+
+	private void deleteWorkerManager(ActorRef dead) {
+		this.workerManagers.remove(dead);
+	}
+
+	private ActorRef getJobManager(Integer jobId) {
+		return this.jobManagers.get(jobId);
+	}
+
+	private Integer getWorkerManagerJob(ActorRef dead) {
+		return this.workerManagers.get(dead);
+	}
+
 	private void onMsgJobDone(JobDone jd) {
-		// free up managers
-		for (ActorSelection manager : jd.managers) {
-			managers.put(manager, null);
+		// free up WorkerManagers
+		for (ActorRef workerManager : jd.workerManagers) {
+			freeWorkerManager(workerManager);
 		}
 
 		// deallocate job manager
@@ -74,31 +99,46 @@ public class Executive extends UntypedActor {
 		log.debug("{} says job done", getSender());
 	}
 
+	private void freeWorkerManager(ActorRef workerManager) {
+		workerManagers.put(workerManager, null);
+	}
+
 	private void onMsgJobStatusQuery() throws Exception {
 		ArrayList<JobStatus> ret = new ArrayList<JobStatus>();
-		for (ActorSelection manager : managers.keySet()) {
+		for (ActorRef workerManager : workerManagers.keySet()) {
 			Timeout timeout = new Timeout(Duration.create(5, "seconds"));
-			Future<Object> future = Patterns.ask(manager, new JobStatusQuery(), timeout);
+			Future<Object> future = Patterns.ask(workerManager, new JobStatusQuery(), timeout);
 			JobStatus result = (JobStatus) Await.result(future, timeout.duration());
 			ret.add(result);
 		}
 		getSender().tell(ret, getSelf());
 	}
 
-	private void onMsgAddManager(AddManager aw) throws Exception {
-		System.out.println("add worker " + aw.remote);
+	private void onMsgAddWorkerManager(AddWorkerManager aw) throws Exception {
+		ActorSelection remoteManagerSel = context().system().actorSelection(aw.path);
+		
+		// get ActorRef of remote WorkerManager
+		Timeout timeout = new Timeout(Duration.create(5, "seconds"));
+		Future<Object> future = Patterns.ask(remoteManagerSel, new Identify("1"), timeout);
+		ActorIdentity actorId = (ActorIdentity)Await.result( future, timeout.duration() );
+		ActorRef remoteManager = actorId.getRef();
+		
+		// watch for termination
+		getContext().watch(remoteManager);
+		
+		System.out.println("add worker " + remoteManager);
 
 		// make sure we can reach the remote WorkerManager
-		Timeout timeout = new Timeout(Duration.create(5, "seconds"));
-		Future<Object> future = Patterns.ask(aw.remote, new AssignExecutive(), timeout);
+		timeout = new Timeout(Duration.create(5, "seconds"));
+		future = Patterns.ask(remoteManager, new AssignExecutive(), timeout);
 		Boolean result = (Boolean)Await.result( future, timeout.duration() );
 		if(result){
-			log.info("connected remote manager {}", aw.remote);
+			log.info("connected remote manager {}", remoteManager);
 		} else {
-			log.info("something went wrong connecting to manager {}", aw.remote);
+			log.info("something went wrong connecting to manager {}", remoteManager);
 		}
 
-		managers.put(aw.remote, null);
+		freeWorkerManager(remoteManager);
 		
 		getSender().tell(new Boolean(true), getSelf());
 	}
@@ -114,7 +154,7 @@ public class Executive extends UntypedActor {
 
 	private void onMsgJobSpec(JobSpec jobSpec) throws Exception {
 		// if there are no workers to route to, bail
-		if (managers.size() == 0) {
+		if (workerManagers.size() == 0) {
 			getSender().tell(new JobId(-1), getSelf());
 			return;
 		}
@@ -134,8 +174,8 @@ public class Executive extends UntypedActor {
 		jobManagers.put(jobId, jobManager);
 
 		// assign some managers to the job manager
-		for (ActorSelection manager : freeManagers()) {
-			assignManager(jobId, manager);
+		for (ActorRef manager : getFreeWorkerManagers()) {
+			assignWorkerManager(jobId, manager);
 		}
 
 		// kick off the job
@@ -144,27 +184,27 @@ public class Executive extends UntypedActor {
 		jobId += 1;
 	}
 
-	private boolean assignManager(int jobId, ActorSelection manager) throws Exception {
+	private boolean assignWorkerManager(int jobId, ActorRef manager) throws Exception {
 		// get the job manager for this job id
 		ActorRef jobManager = jobManagers.get(jobId);
 
-		// assign the manager to the job manager; blocking operation
+		// assign the workermanager to the jobmanager; blocking operation
 		Timeout timeout = new Timeout(Duration.create(5, "seconds"));
-		Future<Object> future = Patterns.ask(jobManager, new AddManager(manager), timeout);
+		Future<Object> future = Patterns.ask(jobManager, manager, timeout);
 		Boolean success = (Boolean) Await.result(future, timeout.duration());
 
 		// if it worked, register the manager as busy
 		if (success) {
-			this.managers.put(manager, jobId);
+			this.workerManagers.put(manager, jobId);
 		}
 
 		return success;
 	}
 
-	private ArrayList<ActorSelection> freeManagers() {
-		ArrayList<ActorSelection> ret = new ArrayList<ActorSelection>();
+	private ArrayList<ActorRef> getFreeWorkerManagers() {
+		ArrayList<ActorRef> ret = new ArrayList<ActorRef>();
 
-		for (Entry<ActorSelection, Integer> entry : this.managers.entrySet()) {
+		for (Entry<ActorRef, Integer> entry : this.workerManagers.entrySet()) {
 			if (entry.getValue() == null) {
 				ret.add(entry.getKey());
 			}
