@@ -12,7 +12,7 @@ import scala.concurrent.Await;
 import scala.concurrent.Future;
 import scala.concurrent.duration.Duration;
 
-import com.conveyal.otpac.S3Datastore;
+import com.conveyal.otpac.DataDatastore;
 import com.conveyal.otpac.message.BuildGraph;
 import com.conveyal.otpac.message.CancelJob;
 import com.conveyal.otpac.message.JobSliceDone;
@@ -58,8 +58,8 @@ public class WorkerManager extends UntypedActor {
 	private Status status;
 
 	private JobSliceSpec jobSpec = null;
-	private S3Datastore s3Datastore;
 	private int nWorkers;
+	private DataDatastore s3Datastore;
 
 	WorkerManager() {
 		this(Runtime.getRuntime().availableProcessors(), false);
@@ -67,7 +67,8 @@ public class WorkerManager extends UntypedActor {
 
 	WorkerManager(int nWorkers, Boolean workOffline) {
 		String s3ConfigFilename = context().system().settings().config().getString("s3.credentials.filename");
-		s3Datastore = new S3Datastore(s3ConfigFilename, workOffline);
+
+		s3Datastore = new DataDatastore(10, s3ConfigFilename, "cache/", workOffline);
 		this.nWorkers = nWorkers;
 		this.workers = new ArrayList<ActorRef>();
 

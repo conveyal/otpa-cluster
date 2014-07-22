@@ -42,12 +42,12 @@ public class JobManager extends UntypedActor {
 	private ActorRef executive;
 	private int jobId;
 	private JobItemCallback callback;
-	private S3Datastore s3Store;
+	private DataDatastore s3Store;
 
 	JobManager() {
 		String s3ConfigFilename = context().system().settings().config().getString("s3.credentials.filename");
 		
-		s3Store = new S3Datastore(s3ConfigFilename);
+		s3Store = new DataDatastore(s3ConfigFilename);
 		
 		workerManagersReady = new HashSet<ActorRef>();
 		workerManagersOut = new HashSet<ActorRef>();
