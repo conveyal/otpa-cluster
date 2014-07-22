@@ -64,7 +64,7 @@ public class SPTWorker extends UntypedActor {
 		
 		TimeSurface ts = new TimeSurface( spt );
 		
-		ResultFeature ind = ResultFeature.eval(this.to, ts);
+		ResultFeature ind = new ResultFeature(this.to, ts);
 		
 		WorkResult res = new WorkResult(true, ind);
 		res.point = req.from;

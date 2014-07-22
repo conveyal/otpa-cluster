@@ -8,7 +8,7 @@ import java.util.TimeZone;
 import org.opentripplanner.analyst.PointSet;
 import org.opentripplanner.util.DateUtils;
 
-import com.conveyal.otpac.S3Datastore;
+import com.conveyal.otpac.DataDatastore;
 import com.conveyal.otpac.message.AddManager;
 import com.conveyal.otpac.message.JobDone;
 import com.conveyal.otpac.message.JobSliceDone;
@@ -32,12 +32,12 @@ public class JobManager extends UntypedActor {
 	private ActorRef executive;
 	private int jobId;
 	private JobItemCallback callback;
-	private S3Datastore s3Store;
+	private DataDatastore s3Store;
 
 	JobManager() {
 		String s3ConfigFilename = context().system().settings().config().getString("s3.credentials.filename");
 		
-		s3Store = new S3Datastore(s3ConfigFilename);
+		s3Store = new DataDatastore(s3ConfigFilename);
 		
 		managers = new ArrayList<ActorSelection>();
 	}
