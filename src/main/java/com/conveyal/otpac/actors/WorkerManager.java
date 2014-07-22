@@ -14,6 +14,7 @@ import scala.concurrent.duration.Duration;
 
 import com.conveyal.otpac.S3Datastore;
 import com.conveyal.otpac.message.BuildGraph;
+import com.conveyal.otpac.message.CancelJob;
 import com.conveyal.otpac.message.JobSliceDone;
 import com.conveyal.otpac.message.JobSliceSpec;
 import com.conveyal.otpac.message.JobStatus;
@@ -59,6 +60,7 @@ public class WorkerManager extends UntypedActor {
 
 	private JobSliceSpec jobSpec = null;
 	private S3Datastore s3Datastore;
+	private int nWorkers;
 
 	WorkerManager() {
 		this(Runtime.getRuntime().availableProcessors(), false);
@@ -67,20 +69,27 @@ public class WorkerManager extends UntypedActor {
 	WorkerManager(int nWorkers, Boolean workOffline) {
 		String s3ConfigFilename = context().system().settings().config().getString("s3.credentials.filename");
 		s3Datastore = new S3Datastore(s3ConfigFilename, workOffline);
+		this.nWorkers = nWorkers;
+		this.workers = new ArrayList<ActorRef>();
 
-		ArrayList<Routee> routees = new ArrayList<Routee>();
-		workers = new ArrayList<ActorRef>();
-		for (int i = 0; i < nWorkers; i++) {
-			ActorRef worker = getContext().actorOf(Props.create(SPTWorker.class), "worker-" + i);
-			routees.add(new ActorRefRoutee(worker));
-			workers.add(worker);
-		}
-		router = new Router(new RoundRobinRoutingLogic(), routees);
+		createAndRouteWorkers();
 
 		graphBuilder = getContext().actorOf(Props.create(GraphBuilder.class, workOffline), "builder");
 
 		System.out.println("starting worker-manager with " + nWorkers + " workers");
 		status = Status.READY;
+	}
+
+	private void createAndRouteWorkers() {
+		ArrayList<Routee> routees = new ArrayList<Routee>();
+		
+		for (int i = 0; i < this.nWorkers; i++) {
+			ActorRef worker = getContext().actorOf(Props.create(SPTWorker.class), "worker-" + i);
+			routees.add(new ActorRefRoutee(worker));
+			workers.add(worker);
+		}
+		
+		router = new Router(new RoundRobinRoutingLogic(), routees);
 	}
 
 	@Override
@@ -99,9 +108,15 @@ public class WorkerManager extends UntypedActor {
 			onMsgWorkResult((WorkResult) message);
 		} else if (message instanceof JobStatusQuery) {
 			getSender().tell(new JobStatus(getSelf(), curJobId, jobsReturned / (float) jobSize), getSelf());
+		} else if (message instanceof CancelJob ){
+			onMsgCancelJob((CancelJob)message);
 		} else {
 			unhandled(message);
 		}
+	}
+
+	private void onMsgCancelJob(CancelJob message) {
+		//TODO implement
 	}
 
 	private void onMsgAssignExecutive(AssignExecutive exec) {
