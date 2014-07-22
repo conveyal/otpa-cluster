@@ -47,7 +47,6 @@ public class WorkerManager extends UntypedActor {
 	private int curJobId = -1;
 	private long jobSize = -1;
 	private long jobsReturned = 0;
-	private ArrayList<WorkResult> jobResults;
 	private ArrayList<ActorRef> workers;
 	private Router router;
 	private ActorRef jobManager;
@@ -71,8 +70,6 @@ public class WorkerManager extends UntypedActor {
 		s3Datastore = new S3Datastore(s3ConfigFilename, workOffline);
 		this.nWorkers = nWorkers;
 		this.workers = new ArrayList<ActorRef>();
-
-		createAndRouteWorkers();
 
 		graphBuilder = getContext().actorOf(Props.create(GraphBuilder.class, workOffline), "builder");
 
@@ -116,7 +113,13 @@ public class WorkerManager extends UntypedActor {
 	}
 
 	private void onMsgCancelJob(CancelJob message) {
-		//TODO implement
+		// stop all the worker actors
+		for( ActorRef worker : this.workers ){
+			this.getContext().system().stop(worker);
+		}
+		
+		// delete the actor refs from the worker list
+		workers.clear();
 	}
 
 	private void onMsgAssignExecutive(AssignExecutive exec) {
@@ -142,6 +145,10 @@ public class WorkerManager extends UntypedActor {
 
 	private void onMsgStartWorkers() throws Exception {
 		log.debug("set the workers doing their thing");
+		
+		if(workers.isEmpty()){
+			createAndRouteWorkers();
+		}
 
 		PointSet fromAll = s3Datastore.getPointset(this.jobSpec.fromPtsLoc);
 		PointSet fromPts = fromAll.slice(this.jobSpec.fromPtsStart, this.jobSpec.fromPtsEnd);
