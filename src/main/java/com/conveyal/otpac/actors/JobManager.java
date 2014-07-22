@@ -13,7 +13,6 @@ import scala.concurrent.Await;
 import scala.concurrent.Future;
 import scala.concurrent.duration.Duration;
 
-import com.conveyal.otpac.S3Datastore;
 import com.conveyal.otpac.message.CancelJob;
 import com.conveyal.otpac.message.JobDone;
 import com.conveyal.otpac.message.JobSliceDone;
@@ -23,6 +22,7 @@ import com.conveyal.otpac.message.JobStatus;
 import com.conveyal.otpac.message.JobStatusQuery;
 import com.conveyal.otpac.message.RemoveWorkerManager;
 import com.conveyal.otpac.message.WorkResult;
+import com.conveyal.otpac.DataDatastore;
 import com.conveyal.otpac.JobItemCallback;
 
 import akka.actor.ActorRef;
