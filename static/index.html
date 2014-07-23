@@ -25,13 +25,14 @@
         //   return false;
         // }
 
+
         var url = "/cancel?jobid="+jobid;
         $.getJSON(url, function(data) {
           console.log( data );
         });
 
 
-        return false;
+        event.preventDefault();
       });
 
       $( "#startjob" ).submit(function( event ) {

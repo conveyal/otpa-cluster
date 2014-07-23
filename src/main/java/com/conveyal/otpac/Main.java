@@ -15,6 +15,7 @@ import org.glassfish.grizzly.websockets.WebSocketEngine;
 import com.conveyal.otpac.actors.Executive;
 import com.conveyal.otpac.actors.WorkerManager;
 import com.conveyal.otpac.handlers.AddWorkerHandler;
+import com.conveyal.otpac.handlers.CancelHandler;
 import com.conveyal.otpac.handlers.FindHandler;
 import com.conveyal.otpac.handlers.GetJobResultHandler;
 import com.typesafe.config.Config;
@@ -84,6 +85,7 @@ public class Main {
 			svCfg.addHttpHandler(new AddWorkerHandler(executive), "/addworker");
 			svCfg.addHttpHandler(new GetJobResultHandler(executive), "/getstatus");
 			svCfg.addHttpHandler(new FindHandler(executive, chatApplication), "/find");
+			svCfg.addHttpHandler(new CancelHandler(executive), "/cancel");
 
 			server.start();
 
