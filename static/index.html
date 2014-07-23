@@ -13,11 +13,26 @@
 
       console.log( "hello world" ); 
       var map = L.map('map').setView([30.258843, -97.753401], 12);
+      var jobid = -1;
 
       L.tileLayer('http://{s}.tiles.mapbox.com/v3/conveyal.map-1gi1jz9z/{z}/{x}/{y}.png', {
         attribution: 'Map data &copy; <a href="http://openstreetmap.org">OpenStreetMap</a> contributors, <a href="http://creativecommons.org/licenses/by-sa/2.0/">CC-BY-SA</a>, Imagery © <a href="http://mapbox.com">Mapbox</a>',
         maxZoom: 18
       }).addTo(map);
+
+      $( "#canceljob" ).submit(function(event) {
+        // if(jobid==-1){
+        //   return false;
+        // }
+
+        var url = "/cancel?jobid="+jobid;
+        $.getJSON(url, function(data) {
+          console.log( data );
+        });
+
+
+        return false;
+      });
 
       $( "#startjob" ).submit(function( event ) {
         console.log( event );
@@ -32,7 +47,7 @@
 
         console.log( "getting: "+url );
         $.getJSON( url, function( data ){
-          var jobId = data["jobId"];
+          jobId = data["jobId"];
 
           $("#readout").html("jobId:"+jobId);
           if(jobId==-1){
@@ -98,7 +113,10 @@
         <span>date:</span><input id="date" type="text" value="2014-06-09"><br>
         <span>time:</span><input id="time" type="text" value="8:05 AM"><br>
         <span>timezone:</span><input id="timezone" type="text" value="America/Chicago"><br>
-        <input type="submit">
+        <input type="submit" value="start">
+      </form>
+      <form id="canceljob">
+        <input type="submit" value="cancel">
       </form>
       <div id="readout"></div>
     </div>
