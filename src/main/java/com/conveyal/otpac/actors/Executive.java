@@ -96,7 +96,11 @@ public class Executive extends UntypedActor {
 		jobManagers.put(jd.jobId, null);
 		getContext().system().stop(getSender());
 
-		log.debug("{} says job done", getSender());
+		if( jd.status == JobDone.Status.SUCCESS ){
+			log.debug("{} says job {} done", getSender(), jd.jobId);
+		} else if (jd.status == JobDone.Status.CANCELLED ){
+			log.debug("{} says job {} cancelled", getSender(), jd.jobId);
+		}
 	}
 
 	private void freeWorkerManager(ActorRef workerManager) {
