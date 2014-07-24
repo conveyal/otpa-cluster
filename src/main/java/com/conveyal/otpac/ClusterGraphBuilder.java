@@ -16,7 +16,7 @@ import org.opentripplanner.graph_builder.model.GtfsBundle;
 import org.opentripplanner.openstreetmap.impl.AnyFileBasedOpenStreetMapProviderImpl;
 import org.opentripplanner.openstreetmap.services.OpenStreetMapProvider;
 
-public class AnalystGraphBuilder {
+public class ClusterGraphBuilder {
 
 	public static GraphBuilderTask createBuilder(File dir) {
 

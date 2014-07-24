@@ -25,24 +25,23 @@ import com.amazonaws.services.s3.model.PutObjectResult;
 import com.amazonaws.services.s3.model.S3Object;
 import com.google.common.io.Files;
 
-public class DataDatastore extends DiskBackedPointSetCache {
+public class PointSetDatastore extends DiskBackedPointSetCache {
 
-	final private File POINT_DIR;
+	static private File POINT_DIR = new File("cache", "pointsets");
+	static private String pointsetBucket = "otpac-pointsets";
 	
 	private AmazonS3Client s3;
 	private Boolean workOffline = false;
 	
-	public DataDatastore(String s3CredentialsFilename) {
+	public PointSetDatastore(String s3CredentialsFilename) {
 		
 		// don't work offline by default
-		this(10, s3CredentialsFilename, "cache/", false);
+		this(10, s3CredentialsFilename, false);
 	}
 	
-	public DataDatastore(Integer maxCacheSize, String s3CredentialsFilename, String cacheDirectory, Boolean workOffline){
-		super(maxCacheSize,new File(new File(cacheDirectory), "pointsets/"));
-		
-		POINT_DIR  = new File(new File(cacheDirectory), "pointsets/");
-		
+	public PointSetDatastore(Integer maxCacheSize, String s3CredentialsFilename, Boolean workOffline){
+		super(maxCacheSize,POINT_DIR);
+
 		// allow the data store to work offline with cached data and skip S3 connection
 		this.workOffline = workOffline;
 		
@@ -51,10 +50,7 @@ public class DataDatastore extends DiskBackedPointSetCache {
 			AWSCredentials creds = new ProfileCredentialsProvider(s3CredentialsFilename, "default").getCredentials();
 			s3 = new AmazonS3Client(creds);
 		}
-		
-		
 	}
-	
 	
 	// adds file to S3 Data store or offline cache (if working offline)
 	public String addPointSet(File pointSetFile) throws IOException {
@@ -66,7 +62,7 @@ public class DataDatastore extends DiskBackedPointSetCache {
 		FileUtils.copyFile(pointSetFile, renamedPointSetFile);
 		
 		if(!this.workOffline) {
-			PutObjectResult obj = s3.putObject("pointsets",pointSetId, pointSetFile);	
+			PutObjectResult obj = s3.putObject(pointsetBucket,pointSetId, pointSetFile);	
 		} 
 		else {
 			FileUtils.moveFileToDirectory(pointSetFile, POINT_DIR, true);
@@ -120,8 +116,6 @@ public class DataDatastore extends DiskBackedPointSetCache {
 			}
 				
 		}
-
-		
 		
 		objectData.close();
 		return ret;
@@ -143,8 +137,6 @@ public class DataDatastore extends DiskBackedPointSetCache {
 	private boolean isCsv(File f) {
 		return f.getName().toLowerCase().endsWith(".csv");
 	}
-	
-	
 	
 	/**
 	 * 
