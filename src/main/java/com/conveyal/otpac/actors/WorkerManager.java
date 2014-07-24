@@ -121,6 +121,8 @@ public class WorkerManager extends UntypedActor {
 		
 		// delete the actor refs from the worker list
 		workers.clear();
+		
+		getSender().tell(new Boolean(true), getSelf());
 	}
 
 	private void onMsgAssignExecutive(AssignExecutive exec) {

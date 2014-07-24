@@ -75,7 +75,6 @@ public class JobManager extends UntypedActor {
 	}
 
 	private void onMsgCancelJob(CancelJob msg) throws Exception {
-		log.info("#####CANCEL#####");
 		cancelAndReturn();
 	}
 
@@ -131,7 +130,7 @@ public class JobManager extends UntypedActor {
 		if(callback != null){
 			this.callback.onWorkResult( res );
 		}
-					
+		
 		executive.tell(res, getSelf());
 	}
 

@@ -1,6 +1,9 @@
 package com.conveyal.otpac.message;
 
-public class CancelJob {
+import java.io.Serializable;
+
+public class CancelJob implements Serializable{
+	private static final long serialVersionUID = 3434520506680469418L;
 	public int jobid;
 
 	public CancelJob(int jobid) {
