@@ -63,8 +63,14 @@ public class Executive extends UntypedActor {
 	}
 
 	private void onMsgCancelJob(CancelJob msg) {
-		// TODO Auto-generated method stub
-		log.info("CANCELING JOB "+msg.jobid);
+		
+		ActorRef jm = getJobManager( msg.jobid );
+		if(jm==null){
+			return;
+		}
+		
+		jm.tell( new CancelJob(), getSelf() );
+		
 	}
 
 	private void onMsgTerminated() {

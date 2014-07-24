@@ -67,9 +67,16 @@ public class JobManager extends UntypedActor {
 			onMsgRemoveWorkerManager((RemoveWorkerManager)msg);
 		} else if(msg instanceof Terminated){
 			unhandled(msg);
+		} else if(msg instanceof CancelJob){
+			onMsgCancelJob((CancelJob)msg);
 		} else {
 			unhandled(msg);
 		}
+	}
+
+	private void onMsgCancelJob(CancelJob msg) throws Exception {
+		log.info("#####CANCEL#####");
+		cancelAndReturn();
 	}
 
 	private void onMsgRemoveWorkerManager(RemoveWorkerManager msg) throws Exception {
