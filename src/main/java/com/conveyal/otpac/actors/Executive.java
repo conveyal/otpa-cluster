@@ -55,9 +55,16 @@ public class Executive extends UntypedActor {
 			onMsgJobStatusQuery();
 		} else if (msg instanceof JobDone) {
 			onMsgJobDone((JobDone) msg);
+		} else if (msg instanceof CancelJob) {
+			onMsgCancelJob((CancelJob) msg);
 		} else if (msg instanceof Terminated) {
 			onMsgTerminated();
 		}
+	}
+
+	private void onMsgCancelJob(CancelJob msg) {
+		// TODO Auto-generated method stub
+		log.info("CANCELING JOB "+msg.jobid);
 	}
 
 	private void onMsgTerminated() {

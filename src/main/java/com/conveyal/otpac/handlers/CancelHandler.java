@@ -5,6 +5,7 @@ import org.glassfish.grizzly.http.server.Request;
 import org.glassfish.grizzly.http.server.Response;
 
 import com.conveyal.otpac.message.AddWorkerManager;
+import com.conveyal.otpac.message.CancelJob;
 
 import akka.actor.ActorRef;
 
@@ -18,9 +19,9 @@ public class CancelHandler extends HttpHandler {
 
 	@Override
 	public void service(Request request, Response response) throws Exception {
-		String jobid = request.getParameterMap().get("jobid")[0];
+		int jobid = Integer.parseInt( request.getParameterMap().get("jobid")[0] );
 
-		//executive.tell(new AddWorkerManager("akka.tcp://" + path), ActorRef.noSender());
+		executive.tell(new CancelJob(jobid), ActorRef.noSender());
 		
 		response.getWriter().write( "{\"jobid\":"+jobid+"}" );
 	}
