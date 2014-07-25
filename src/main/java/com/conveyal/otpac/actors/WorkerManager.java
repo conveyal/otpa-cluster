@@ -25,8 +25,12 @@ import com.conveyal.otpac.message.StartWorkers;
 import com.conveyal.otpac.message.WorkResult;
 import com.conveyal.otpac.message.AssignExecutive;
 
+import akka.actor.ActorIdentity;
 import akka.actor.ActorRef;
+import akka.actor.ActorSelection;
+import akka.actor.Identify;
 import akka.actor.Props;
+import akka.actor.Terminated;
 import akka.actor.UntypedActor;
 import akka.event.Logging;
 import akka.event.LoggingAdapter;
@@ -92,7 +96,7 @@ public class WorkerManager extends UntypedActor {
 
 	@Override
 	public void onReceive(Object message) throws Exception {
-		log.info("got message {}", message);
+		log.info("#####got message {}#####", message);
 		
 		if (message instanceof JobSliceSpec) {
 			onMsgJobSliceSpec((JobSliceSpec) message);
@@ -108,12 +112,27 @@ public class WorkerManager extends UntypedActor {
 			getSender().tell(new JobStatus(getSelf(), curJobId, jobsReturned / (float) jobSize), getSelf());
 		} else if (message instanceof CancelJob ){
 			onMsgCancelJob((CancelJob)message);
+		} else if (message instanceof Terminated){
+			onMsgTerminated((Terminated)message);
 		} else {
 			unhandled(message);
 		}
 	}
 
+	private void onMsgTerminated(Terminated message) {
+		//TODO check that it's the executive terminating
+		
+		this.executive = null;
+		cancelAllWorkers();
+	}
+
 	private void onMsgCancelJob(CancelJob message) {
+		cancelAllWorkers();
+		
+		getSender().tell(new Boolean(true), getSelf());
+	}
+
+	private void cancelAllWorkers() {
 		// stop all the worker actors
 		for( ActorRef worker : this.workers ){
 			this.getContext().system().stop(worker);
@@ -121,14 +140,21 @@ public class WorkerManager extends UntypedActor {
 		
 		// delete the actor refs from the worker list
 		workers.clear();
-		
-		getSender().tell(new Boolean(true), getSelf());
 	}
 
-	private void onMsgAssignExecutive(AssignExecutive exec) {
-		this.executive = getSender();
+	private void onMsgAssignExecutive(AssignExecutive exec) throws Exception {
+		ActorRef unofficialSender = getSender();
+		
+		// get an ActorRef for the executive via official safe channels
+		Timeout timeout = new Timeout(Duration.create(5, "seconds"));
+		Future<Object> future = Patterns.ask(unofficialSender, new Identify("2"), timeout);
+		ActorIdentity actorId = (ActorIdentity)Await.result( future, timeout.duration() );
+		this.executive = actorId.getRef();
+		
 		log.debug("assigned to executive: {}", this.executive);
-		this.executive.tell(new Boolean(true), getSelf());
+		
+		getContext().watch(this.executive);
+		
 	}
 
 	private void onMsgWorkResult(WorkResult res) throws IOException {

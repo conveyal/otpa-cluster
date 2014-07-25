@@ -59,6 +59,8 @@ public class Executive extends UntypedActor {
 			onMsgCancelJob((CancelJob) msg);
 		} else if (msg instanceof Terminated) {
 			onMsgTerminated();
+		} else if(msg instanceof String){
+			getSender().tell(msg, getSelf());
 		}
 	}
 
@@ -145,15 +147,7 @@ public class Executive extends UntypedActor {
 		
 		System.out.println("add worker " + remoteManager);
 
-		// make sure we can reach the remote WorkerManager
-		timeout = new Timeout(Duration.create(5, "seconds"));
-		future = Patterns.ask(remoteManager, new AssignExecutive(), timeout);
-		Boolean result = (Boolean)Await.result( future, timeout.duration() );
-		if(result){
-			log.info("connected remote manager {}", remoteManager);
-		} else {
-			log.info("something went wrong connecting to manager {}", remoteManager);
-		}
+		remoteManager.tell(new AssignExecutive(), getSelf());
 
 		freeWorkerManager(remoteManager);
 		
