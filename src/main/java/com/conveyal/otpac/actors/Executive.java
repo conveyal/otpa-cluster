@@ -149,7 +149,7 @@ public class Executive extends UntypedActor {
 
 		remoteManager.tell(new AssignExecutive(), getSelf());
 
-		freeWorkerManager(remoteManager);
+		workerManagers.put(remoteManager, null);
 		
 		getSender().tell(new Boolean(true), getSelf());
 	}
