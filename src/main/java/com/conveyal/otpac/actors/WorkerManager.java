@@ -96,9 +96,7 @@ public class WorkerManager extends UntypedActor {
 	}
 
 	@Override
-	public void onReceive(Object message) throws Exception {
-		log.info("#####got message {}#####", message);
-		
+	public void onReceive(Object message) throws Exception {		
 		if (message instanceof JobSliceSpec) {
 			onMsgJobSliceSpec((JobSliceSpec) message);
 		} else if (message instanceof AssignExecutive) {
@@ -151,9 +149,7 @@ public class WorkerManager extends UntypedActor {
 		Future<Object> future = Patterns.ask(unofficialSender, new Identify("2"), timeout);
 		ActorIdentity actorId = (ActorIdentity)Await.result( future, timeout.duration() );
 		this.executive = actorId.getRef();
-		
-		log.debug("assigned to executive: {}", this.executive);
-		
+				
 		getContext().watch(this.executive);
 		
 		getSender().tell(new DoneAssigningExecutive(), getSelf());

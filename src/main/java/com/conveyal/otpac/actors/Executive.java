@@ -71,7 +71,6 @@ public class Executive extends UntypedActor {
 	private void onMsgDoneAssigningExecutive(DoneAssigningExecutive msg) {
 		String path = getSender().path().toString();
 		
-		System.out.println( "###WORKER MANAGER PATH "+path+"###");
 		workerManagers.put(path, null);
 	}
 
