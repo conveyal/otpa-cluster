@@ -27,7 +27,8 @@ public class Executive extends UntypedActor {
 	int tasksOut;
 	int jobId = 0;
 	Map<Integer, ArrayList<WorkResult>> jobResults;
-	Map<ActorRef, Integer> workerManagers;
+	Map<String,ActorRef> wmPathActorRefs; //path->canonical actorref
+	Map<String, Integer> workerManagers; //path->jobid
 	Map<Integer, ActorRef> jobManagers;
 
 	LoggingAdapter log = Logging.getLogger(getContext().system(), this);
@@ -35,7 +36,8 @@ public class Executive extends UntypedActor {
 	Executive() {
 		jobResults = new HashMap<Integer, ArrayList<WorkResult>>();
 
-		workerManagers = new HashMap<ActorRef, Integer>();
+		workerManagers = new HashMap<String, Integer>();
+		wmPathActorRefs = new HashMap<String,ActorRef>();
 
 		jobManagers = new HashMap<Integer, ActorRef>();
 
@@ -82,7 +84,7 @@ public class Executive extends UntypedActor {
 		Integer jobId = getWorkerManagerJob( dead );
 		if(jobId != null){
 			getJobManager(jobId).tell( new RemoveWorkerManager(dead), getSelf() );
-			freeWorkerManager(dead);
+			freeWorkerManager(dead.path().toString()); //TODO double check this
 		}
 		
 		// delete the workermanager from the roster
@@ -90,7 +92,7 @@ public class Executive extends UntypedActor {
 	}
 
 	private void deleteWorkerManager(ActorRef dead) {
-		this.workerManagers.remove(dead);
+		this.workerManagers.remove(dead.path().toString());
 	}
 
 	private ActorRef getJobManager(Integer jobId) {
@@ -98,13 +100,13 @@ public class Executive extends UntypedActor {
 	}
 
 	private Integer getWorkerManagerJob(ActorRef dead) {
-		return this.workerManagers.get(dead);
+		return this.workerManagers.get(dead.path().toString());
 	}
 
 	private void onMsgJobDone(JobDone jd) {
 		// free up WorkerManagers
 		for (ActorRef workerManager : jd.workerManagers) {
-			freeWorkerManager(workerManager);
+			freeWorkerManager(workerManager.path().toString());
 		}
 
 		// deallocate job manager
@@ -118,13 +120,15 @@ public class Executive extends UntypedActor {
 		}
 	}
 
-	private void freeWorkerManager(ActorRef workerManager) {
-		workerManagers.put(workerManager, null);
+	private void freeWorkerManager(String workerManagerPath) {
+		workerManagers.put(workerManagerPath, null);
 	}
 
 	private void onMsgJobStatusQuery() throws Exception {
 		ArrayList<JobStatus> ret = new ArrayList<JobStatus>();
-		for (ActorRef workerManager : workerManagers.keySet()) {
+		for (String workerManagerPath : workerManagers.keySet()) {
+			ActorRef workerManager = this.wmPathActorRefs.get( workerManagerPath );
+			
 			Timeout timeout = new Timeout(Duration.create(5, "seconds"));
 			Future<Object> future = Patterns.ask(workerManager, new JobStatusQuery(), timeout);
 			JobStatus result = (JobStatus) Await.result(future, timeout.duration());
@@ -142,6 +146,8 @@ public class Executive extends UntypedActor {
 		ActorIdentity actorId = (ActorIdentity)Await.result( future, timeout.duration() );
 		ActorRef remoteManager = actorId.getRef();
 		
+		this.wmPathActorRefs.put(remoteManager.path().toString(), remoteManager);
+		
 		// watch for termination
 		getContext().watch(remoteManager);
 		
@@ -149,7 +155,8 @@ public class Executive extends UntypedActor {
 
 		remoteManager.tell(new AssignExecutive(), getSelf());
 
-		workerManagers.put(remoteManager, null);
+		System.out.println( "###WORKER MANAGER PATH "+remoteManager.path().toString()+"###");
+		workerManagers.put(remoteManager.path().toString(), null);
 		
 		getSender().tell(new Boolean(true), getSelf());
 	}
@@ -185,7 +192,7 @@ public class Executive extends UntypedActor {
 		jobManagers.put(jobId, jobManager);
 
 		// assign some managers to the job manager
-		for (ActorRef manager : getFreeWorkerManagers()) {
+		for (String manager : getFreeWorkerManagers()) {
 			assignWorkerManager(jobId, manager);
 		}
 
@@ -195,27 +202,29 @@ public class Executive extends UntypedActor {
 		jobId += 1;
 	}
 
-	private boolean assignWorkerManager(int jobId, ActorRef manager) throws Exception {
+	private boolean assignWorkerManager(int jobId, String managerPath) throws Exception {
 		// get the job manager for this job id
 		ActorRef jobManager = jobManagers.get(jobId);
+		
+		ActorRef workerManager = wmPathActorRefs.get( managerPath );
 
 		// assign the workermanager to the jobmanager; blocking operation
 		Timeout timeout = new Timeout(Duration.create(5, "seconds"));
-		Future<Object> future = Patterns.ask(jobManager, manager, timeout);
+		Future<Object> future = Patterns.ask(jobManager, workerManager, timeout);
 		Boolean success = (Boolean) Await.result(future, timeout.duration());
 
 		// if it worked, register the manager as busy
 		if (success) {
-			this.workerManagers.put(manager, jobId);
+			this.workerManagers.put(managerPath, jobId);
 		}
 
 		return success;
 	}
 
-	private ArrayList<ActorRef> getFreeWorkerManagers() {
-		ArrayList<ActorRef> ret = new ArrayList<ActorRef>();
+	private ArrayList<String> getFreeWorkerManagers() {
+		ArrayList<String> ret = new ArrayList<String>();
 
-		for (Entry<ActorRef, Integer> entry : this.workerManagers.entrySet()) {
+		for (Entry<String, Integer> entry : this.workerManagers.entrySet()) {
 			if (entry.getValue() == null) {
 				ret.add(entry.getKey());
 			}
