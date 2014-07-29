@@ -15,6 +15,7 @@ import scala.concurrent.duration.Duration;
 import com.conveyal.otpac.DataDatastore;
 import com.conveyal.otpac.message.BuildGraph;
 import com.conveyal.otpac.message.CancelJob;
+import com.conveyal.otpac.message.DoneAssigningExecutive;
 import com.conveyal.otpac.message.JobSliceDone;
 import com.conveyal.otpac.message.JobSliceSpec;
 import com.conveyal.otpac.message.JobStatus;
@@ -154,6 +155,8 @@ public class WorkerManager extends UntypedActor {
 		log.debug("assigned to executive: {}", this.executive);
 		
 		getContext().watch(this.executive);
+		
+		getSender().tell(new DoneAssigningExecutive(), getSelf());
 		
 	}
 
