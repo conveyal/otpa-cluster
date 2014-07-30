@@ -113,9 +113,17 @@ public class WorkerManager extends UntypedActor {
 			onMsgCancelJob((CancelJob)message);
 		} else if (message instanceof Terminated){
 			onMsgTerminated((Terminated)message);
+		} else if (message instanceof ActorIdentity){
+			onMsgActorIdentity((ActorIdentity)message);
 		} else {
 			unhandled(message);
 		}
+	}
+
+	private void onMsgActorIdentity(ActorIdentity actorId) {
+		System.out.println("#####GOT ACTOR IDENTITY#####");
+
+        this.executive = actorId.getRef();
 	}
 
 	private void onMsgTerminated(Terminated message) {
@@ -142,17 +150,18 @@ public class WorkerManager extends UntypedActor {
 	}
 
 	private void onMsgAssignExecutive(AssignExecutive exec) throws Exception {
-		ActorRef unofficialSender = getSender();
+		// we set up a quickie "good enough" executive reference and then signal to the exec caller
+		// that we're done. The caller then unblocks, and we can establish an official reference
+		// and set up watching
+		this.executive = getSender();
+		this.executive.tell(new DoneAssigningExecutive(), getSelf());
+		
+		// set up a watch on exec
 		
 		// get an ActorRef for the executive via official safe channels
-		Timeout timeout = new Timeout(Duration.create(5, "seconds"));
-		Future<Object> future = Patterns.ask(unofficialSender, new Identify("2"), timeout);
-		ActorIdentity actorId = (ActorIdentity)Await.result( future, timeout.duration() );
-		this.executive = actorId.getRef();
+		this.executive.tell(new Identify("1"), getSelf());
 				
 		getContext().watch(this.executive);
-		
-		getSender().tell(new DoneAssigningExecutive(), getSelf());
 		
 	}
 

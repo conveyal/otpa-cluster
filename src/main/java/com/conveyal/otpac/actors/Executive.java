@@ -63,15 +63,7 @@ public class Executive extends UntypedActor {
 			onMsgTerminated();
 		} else if(msg instanceof String){
 			getSender().tell(msg, getSelf());
-		} else if(msg instanceof DoneAssigningExecutive){
-			onMsgDoneAssigningExecutive((DoneAssigningExecutive)msg);
-		}
-	}
-
-	private void onMsgDoneAssigningExecutive(DoneAssigningExecutive msg) {
-		String path = getSender().path().toString();
-		
-		workerManagers.put(path, null);
+		} 
 	}
 
 	private void onMsgCancelJob(CancelJob msg) {
@@ -161,7 +153,12 @@ public class Executive extends UntypedActor {
 		
 		System.out.println("add worker " + remoteManager);
 
+		// block waiting for the the workermanager to hook up to this exec
+		future = Patterns.ask(remoteManager, new AssignExecutive(), timeout);
+		Await.result( future, timeout.duration() );
 		remoteManager.tell(new AssignExecutive(), getSelf());
+		
+		workerManagers.put(remoteManager.path().toString(), null);
 		
 		getSender().tell(new Boolean(true), getSelf());
 	}

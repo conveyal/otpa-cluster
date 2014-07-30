@@ -22,9 +22,6 @@ public class BasicTest extends TestCase {
 		StandaloneWorker worker = cluster.createWorker();
 
 		cluster.registerWorker(exec, worker);
-		
-		// give the cluster a second to wire together
-		Thread.sleep(100);
 
 		ArrayList<JobStatus> js = exec.getJobStatus();
 		assertEquals(js.size(), 1);
