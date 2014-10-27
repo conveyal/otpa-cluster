@@ -7,11 +7,13 @@ import org.opentripplanner.analyst.PointFeature;
 import org.opentripplanner.analyst.PointSet;
 import org.opentripplanner.analyst.SampleSet;
 import org.opentripplanner.routing.graph.Graph;
+import org.opentripplanner.routing.services.GraphService;
 
 import scala.concurrent.Await;
 import scala.concurrent.Future;
 import scala.concurrent.duration.Duration;
 
+import com.conveyal.otpac.ClusterGraphService;
 import com.conveyal.otpac.PointSetDatastore;
 import com.conveyal.otpac.message.BuildGraph;
 import com.conveyal.otpac.message.JobSliceDone;
@@ -44,8 +46,8 @@ public class WorkerManager extends UntypedActor {
 	};
 
 	private int curJobId = -1;
-	private long jobSize = -1;
-	private long jobsReturned = 0;
+	private int jobSize = -1;
+	private int jobsReturned = 0;
 	private ArrayList<WorkResult> jobResults;
 	private ArrayList<ActorRef> workers;
 	private Router router;
@@ -61,10 +63,13 @@ public class WorkerManager extends UntypedActor {
 	private PointSetDatastore s3Datastore;
 
 	WorkerManager() {
-		this(Runtime.getRuntime().availableProcessors(), false);
+		this(null, false, null);
 	}
 
-	WorkerManager(int nWorkers, Boolean workOffline) {
+	WorkerManager(Integer nWorkers, Boolean workOffline, GraphService graphService) {
+		if(nWorkers == null)
+			nWorkers = Runtime.getRuntime().availableProcessors();
+		
 		String s3ConfigFilename = context().system().settings().config().getString("s3.credentials.filename");
 		s3Datastore = new PointSetDatastore(10, s3ConfigFilename, workOffline);
 
@@ -77,7 +82,10 @@ public class WorkerManager extends UntypedActor {
 		}
 		router = new Router(new RoundRobinRoutingLogic(), routees);
 
-		graphBuilder = getContext().actorOf(Props.create(GraphBuilder.class, workOffline), "builder");
+		if(graphService == null)
+			graphService = new ClusterGraphService(context().system().settings().config().getString("s3.credentials.filename"), workOffline);
+		
+		graphBuilder = getContext().actorOf(Props.create(GraphBuilder.class, graphService), "builder");
 
 		System.out.println("starting worker-manager with " + nWorkers + " workers");
 		status = Status.READY;
@@ -98,7 +106,7 @@ public class WorkerManager extends UntypedActor {
 		} else if (message instanceof WorkResult) {
 			onMsgWorkResult((WorkResult) message);
 		} else if (message instanceof JobStatusQuery) {
-			getSender().tell(new JobStatus(getSelf(), curJobId, jobsReturned / (float) jobSize), getSelf());
+			getSender().tell(new JobStatus(getSelf(), curJobId, jobSize, jobsReturned), getSelf());
 		} else {
 			unhandled(message);
 		}
@@ -117,7 +125,6 @@ public class WorkerManager extends UntypedActor {
 
 		if (res.success) {
 			jobManager.forward(res, getContext());
-			;
 		}
 
 		if (jobsReturned == jobSize) {
@@ -129,8 +136,13 @@ public class WorkerManager extends UntypedActor {
 		log.debug("set the workers doing their thing");
 
 		PointSet fromAll = s3Datastore.getPointset(this.jobSpec.fromPtsLoc);
-		PointSet fromPts = fromAll.slice(this.jobSpec.fromPtsStart, this.jobSpec.fromPtsEnd);
-
+		PointSet fromPts;
+		
+		if(this.jobSpec.fromPtsStart == null && this.jobSpec.fromPtsEnd == null && this.jobSpec.subsetIds != null)
+			fromPts = fromAll.slice(this.jobSpec.subsetIds);
+		else 
+			fromPts = fromAll.slice(this.jobSpec.fromPtsStart, this.jobSpec.fromPtsEnd);
+		
 		PointSet toPts = s3Datastore.getPointset(this.jobSpec.toPtsLoc);
 
 		SampleSet sampleSet = new SampleSet(toPts, this.graph.getSampleFactory());
@@ -147,7 +159,7 @@ public class WorkerManager extends UntypedActor {
 		this.jobsReturned = 0;
 		for (int i = 0; i < fromPts.featureCount(); i++) {
 			PointFeature from = fromPts.getFeature(i);
-			router.route(new OneToManyRequest(from, this.jobSpec.date), getSelf());
+			router.route(new OneToManyRequest(from, this.jobSpec.date, this.jobSpec.mode), getSelf());
 			this.jobSize += 1;
 		}
 	}

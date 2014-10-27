@@ -65,7 +65,7 @@ public class ClusterGraphService implements GraphService {
 			
 			Graph g = gbt.getGraph();
 			
-			g.setRouterId(graphId);
+			g.routerId = graphId;
 			
 			graphMap.put(graphId,g);
 					

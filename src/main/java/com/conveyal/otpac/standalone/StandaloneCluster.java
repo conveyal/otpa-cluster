@@ -1,5 +1,7 @@
 package com.conveyal.otpac.standalone;
 
+import org.opentripplanner.routing.services.GraphService;
+
 import com.conveyal.otpac.actors.Executive;
 import com.conveyal.otpac.actors.WorkerManager;
 import com.typesafe.config.Config;
@@ -12,7 +14,14 @@ import akka.actor.Props;
 public class StandaloneCluster {
 	ActorSystem system;
 	
-	public StandaloneCluster(String s3configfilename){
+	Boolean workOffline;
+	GraphService graphService;
+	
+	public StandaloneCluster(String s3configfilename, Boolean workOffline, GraphService graphService){
+		
+		this.workOffline = workOffline;
+		this.graphService = graphService;
+		
 		Config config = ConfigFactory.parseString("s3.credentials.filename=\""+s3configfilename+"\"")
 			    .withFallback(ConfigFactory.defaultOverrides());
 		
@@ -22,23 +31,15 @@ public class StandaloneCluster {
 	public StandaloneExecutive createExecutive() {
 		StandaloneExecutive ret = new StandaloneExecutive();
 		
-		ret.executive = system.actorOf(Props.create(Executive.class));
+		ret.executive = system.actorOf(Props.create(Executive.class, workOffline));
 		
 		return ret;
 	}
 
-	public StandaloneWorker createWorker(int nWorkers, Boolean workOffline) {
-		StandaloneWorker ret = new StandaloneWorker();
-		
-		ret.manager = system.actorOf(Props.create(WorkerManager.class, nWorkers, workOffline), "manager");
-		
-		return ret;
-	}
-	
 	public StandaloneWorker createWorker() {
 		StandaloneWorker ret = new StandaloneWorker();
 		
-		ret.manager = system.actorOf(Props.create(WorkerManager.class), "manager");
+		ret.manager = system.actorOf(Props.create(WorkerManager.class, null, workOffline, graphService), "manager");
 		
 		return ret;
 	}

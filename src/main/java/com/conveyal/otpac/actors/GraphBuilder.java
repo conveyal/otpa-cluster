@@ -17,6 +17,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.opentripplanner.graph_builder.GraphBuilderTask;
 import org.opentripplanner.routing.graph.Graph;
+import org.opentripplanner.routing.services.GraphService;
 
 import ch.qos.logback.core.util.FileUtil;
 
@@ -35,7 +36,7 @@ import akka.event.LoggingAdapter;
 
 public class GraphBuilder extends UntypedActor {
 
-	private ClusterGraphService graphService;
+	private GraphService graphService;
 	
 	LoggingAdapter log = Logging.getLogger(getContext().system(), this);
 
@@ -45,9 +46,9 @@ public class GraphBuilder extends UntypedActor {
 			onMsgBuildGraph((BuildGraph) msg);
 		}
 	}
-
-	public GraphBuilder(Boolean workOffline) {
-		graphService = new ClusterGraphService(context().system().settings().config().getString("s3.credentials.filename"), workOffline);
+	
+	public GraphBuilder(GraphService graphService) {
+		this.graphService = graphService;
 	}
 	
 	private void onMsgBuildGraph(BuildGraph bg) throws IOException {

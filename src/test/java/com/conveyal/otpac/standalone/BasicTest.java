@@ -16,7 +16,7 @@ import junit.framework.TestCase;
 
 public class BasicTest extends TestCase {
 	public void testBasicSetup() throws Exception {
-		StandaloneCluster cluster = new StandaloneCluster("s3credentials");
+		StandaloneCluster cluster = new StandaloneCluster("s3credentials", false, null);
 
 		StandaloneExecutive exec = cluster.createExecutive();
 		StandaloneWorker worker = cluster.createWorker();
@@ -30,15 +30,15 @@ public class BasicTest extends TestCase {
 
 	public void testJob() throws Exception {
 		// start up cluster
-		StandaloneCluster cluster = new StandaloneCluster("s3credentials");
+		StandaloneCluster cluster = new StandaloneCluster("s3credentials", false, null);
 
 		StandaloneExecutive exec = cluster.createExecutive();
-		StandaloneWorker worker = cluster.createWorker(1, false);
+		StandaloneWorker worker = cluster.createWorker();
 
 		cluster.registerWorker(exec, worker);
 
 		// build the request
-		JobSpec js = new JobSpec("austin", "austin.csv", "austin.csv", "2014-06-09", "8:05 AM", "America/Chicago");
+		JobSpec js = new JobSpec("austin", "austin.csv", "austin.csv", "2014-06-09", "8:05 AM", "America/Chicago", "TRANSIT", null);
 
 		// plus a callback that registers how many work items have returned
 		class CounterCallback implements JobItemCallback {
@@ -49,8 +49,8 @@ public class BasicTest extends TestCase {
 				System.out.println("got callback");
 				jobsBack += 1;
 			}
-		}
-		;
+		};
+		
 		CounterCallback callback = new CounterCallback();
 		js.setCallback(callback);
 
@@ -67,15 +67,15 @@ public class BasicTest extends TestCase {
 	
 	public void testShapefile() throws Exception {
 		// start up cluster
-		StandaloneCluster cluster = new StandaloneCluster("s3credentials");
+		StandaloneCluster cluster = new StandaloneCluster("s3credentials", false, null);
 
 		StandaloneExecutive exec = cluster.createExecutive();
-		StandaloneWorker worker = cluster.createWorker(1, false);
+		StandaloneWorker worker = cluster.createWorker();
 
 		cluster.registerWorker(exec, worker);
 
 		// build the request
-		JobSpec js = new JobSpec("austin", "austin.shp.zip", "austin.shp.zip", "2014-06-09", "8:05 AM", "America/Chicago");
+		JobSpec js = new JobSpec("austin", "austin.shp.zip", "austin.shp.zip", "2014-06-09", "8:05 AM", "America/Chicago", "TRANSIT", null);
 
 		// plus a callback that registers how many work items have returned
 		class CounterCallback implements JobItemCallback {

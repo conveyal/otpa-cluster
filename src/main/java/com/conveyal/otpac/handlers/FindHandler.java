@@ -40,6 +40,7 @@ public class FindHandler extends HttpHandler{
 		String dateStr = request.getParameter("date");
 		String timeStr = request.getParameter("time");
 		String timezoneStr = request.getParameter("tz");
+		String mode = request.getParameter("mode");
 
 		if (bucket == null) {
 			response.setStatus(400);
@@ -74,7 +75,7 @@ public class FindHandler extends HttpHandler{
 
 		try {
 			JobSpec js = new JobSpec(bucket, fromPtsLoc, toPtsLoc, dateStr,
-					timeStr, timezoneStr);
+					timeStr, timezoneStr, mode, null);
 			
 			js.setCallback( new JobItemCallback(){
 

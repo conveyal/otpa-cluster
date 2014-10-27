@@ -53,19 +53,23 @@ public class PointSetDatastore extends DiskBackedPointSetCache {
 	}
 	
 	// adds file to S3 Data store or offline cache (if working offline)
-	public String addPointSet(File pointSetFile) throws IOException {
+	public String addPointSet(File pointSetFile, String pointSetId) throws IOException {
 		
-		String pointSetId = Util.hashFile(pointSetFile) + "." + FilenameUtils.getExtension(pointSetFile.getName()).toLowerCase();
-		
-		File renamedPointSetFile = new File(pointSetFile.getParentFile(), pointSetId);
+		if(pointSetId == null)
+			pointSetId = Util.hashFile(pointSetFile) + "." + FilenameUtils.getExtension(pointSetFile.getName()).toLowerCase();
+	
+		File renamedPointSetFile = new File(POINT_DIR, pointSetId);
 		
 		FileUtils.copyFile(pointSetFile, renamedPointSetFile);
 		
 		if(!this.workOffline) {
-			PutObjectResult obj = s3.putObject(pointsetBucket,pointSetId, pointSetFile);	
+			PutObjectResult obj = s3.putObject(pointsetBucket, pointSetId, pointSetFile);	
 		} 
 		else {
-			FileUtils.moveFileToDirectory(pointSetFile, POINT_DIR, true);
+			if(renamedPointSetFile.exists())
+				renamedPointSetFile.delete();
+			
+			FileUtils.copyFile(pointSetFile, renamedPointSetFile);
 		}
 		
 		return pointSetId;

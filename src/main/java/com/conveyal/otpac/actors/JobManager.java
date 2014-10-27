@@ -16,6 +16,7 @@ import com.conveyal.otpac.message.JobSpec;
 import com.conveyal.otpac.message.RemoveWorkerManager;
 import com.conveyal.otpac.message.WorkResult;
 import com.conveyal.otpac.JobItemCallback;
+import com.google.common.base.Joiner;
 
 import akka.actor.ActorRef;
 import akka.actor.Terminated;
@@ -34,10 +35,10 @@ public class JobManager extends UntypedActor {
 	private JobItemCallback callback;
 	private PointSetDatastore s3Store;
 
-	JobManager() {
+	JobManager(Boolean workOffline) {
 		String s3ConfigFilename = context().system().settings().config().getString("s3.credentials.filename");
 		
-		s3Store = new PointSetDatastore(s3ConfigFilename);
+		s3Store = new PointSetDatastore(10, s3ConfigFilename, workOffline);
 		
 		workerManagers = new ArrayList<ActorRef>();
 	}
@@ -97,17 +98,36 @@ public class JobManager extends UntypedActor {
 		
 		TimeZone tz = TimeZone.getTimeZone(js.tz);
 		Date date = DateUtils.toDate(js.date, js.time, tz);
-
-		// split the job evenly between managers
-		float seglen = fromPts.featureCount() / ((float) workerManagers.size());
-		for(int i=0;i<workerManagers.size(); i++){				
-			int start = Math.round(seglen * i);
-			int end = Math.round(seglen * (i + 1));
-						
-			ActorRef workerManager = workerManagers.get(i);
+		
+		if(js.subsetIds != null && js.subsetIds.size() > 0) {
+			Joiner joiner = Joiner.on(",").skipNulls();
+			log.debug( "restricting analysis to ids: {}", joiner.join(js.subsetIds));
 			
-			workerManagersOut+=1;
-			workerManager.tell(new JobSliceSpec(js.fromPtsLoc,start,end,js.toPtsLoc,js.graphId,date), getSelf());
+			// split the job evenly between managers
+			float seglen = js.subsetIds.size() / ((float) workerManagers.size());
+			for(int i=0;i<workerManagers.size(); i++){				
+				int start = Math.round(seglen * i);
+				int end = Math.round(seglen * (i + 1));
+							
+				ActorRef workerManager = workerManagers.get(i);
+				
+				workerManagersOut+=1;
+				workerManager.tell(new JobSliceSpec(js.fromPtsLoc,js.subsetIds,js.toPtsLoc,js.graphId,date,js.mode), getSelf());
+			}
+			
+		}
+		else {
+			// split the job evenly between managers
+			float seglen = fromPts.featureCount() / ((float) workerManagers.size());
+			for(int i=0;i<workerManagers.size(); i++){				
+				int start = Math.round(seglen * i);
+				int end = Math.round(seglen * (i + 1));
+							
+				ActorRef workerManager = workerManagers.get(i);
+				
+				workerManagersOut+=1;
+				workerManager.tell(new JobSliceSpec(js.fromPtsLoc,start,end,js.toPtsLoc,js.graphId,date,js.mode), getSelf());
+			}
 		}
 	}
 

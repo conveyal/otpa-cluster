@@ -75,8 +75,8 @@ public class ClusterGraphBuilder {
 			for (File gtfsFile : gtfsFiles) {
 				GtfsBundle gtfsBundle = new GtfsBundle(gtfsFile);
 				gtfsBundle.setTransfersTxtDefinesStationPaths(false);
-				gtfsBundle.setLinkStopsToParentStations(false);
-				gtfsBundle.setParentStationTransfers(false);
+				gtfsBundle.linkStopsToParentStations = false;
+				gtfsBundle.parentStationTransfers = false;
 				gtfsBundles.add(gtfsBundle);
 			}
 			GtfsGraphBuilderImpl gtfsBuilder = new GtfsGraphBuilderImpl(gtfsBundles);
@@ -85,7 +85,7 @@ public class ClusterGraphBuilder {
 			graphBuilder.addGraphBuilder(new TransitToStreetNetworkGraphBuilderImpl());
 
 		}
-		graphBuilder.setSerializeGraph(false);
+		graphBuilder.serializeGraph = false;
 		return graphBuilder;
 	}
 

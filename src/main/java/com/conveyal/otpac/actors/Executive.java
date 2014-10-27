@@ -29,16 +29,23 @@ public class Executive extends UntypedActor {
 	Map<Integer, ArrayList<WorkResult>> jobResults;
 	Map<ActorRef, Integer> workerManagers;
 	Map<Integer, ActorRef> jobManagers;
+	
+	Boolean workOffline;
 
 	LoggingAdapter log = Logging.getLogger(getContext().system(), this);
 
 	Executive() {
+		this(true);
+	}
+	
+	Executive(Boolean workOffline) {
 		jobResults = new HashMap<Integer, ArrayList<WorkResult>>();
 
 		workerManagers = new HashMap<ActorRef, Integer>();
 
 		jobManagers = new HashMap<Integer, ActorRef>();
 
+		this.workOffline = workOffline;
 	}
 
 	@Override
@@ -106,7 +113,7 @@ public class Executive extends UntypedActor {
 	private void onMsgJobStatusQuery() throws Exception {
 		ArrayList<JobStatus> ret = new ArrayList<JobStatus>();
 		for (ActorRef workerManager : workerManagers.keySet()) {
-			Timeout timeout = new Timeout(Duration.create(5, "seconds"));
+			Timeout timeout = new Timeout(Duration.create(60, "seconds"));
 			Future<Object> future = Patterns.ask(workerManager, new JobStatusQuery(), timeout);
 			JobStatus result = (JobStatus) Await.result(future, timeout.duration());
 			ret.add(result);
@@ -118,7 +125,7 @@ public class Executive extends UntypedActor {
 		ActorSelection remoteManagerSel = context().system().actorSelection(aw.path);
 		
 		// get ActorRef of remote WorkerManager
-		Timeout timeout = new Timeout(Duration.create(5, "seconds"));
+		Timeout timeout = new Timeout(Duration.create(60, "seconds"));
 		Future<Object> future = Patterns.ask(remoteManagerSel, new Identify("1"), timeout);
 		ActorIdentity actorId = (ActorIdentity)Await.result( future, timeout.duration() );
 		ActorRef remoteManager = actorId.getRef();
@@ -129,7 +136,7 @@ public class Executive extends UntypedActor {
 		System.out.println("add worker " + remoteManager);
 
 		// make sure we can reach the remote WorkerManager
-		timeout = new Timeout(Duration.create(5, "seconds"));
+		timeout = new Timeout(Duration.create(60, "seconds"));
 		future = Patterns.ask(remoteManager, new AssignExecutive(), timeout);
 		Boolean result = (Boolean)Await.result( future, timeout.duration() );
 		if(result){
@@ -169,7 +176,7 @@ public class Executive extends UntypedActor {
 		getSender().tell(new JobId(jobId), getSelf());
 
 		// create a job manager
-		ActorRef jobManager = getContext().actorOf(Props.create(JobManager.class), "jobmanager-" + jobId);
+		ActorRef jobManager = getContext().actorOf(Props.create(JobManager.class, workOffline), "jobmanager-" + jobId);
 		
 		jobManagers.put(jobId, jobManager);
 
@@ -189,7 +196,7 @@ public class Executive extends UntypedActor {
 		ActorRef jobManager = jobManagers.get(jobId);
 
 		// assign the workermanager to the jobmanager; blocking operation
-		Timeout timeout = new Timeout(Duration.create(5, "seconds"));
+		Timeout timeout = new Timeout(Duration.create(60, "seconds"));
 		Future<Object> future = Patterns.ask(jobManager, manager, timeout);
 		Boolean success = (Boolean) Await.result(future, timeout.duration());
 
