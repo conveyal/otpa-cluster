@@ -1,18 +1,27 @@
 package com.conveyal.otpac.actors;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.TimeZone;
 
 import org.opentripplanner.analyst.PointSet;
 import org.opentripplanner.util.DateUtils;
 
 import com.conveyal.otpac.PointSetDatastore;
+import scala.concurrent.Await;
+import scala.concurrent.Future;
+import scala.concurrent.duration.Duration;
+
+import com.conveyal.otpac.message.CancelJob;
+
 import com.conveyal.otpac.message.JobDone;
 import com.conveyal.otpac.message.JobSliceDone;
 import com.conveyal.otpac.message.JobSliceSpec;
 import com.conveyal.otpac.message.JobSpec;
+import com.conveyal.otpac.message.JobStatus;
+import com.conveyal.otpac.message.JobStatusQuery;
 import com.conveyal.otpac.message.RemoveWorkerManager;
 import com.conveyal.otpac.message.WorkResult;
 import com.conveyal.otpac.JobItemCallback;
@@ -23,12 +32,14 @@ import akka.actor.Terminated;
 import akka.actor.UntypedActor;
 import akka.event.Logging;
 import akka.event.LoggingAdapter;
+import akka.pattern.Patterns;
+import akka.util.Timeout;
 
 public class JobManager extends UntypedActor {
 
-	private ArrayList<ActorRef> workerManagers;
+	private Set<ActorRef> workerManagersReady;
+	private Set<ActorRef> workerManagersOut;
 	LoggingAdapter log = Logging.getLogger(getContext().system(), this);
-	int workerManagersOut=0;
 	
 	private ActorRef executive;
 	private int jobId;
@@ -40,13 +51,14 @@ public class JobManager extends UntypedActor {
 		
 		s3Store = new PointSetDatastore(10, s3ConfigFilename, workOffline);
 		
-		workerManagers = new ArrayList<ActorRef>();
+		workerManagersReady = new HashSet<ActorRef>();
+		workerManagersOut = new HashSet<ActorRef>();
 	}
 
 	@Override
 	public void onReceive(Object msg) throws Exception {		
 		if (msg instanceof ActorRef) {
-			onMsgActorSelection((ActorRef) msg);
+			onMsgActorRef((ActorRef) msg);
 		} else if (msg instanceof JobSpec) {
 			onMsgJobSpec((JobSpec) msg);
 		} else if(msg instanceof WorkResult){
@@ -56,22 +68,61 @@ public class JobManager extends UntypedActor {
 		} else if(msg instanceof RemoveWorkerManager){
 			onMsgRemoveWorkerManager((RemoveWorkerManager)msg);
 		} else if(msg instanceof Terminated){
-			System.out.println("#############JOBMANAGER: TERMINATED#############");
+			unhandled(msg);
+		} else if(msg instanceof CancelJob){
+			onMsgCancelJob((CancelJob)msg);
 		} else {
 			unhandled(msg);
 		}
 	}
 
-	private void onMsgRemoveWorkerManager(RemoveWorkerManager msg) {
-		//stub
+	private void onMsgCancelJob(CancelJob msg) throws Exception {
+		cancelAndReturn();
+	}
+
+	private void onMsgRemoveWorkerManager(RemoveWorkerManager msg) throws Exception {
+		ActorRef dead = msg.workerManager;
+		
+		if( workerManagersOut.contains( dead ) ){
+			workerManagersOut.remove( dead );
+			cancelAndReturn();
+			return;
+		}
+		
+		boolean removedFromReady = workerManagersReady.remove(dead);
+		
+		if(!removedFromReady){
+			log.error("attepting to remove workermanager not on the jobmanager's roster");
+			//TODO raise error more sternly?
+		}	
+	}
+
+	private void cancelAndReturn() throws Exception {
+		// cancel every WorkerManager still on a job
+		Timeout timeout = new Timeout(Duration.create(5, "seconds"));
+		Set<Future<Object>> futures = new HashSet<Future<Object>>();
+		for(ActorRef wm : workerManagersOut ){
+			futures.add( Patterns.ask(wm, new CancelJob(), timeout) );
+		}
+		for(Future<Object> future : futures){
+			Await.result(future, timeout.duration());
+		}
+		
+		// move them all the the ready set
+		workerManagersReady.addAll( workerManagersOut );
+		workerManagersOut.clear();
+		
+		// report to supervisor
+		executive.tell( new JobDone(JobDone.Status.CANCELLED, workerManagersReady), getSelf());
 	}
 
 	private void onMsgJobSliceDone() {
-		workerManagersOut-=1;
-		log.debug("worker {} is done", getSender());
+		ActorRef mng = getSender();
+		workerManagersOut.remove(mng);
+		workerManagersReady.add(mng);
 		
-		if (workerManagersOut==0){
-			executive.tell(new JobDone(jobId, workerManagers), getSelf());
+		if (workerManagersOut.isEmpty()){
+			executive.tell(new JobDone(jobId, workerManagersReady), getSelf());
 		}
 	}
 
@@ -81,7 +132,7 @@ public class JobManager extends UntypedActor {
 		if(callback != null){
 			this.callback.onWorkResult( res );
 		}
-					
+		
 		executive.tell(res, getSelf());
 	}
 
@@ -104,37 +155,48 @@ public class JobManager extends UntypedActor {
 			log.debug( "restricting analysis to ids: {}", joiner.join(js.subsetIds));
 			
 			// split the job evenly between managers
-			float seglen = js.subsetIds.size() / ((float) workerManagers.size());
-			for(int i=0;i<workerManagers.size(); i++){				
+			float seglen = js.subsetIds.size() / ((float) workerManagersReady.size());
+			int i=0;
+			
+			for(ActorRef workerManager : workerManagersReady){			
 				int start = Math.round(seglen * i);
 				int end = Math.round(seglen * (i + 1));
 							
-				ActorRef workerManager = workerManagers.get(i);
-				
-				workerManagersOut+=1;
 				workerManager.tell(new JobSliceSpec(js.fromPtsLoc,js.subsetIds,js.toPtsLoc,js.graphId,date,js.mode), getSelf());
+			
+				workerManagersOut.add( workerManager );
+				
+				i++;
 			}
 			
 		}
 		else {
+		
 			// split the job evenly between managers
-			float seglen = fromPts.featureCount() / ((float) workerManagers.size());
-			for(int i=0;i<workerManagers.size(); i++){				
+			float seglen = fromPts.featureCount() / ((float) workerManagersReady.size());
+			int i=0;
+			
+			for(ActorRef workerManager : workerManagersReady){
 				int start = Math.round(seglen * i);
 				int end = Math.round(seglen * (i + 1));
-							
-				ActorRef workerManager = workerManagers.get(i);
+										
+				workerManager.tell(new JobSliceSpec(js.fromPtsLoc,start,end,js.toPtsLoc,js.graphId,date, js.mode), getSelf());
 				
-				workerManagersOut+=1;
-				workerManager.tell(new JobSliceSpec(js.fromPtsLoc,start,end,js.toPtsLoc,js.graphId,date,js.mode), getSelf());
+				workerManagersOut.add( workerManager );
+				
+				i++;
+
 			}
 		}
+		// since we added every WorkerManager in the ready set to the out set, we can empty it
+		workerManagersReady.clear();
+		
 	}
 
-	private void onMsgActorSelection(ActorRef asel) {
+	private void onMsgActorRef(ActorRef asel) {
 		//getContext().watch(asel);
 		
-		workerManagers.add(asel);
+		workerManagersReady.add(asel);
 		getSender().tell(new Boolean(true), getSelf());
 	}
 

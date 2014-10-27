@@ -16,6 +16,8 @@ import scala.concurrent.duration.Duration;
 import com.conveyal.otpac.ClusterGraphService;
 import com.conveyal.otpac.PointSetDatastore;
 import com.conveyal.otpac.message.BuildGraph;
+import com.conveyal.otpac.message.CancelJob;
+import com.conveyal.otpac.message.DoneAssigningExecutive;
 import com.conveyal.otpac.message.JobSliceDone;
 import com.conveyal.otpac.message.JobSliceSpec;
 import com.conveyal.otpac.message.JobStatus;
@@ -26,8 +28,12 @@ import com.conveyal.otpac.message.StartWorkers;
 import com.conveyal.otpac.message.WorkResult;
 import com.conveyal.otpac.message.AssignExecutive;
 
+import akka.actor.ActorIdentity;
 import akka.actor.ActorRef;
+import akka.actor.ActorSelection;
+import akka.actor.Identify;
 import akka.actor.Props;
+import akka.actor.Terminated;
 import akka.actor.UntypedActor;
 import akka.event.Logging;
 import akka.event.LoggingAdapter;
@@ -46,20 +52,25 @@ public class WorkerManager extends UntypedActor {
 	};
 
 	private int curJobId = -1;
-	private int jobSize = -1;
-	private int jobsReturned = 0;
-	private ArrayList<WorkResult> jobResults;
+
+	private long jobSize = -1;
+	private long jobsReturned = 0;
+
 	private ArrayList<ActorRef> workers;
 	private Router router;
 	private ActorRef jobManager;
 	private ActorRef graphBuilder;
 	private ActorRef executive;
+	
+	private Boolean workOffline;
 
 	private String curGraphId = null;
+	private GraphService graphService = null;
 	private Graph graph = null;
 	private Status status;
 
 	private JobSliceSpec jobSpec = null;
+	private int nWorkers;
 	private PointSetDatastore s3Datastore;
 
 	WorkerManager() {
@@ -71,30 +82,42 @@ public class WorkerManager extends UntypedActor {
 			nWorkers = Runtime.getRuntime().availableProcessors();
 		
 		String s3ConfigFilename = context().system().settings().config().getString("s3.credentials.filename");
-		s3Datastore = new PointSetDatastore(10, s3ConfigFilename, workOffline);
 
-		ArrayList<Routee> routees = new ArrayList<Routee>();
-		workers = new ArrayList<ActorRef>();
-		for (int i = 0; i < nWorkers; i++) {
-			ActorRef worker = getContext().actorOf(Props.create(SPTWorker.class), "worker-" + i);
-			routees.add(new ActorRefRoutee(worker));
-			workers.add(worker);
-		}
-		router = new Router(new RoundRobinRoutingLogic(), routees);
+		this.graphService = graphService; 
+		this.workOffline = workOffline;
 
-		if(graphService == null)
+		if(this.graphService == null)
 			graphService = new ClusterGraphService(context().system().settings().config().getString("s3.credentials.filename"), workOffline);
 		
+		
+		s3Datastore = new PointSetDatastore(10, s3ConfigFilename, workOffline);
+		this.nWorkers = nWorkers;
+		this.workers = new ArrayList<ActorRef>();
+
 		graphBuilder = getContext().actorOf(Props.create(GraphBuilder.class, graphService), "builder");
 
 		System.out.println("starting worker-manager with " + nWorkers + " workers");
 		status = Status.READY;
 	}
 
-	@Override
-	public void onReceive(Object message) throws Exception {
-		log.info("got message {}", message);
+	private void createAndRouteWorkers() {
+		ArrayList<Routee> routees = new ArrayList<Routee>();
 		
+		for (int i = 0; i < this.nWorkers; i++) {
+			ActorRef worker = getContext().actorOf(Props.create(SPTWorker.class), "worker-" + i);
+			routees.add(new ActorRefRoutee(worker));
+			workers.add(worker);
+		}
+		
+		router = new Router(new RoundRobinRoutingLogic(), routees);
+
+		System.out.println("starting worker-manager with " + nWorkers + " workers");
+		status = Status.READY;
+
+	}
+
+	@Override
+	public void onReceive(Object message) throws Exception {		
 		if (message instanceof JobSliceSpec) {
 			onMsgJobSliceSpec((JobSliceSpec) message);
 		} else if (message instanceof AssignExecutive) {
@@ -107,15 +130,60 @@ public class WorkerManager extends UntypedActor {
 			onMsgWorkResult((WorkResult) message);
 		} else if (message instanceof JobStatusQuery) {
 			getSender().tell(new JobStatus(getSelf(), curJobId, jobSize, jobsReturned), getSelf());
+		} else if (message instanceof CancelJob ){
+			onMsgCancelJob((CancelJob)message);
+		} else if (message instanceof Terminated){
+			onMsgTerminated((Terminated)message);
+		} else if (message instanceof ActorIdentity){
+			onMsgActorIdentity((ActorIdentity)message);
 		} else {
 			unhandled(message);
 		}
 	}
 
-	private void onMsgAssignExecutive(AssignExecutive exec) {
+	private void onMsgActorIdentity(ActorIdentity actorId) {
+		System.out.println("#####GOT ACTOR IDENTITY#####");
+
+        this.executive = actorId.getRef();
+	}
+
+	private void onMsgTerminated(Terminated message) {
+		//TODO check that it's the executive terminating
+		
+		this.executive = null;
+		cancelAllWorkers();
+	}
+
+	private void onMsgCancelJob(CancelJob message) {
+		cancelAllWorkers();
+		
+		getSender().tell(new Boolean(true), getSelf());
+	}
+
+	private void cancelAllWorkers() {
+		// stop all the worker actors
+		for( ActorRef worker : this.workers ){
+			this.getContext().system().stop(worker);
+		}
+		
+		// delete the actor refs from the worker list
+		workers.clear();
+	}
+
+	private void onMsgAssignExecutive(AssignExecutive exec) throws Exception {
+		// we set up a quickie "good enough" executive reference and then signal to the exec caller
+		// that we're done. The caller then unblocks, and we can establish an official reference
+		// and set up watching
 		this.executive = getSender();
-		log.debug("assigned to executive: {}", this.executive);
-		this.executive.tell(new Boolean(true), getSelf());
+		this.executive.tell(new DoneAssigningExecutive(), getSelf());
+		
+		// set up a watch on exec
+		
+		// get an ActorRef for the executive via official safe channels
+		this.executive.tell(new Identify("1"), getSelf());
+				
+		getContext().watch(this.executive);
+		
 	}
 
 	private void onMsgWorkResult(WorkResult res) throws IOException {
@@ -134,6 +202,10 @@ public class WorkerManager extends UntypedActor {
 
 	private void onMsgStartWorkers() throws Exception {
 		log.debug("set the workers doing their thing");
+		
+		if(workers.isEmpty()){
+			createAndRouteWorkers();
+		}
 
 		PointSet fromAll = s3Datastore.getPointset(this.jobSpec.fromPtsLoc);
 		PointSet fromPts;
