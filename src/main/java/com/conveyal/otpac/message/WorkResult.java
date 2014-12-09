@@ -24,11 +24,29 @@ public class WorkResult implements Serializable{
 	public boolean success;
 	public PointFeature point=null;
 	public int jobId;
+	
+	/** The result, or the central tendency of the results in profile mode */
 	private ResultFeature feat;
+	private ResultFeature min;
+	private ResultFeature max;
+	
+	/** Was this request made in profile mode? */
+	public final boolean profile;
 
 	public WorkResult(boolean success, ResultFeature feat) {
 		this.success = success;
 		this.feat = feat;
+		this.min = null;
+		this.max = null;
+		this.profile = false;
+	}
+	
+	public WorkResult(boolean success, ResultFeature min, ResultFeature max, ResultFeature centralTendency) {
+		this.success = success;
+		this.feat = centralTendency;
+		this.min = min;
+		this.max = max;
+		this.profile = true;
 	}
 	
 	public String toString(){
@@ -38,8 +56,19 @@ public class WorkResult implements Serializable{
 			return "<Job success:"+success+">";
 	}
 	
+	/** The result, or the central tendency of the results in profile mode */
 	public ResultFeature getResult() {
 		return feat;
+	}
+	
+	/** The minimum of the results in profile mode */
+	public ResultFeature getMinimum () {
+		return min;
+	}
+	
+	/** The maximum of the results in profile mode */
+	public ResultFeature getMaximum () {
+		return max;
 	}
 
 	public String toJsonString() throws IOException {
@@ -54,10 +83,19 @@ public class WorkResult implements Serializable{
 		{
 			jgen.writeNumberField("jobId", jobId);
 			jgen.writeBooleanField("success", success);
+			jgen.writeBooleanField("profile", profile);
 			if(success){
 				jgen.writeNumberField("lat", this.point.getLat());
 				jgen.writeNumberField("lon", this.point.getLon());
-				writeHistogramsJson(jgen,this.feat.histograms);
+				
+				if (profile) {
+					writeHistogramsJson("minimum", jgen, this.min.histograms);
+					writeHistogramsJson("maximum", jgen, this.max.histograms);
+				}
+				else {
+					writeHistogramsJson("histograms", jgen, this.feat.histograms);
+				}
+				
 				Geometry geom = this.point.getGeom();
 				if(geom!=null){
 					GeometrySerializer gs = new GeometrySerializer();
@@ -73,8 +111,9 @@ public class WorkResult implements Serializable{
 		return out.toString();
 	}
 
-	private void writeHistogramsJson(JsonGenerator jgen, Map<String, Histogram> histograms) throws JsonGenerationException, IOException {
-		jgen.writeObjectFieldStart("histograms");
+	private void writeHistogramsJson(String name, JsonGenerator jgen, Map<String, Histogram> histograms)
+			throws JsonGenerationException, IOException {
+		jgen.writeObjectFieldStart(name);
 		{
 			for(Entry<String,Histogram> entry : histograms.entrySet()){
 				jgen.writeArrayFieldStart( entry.getKey() );

@@ -3,6 +3,8 @@ package com.conveyal.otpac.actors;
 import org.opentripplanner.analyst.ResultFeature;
 import org.opentripplanner.analyst.SampleSet;
 import org.opentripplanner.analyst.TimeSurface;
+import org.opentripplanner.profile.ProfileResponse;
+import org.opentripplanner.profile.ProfileRouter;
 import org.opentripplanner.routing.algorithm.EarliestArrivalSPTService;
 import org.opentripplanner.routing.error.VertexNotFoundException;
 import org.opentripplanner.routing.graph.Graph;
@@ -32,6 +34,8 @@ public class SPTWorker extends UntypedActor {
 			onMsgSetOneToManyContext((SetOneToManyContext) message);
 		} else if( message instanceof OneToManyRequest ){
 			onMsgOneToManyRequest((OneToManyRequest) message);
+		} else if (message instanceof OneToManyProfileRequest) {
+			onMsgOneToManyProfileRequest((OneToManyProfileRequest) message);
 		} else {
 			unhandled(message);
 		}
@@ -72,6 +76,25 @@ public class SPTWorker extends UntypedActor {
 		catch(Exception e) {
 			log.debug("failed to calc timesurface for feature {}", req.from.getId());
 			getSender().tell(new WorkResult(false, null), getSelf());
+		}
+	}
+	
+	/** Perform profile routing */
+	private void onMsgOneToManyProfileRequest(OneToManyProfileRequest message) {
+		try {
+			ProfileRouter rtr = new ProfileRouter(this.graph, message.options);
+			rtr.route();
+			ResultFeature min = new ResultFeature(this.to, rtr.minSurface);
+			ResultFeature max = new ResultFeature(this.to, rtr.maxSurface);
+			
+			// TODO: Central tendency calculation
+			WorkResult result = new WorkResult(true, min, max, null);
+			getSender().tell(result, getSelf());
+		} catch (Exception e) {
+			log.debug("failed to calc timesurface for feature {}", message.from.getId());
+			e.printStackTrace();
+			// we use the version with three nulls to imply that it was a profile request
+			getSender().tell(new WorkResult(false, null, null, null), getSelf());
 		}
 	}
 

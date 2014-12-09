@@ -17,6 +17,12 @@ public class OneToManyProfileRequest {
 		this.from = from;
 		this.options = options.clone();
 		this.options.analyst = true;
-		this.options.from = new LatLon(from.getLat(), from.getLon());
+		// putting the lat lons into a string is ugly, but there's not really a better
+		// way to do it without major changes in OTP.
+		this.options.from = new LatLon(String.format("%f,%f", from.getLat(), from.getLon()));
+		
+		// Even though we're making an analyst request, OTP requires a to location
+		// which will be ignored
+		this.options.to = this.options.from;
 	}
 }
