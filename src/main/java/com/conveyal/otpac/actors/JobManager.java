@@ -147,9 +147,6 @@ public class JobManager extends UntypedActor {
 		PointSet fromPts = s3Store.getPointset( js.fromPtsLoc );
 		log.debug( "got origin pointset: {}",fromPts.featureCount() );
 		
-		TimeZone tz = TimeZone.getTimeZone(js.tz);
-		Date date = DateUtils.toDate(js.date, js.time, tz);
-		
 		if(js.subsetIds != null && js.subsetIds.size() > 0) {
 			Joiner joiner = Joiner.on(",").skipNulls();
 			log.debug( "restricting analysis to ids: {}", joiner.join(js.subsetIds));
@@ -162,7 +159,7 @@ public class JobManager extends UntypedActor {
 				int start = Math.round(seglen * i);
 				int end = Math.round(seglen * (i + 1));
 							
-				workerManager.tell(new JobSliceSpec(js.fromPtsLoc,js.subsetIds,js.toPtsLoc,js.graphId,date,js.mode), getSelf());
+				workerManager.tell(new JobSliceSpec(js, start, end, js.graphId), getSelf());
 			
 				workerManagersOut.add( workerManager );
 				
@@ -180,7 +177,7 @@ public class JobManager extends UntypedActor {
 				int start = Math.round(seglen * i);
 				int end = Math.round(seglen * (i + 1));
 										
-				workerManager.tell(new JobSliceSpec(js.fromPtsLoc,start,end,js.toPtsLoc,js.graphId,date, js.mode), getSelf());
+				workerManager.tell(new JobSliceSpec(js, start, end, js.graphId), getSelf());
 				
 				workerManagersOut.add( workerManager );
 				

@@ -1,11 +1,15 @@
 package com.conveyal.otpac.handlers;
 
 import java.io.IOException;
+import java.util.Date;
+import java.util.TimeZone;
 import java.util.concurrent.TimeoutException;
 
 import org.glassfish.grizzly.http.server.HttpHandler;
 import org.glassfish.grizzly.http.server.Request;
 import org.glassfish.grizzly.http.server.Response;
+import org.opentripplanner.routing.core.RoutingRequest;
+import org.opentripplanner.util.DateUtils;
 
 import scala.concurrent.Await;
 import scala.concurrent.Future;
@@ -13,6 +17,7 @@ import scala.concurrent.duration.Duration;
 
 import com.conveyal.otpac.JobItemCallback;
 import com.conveyal.otpac.JobResultsApplication;
+import com.conveyal.otpac.PrototypeAnalystRequest;
 import com.conveyal.otpac.message.JobId;
 import com.conveyal.otpac.message.JobSpec;
 import com.conveyal.otpac.message.WorkResult;
@@ -74,8 +79,43 @@ public class FindHandler extends HttpHandler{
 		}
 
 		try {
-			JobSpec js = new JobSpec(bucket, fromPtsLoc, toPtsLoc, dateStr,
-					timeStr, timezoneStr, mode, null);
+			//  build a routing request
+			RoutingRequest rr = new PrototypeAnalystRequest();
+			
+			TimeZone tz = TimeZone.getTimeZone(timezoneStr);
+			Date date = DateUtils.toDate(dateStr, timeStr, tz);
+			rr.dateTime = date.getTime() / 1000;
+			
+			rr.modes.clear();
+			switch(mode) {
+			case "TRANSIT":
+				rr.modes.setWalk(true);
+				rr.modes.setTransit(true);
+				break;
+			case "CAR,TRANSIT,WALK":
+				rr.modes.setCar(true);
+				rr.modes.setTransit(true);
+				rr.modes.setWalk(true);
+				rr.kissAndRide = true;
+				rr.walkReluctance = 1.0;
+				break;
+			case "BIKE,TRANSIT":
+				rr.modes.setBicycle(true);
+				rr.modes.setTransit(true);
+				break;
+			case "CAR":
+				rr.modes.setCar(true);
+				break;
+			case "BIKE":
+				rr.modes.setBicycle(true);
+				break;
+			case "WALK":
+				rr.modes.setWalk(true);
+				break;
+			}
+			
+			
+			JobSpec js = new JobSpec(bucket, fromPtsLoc, toPtsLoc, rr);
 			
 			js.setCallback( new JobItemCallback(){
 
@@ -103,5 +143,5 @@ public class FindHandler extends HttpHandler{
 			response.getWriter().write("something went wrong");
 		}
 	}
-
 }
+

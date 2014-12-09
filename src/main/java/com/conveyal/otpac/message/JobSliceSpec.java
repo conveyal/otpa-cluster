@@ -9,36 +9,25 @@ public class JobSliceSpec implements Serializable {
 	private static final long serialVersionUID = -2994498856080149222L;
 	
 	public String bucket;
-	public Date date;
-	public String fromPtsLoc;
+	
+	/** JobSpec for this slice */
+	public JobSpec jobSpec;
+	
+	/** The start of the slice of this pointset that this worker should compute */
 	public Integer fromPtsStart = null;
+	
+	/** The end of the slice */
 	public Integer fromPtsEnd = null;
-	public List<String> subsetIds = null;
-	public String toPtsLoc;
-	public String mode;
-	
-	
-	public JobSliceSpec(String fromPtsLoc, int start, int end, String toPtsLoc, String bucket, Date date, String mode) {
-		this.fromPtsLoc = fromPtsLoc;
+
+	public JobSliceSpec(JobSpec js, int start, int end, String bucket) {
 		this.fromPtsStart = start;
 		this.fromPtsEnd = end;
-		this.toPtsLoc = toPtsLoc;
+		this.jobSpec = js;
 		this.bucket = bucket;
-		this.date = date;
-		this.mode = mode;
 	}
 	
-	public JobSliceSpec(String fromPtsLoc, List<String> subsetIds, String toPtsLoc, String bucket, Date date, String mode) {
-		this.fromPtsLoc = fromPtsLoc;
-		this.subsetIds = subsetIds;
-		this.toPtsLoc = toPtsLoc;
-		this.bucket = bucket;
-		this.date = date;
-		this.mode = mode;
-	}
-
 	public String toString(){
-		return "<JobSliceSpec from:"+fromPtsLoc+" to:"+toPtsLoc+" bucket:"+this.bucket+">";
+		return "<JobSliceSpec from:" + jobSpec.fromPtsLoc + " to:" + jobSpec.toPtsLoc + " bucket:" + this.bucket + ">";
 	}
 
 }

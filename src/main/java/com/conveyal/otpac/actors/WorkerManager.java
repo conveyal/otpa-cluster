@@ -69,7 +69,7 @@ public class WorkerManager extends UntypedActor {
 	private Graph graph = null;
 	private Status status;
 
-	private JobSliceSpec jobSpec = null;
+	private JobSliceSpec slice = null;
 	private int nWorkers;
 	private PointSetDatastore s3Datastore;
 
@@ -207,15 +207,25 @@ public class WorkerManager extends UntypedActor {
 			createAndRouteWorkers();
 		}
 
-		PointSet fromAll = s3Datastore.getPointset(this.jobSpec.fromPtsLoc);
+		PointSet fromAll = s3Datastore.getPointset(this.slice.jobSpec.fromPtsLoc);
 		PointSet fromPts;
 		
-		if(this.jobSpec.fromPtsStart == null && this.jobSpec.fromPtsEnd == null && this.jobSpec.subsetIds != null)
-			fromPts = fromAll.slice(this.jobSpec.subsetIds);
-		else 
-			fromPts = fromAll.slice(this.jobSpec.fromPtsStart, this.jobSpec.fromPtsEnd);
+		if (this.slice.fromPtsStart == null && this.slice.fromPtsEnd == null && this.slice.jobSpec.subsetIds != null)
+			fromPts = fromAll.slice(this.slice.jobSpec.subsetIds);
 		
-		PointSet toPts = s3Datastore.getPointset(this.jobSpec.toPtsLoc);
+		else if (this.slice.fromPtsStart != null && this.slice.fromPtsEnd != null && this.slice.jobSpec.subsetIds != null)
+			// we slice by indices first, because the indices will change when we slice by IDs. Some of the IDs will
+			// no longer be in the point set, which is fine as pointset.slice(List<String>) simply ignores them.
+			// (confirmed)
+			fromPts = fromAll.slice(this.slice.fromPtsStart, this.slice.fromPtsEnd).slice(this.slice.jobSpec.subsetIds);
+		
+		else if (this.slice.fromPtsStart != null && this.slice.fromPtsEnd != null && this.slice.jobSpec.subsetIds == null)
+			fromPts = fromAll.slice(this.slice.fromPtsStart, this.slice.fromPtsEnd);
+		
+		else
+			fromPts = fromAll;
+		
+		PointSet toPts = s3Datastore.getPointset(this.slice.jobSpec.toPtsLoc);
 
 		SampleSet sampleSet = new SampleSet(toPts, this.graph.getSampleFactory());
 
@@ -231,7 +241,12 @@ public class WorkerManager extends UntypedActor {
 		this.jobsReturned = 0;
 		for (int i = 0; i < fromPts.featureCount(); i++) {
 			PointFeature from = fromPts.getFeature(i);
-			router.route(new OneToManyRequest(from, this.jobSpec.date, this.jobSpec.mode), getSelf());
+			
+			if (this.slice.jobSpec.profileRouting)
+				router.route(new OneToManyProfileRequest(from, this.slice.jobSpec.profileOptions), getSelf());
+			else
+				router.route(new OneToManyRequest(from, this.slice.jobSpec.options), getSelf());
+			
 			this.jobSize += 1;
 		}
 	}
@@ -250,7 +265,7 @@ public class WorkerManager extends UntypedActor {
 
 		log.debug("got job slice: {}", jobSpec);
 
-		this.jobSpec = jobSpec;
+		this.slice = jobSpec;
 
 		// if the current graph isn't the graph specified by the job, kick the
 		// graph builder into action

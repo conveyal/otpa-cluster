@@ -3,17 +3,20 @@ package com.conveyal.otpac.message;
 import java.util.Date;
 
 import org.opentripplanner.analyst.PointFeature;
+import org.opentripplanner.common.model.GenericLocation;
+import org.opentripplanner.routing.core.RoutingRequest;
 
 public class OneToManyRequest {
 
 	public PointFeature from;
-	public Date date;
-	public String mode;
+	public RoutingRequest options;
 
-	public OneToManyRequest(PointFeature from, Date date, String mode) {
+	public OneToManyRequest(PointFeature from, RoutingRequest options) {
 		this.from = from;
-		this.date = date;
-		this.mode = mode;
+		this.options = options.clone();
+		this.options.batch = true;
+		this.options.rctx = null;
+		this.options.from = new GenericLocation(from.getLat(), from.getLon());
 	}
 
 }

@@ -3,7 +3,14 @@ package com.conveyal.otpac.standalone;
 import java.io.IOException;
 import java.util.ArrayList;
 
+import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
+import org.joda.time.LocalTime;
+import org.opentripplanner.routing.core.RoutingRequest;
+import org.opentripplanner.routing.core.TraverseModeSet;
+
 import com.conveyal.otpac.JobItemCallback;
+import com.conveyal.otpac.PrototypeAnalystRequest;
 import com.conveyal.otpac.standalone.StandaloneCluster;
 import com.conveyal.otpac.standalone.StandaloneExecutive;
 import com.conveyal.otpac.standalone.StandaloneWorker;
@@ -38,7 +45,12 @@ public class BasicTest extends TestCase {
 		cluster.registerWorker(exec, worker);
 
 		// build the request
-		JobSpec js = new JobSpec("austin", "austin.csv", "austin.csv", "2014-06-09", "8:05 AM", "America/Chicago", "TRANSIT", null);
+		RoutingRequest rr = new PrototypeAnalystRequest();		
+		DateTime t = new DateTime(2014, 6, 9, 8, 5, DateTimeZone.forID("America/Chicago"));
+		rr.dateTime = t.getMillis() / 1000;
+		rr.setModes(new TraverseModeSet("TRANSIT"));
+		
+		JobSpec js = new JobSpec("austin", "austin.csv", "austin.csv", rr);
 
 		// plus a callback that registers how many work items have returned
 		class CounterCallback implements JobItemCallback {
@@ -75,7 +87,12 @@ public class BasicTest extends TestCase {
 		cluster.registerWorker(exec, worker);
 
 		// build the request
-		JobSpec js = new JobSpec("austin", "austin.shp.zip", "austin.shp.zip", "2014-06-09", "8:05 AM", "America/Chicago", "TRANSIT", null);
+		RoutingRequest rr = new PrototypeAnalystRequest();		
+		DateTime t = new DateTime(2014, 6, 9, 8, 5, DateTimeZone.forID("America/Chicago"));
+		rr.dateTime = t.getMillis() / 1000;
+		rr.setModes(new TraverseModeSet("TRANSIT"));
+		
+		JobSpec js = new JobSpec("austin", "austin.shp.zip", "austin.shp.zip", rr);
 
 		// plus a callback that registers how many work items have returned
 		class CounterCallback implements JobItemCallback {
