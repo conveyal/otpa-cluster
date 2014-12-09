@@ -1,6 +1,6 @@
 package com.conveyal.otpac.actors;
 
-import org.opentripplanner.analyst.ResultFeature;
+import org.opentripplanner.analyst.ResultSet;
 import org.opentripplanner.analyst.SampleSet;
 import org.opentripplanner.analyst.TimeSurface;
 import org.opentripplanner.profile.ProfileResponse;
@@ -66,7 +66,7 @@ public class SPTWorker extends UntypedActor {
 			
 			TimeSurface ts = new TimeSurface( spt );
 			
-			ResultFeature ind = new ResultFeature(this.to, ts);
+			ResultSet ind = new ResultSet(this.to, ts);
 			ind.id = req.from.getId();
 
 			WorkResult res = new WorkResult(true, ind);
@@ -84,8 +84,8 @@ public class SPTWorker extends UntypedActor {
 		try {
 			ProfileRouter rtr = new ProfileRouter(this.graph, message.options);
 			rtr.route();
-			ResultFeature min = new ResultFeature(this.to, rtr.minSurface);
-			ResultFeature max = new ResultFeature(this.to, rtr.maxSurface);
+			ResultSet min = new ResultSet(this.to, rtr.minSurface);
+			ResultSet max = new ResultSet(this.to, rtr.maxSurface);
 			
 			// TODO: Central tendency calculation
 			WorkResult result = new WorkResult(true, min, max, null);

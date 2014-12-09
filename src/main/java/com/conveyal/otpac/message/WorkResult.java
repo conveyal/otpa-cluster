@@ -8,7 +8,7 @@ import java.util.Map.Entry;
 
 import org.opentripplanner.analyst.Histogram;
 import org.opentripplanner.analyst.PointFeature;
-import org.opentripplanner.analyst.ResultFeature;
+import org.opentripplanner.analyst.ResultSet;
 
 import com.bedatadriven.geojson.GeometrySerializer;
 import com.fasterxml.jackson.core.JsonFactory;
@@ -26,14 +26,14 @@ public class WorkResult implements Serializable{
 	public int jobId;
 	
 	/** The result, or the central tendency of the results in profile mode */
-	private ResultFeature feat;
-	private ResultFeature min;
-	private ResultFeature max;
+	private ResultSet feat;
+	private ResultSet min;
+	private ResultSet max;
 	
 	/** Was this request made in profile mode? */
 	public final boolean profile;
 
-	public WorkResult(boolean success, ResultFeature feat) {
+	public WorkResult(boolean success, ResultSet feat) {
 		this.success = success;
 		this.feat = feat;
 		this.min = null;
@@ -41,7 +41,7 @@ public class WorkResult implements Serializable{
 		this.profile = false;
 	}
 	
-	public WorkResult(boolean success, ResultFeature min, ResultFeature max, ResultFeature centralTendency) {
+	public WorkResult(boolean success, ResultSet min, ResultSet max, ResultSet centralTendency) {
 		this.success = success;
 		this.feat = centralTendency;
 		this.min = min;
@@ -57,17 +57,17 @@ public class WorkResult implements Serializable{
 	}
 	
 	/** The result, or the central tendency of the results in profile mode */
-	public ResultFeature getResult() {
+	public ResultSet getResult() {
 		return feat;
 	}
 	
 	/** The minimum of the results in profile mode */
-	public ResultFeature getMinimum () {
+	public ResultSet getMinimum () {
 		return min;
 	}
 	
 	/** The maximum of the results in profile mode */
-	public ResultFeature getMaximum () {
+	public ResultSet getMaximum () {
 		return max;
 	}
 
