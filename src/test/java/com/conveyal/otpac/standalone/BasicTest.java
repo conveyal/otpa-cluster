@@ -23,7 +23,7 @@ import junit.framework.TestCase;
 
 public class BasicTest extends TestCase {
 	public void testBasicSetup() throws Exception {
-		StandaloneCluster cluster = new StandaloneCluster("s3credentials", false, null);
+		StandaloneCluster cluster = new StandaloneCluster("s3credentials", true, null);
 
 		StandaloneExecutive exec = cluster.createExecutive();
 		StandaloneWorker worker = cluster.createWorker();
@@ -37,7 +37,7 @@ public class BasicTest extends TestCase {
 
 	public void testJob() throws Exception {
 		// start up cluster
-		StandaloneCluster cluster = new StandaloneCluster("s3credentials", false, null);
+		StandaloneCluster cluster = new StandaloneCluster("s3credentials", true, null);
 
 		StandaloneExecutive exec = cluster.createExecutive();
 		StandaloneWorker worker = cluster.createWorker();
@@ -79,7 +79,7 @@ public class BasicTest extends TestCase {
 	
 	public void testShapefile() throws Exception {
 		// start up cluster
-		StandaloneCluster cluster = new StandaloneCluster("s3credentials", false, null);
+		StandaloneCluster cluster = new StandaloneCluster("s3credentials", true, null);
 
 		StandaloneExecutive exec = cluster.createExecutive();
 		StandaloneWorker worker = cluster.createWorker();
