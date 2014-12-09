@@ -19,7 +19,12 @@ import org.apache.commons.io.IOUtils;
 import org.opentripplanner.graph_builder.GraphBuilderTask;
 import org.opentripplanner.routing.graph.Graph;
 import org.opentripplanner.routing.graph.Graph.LoadLevel;
+import org.opentripplanner.routing.impl.DefaultStreetVertexIndexFactory;
 import org.opentripplanner.routing.services.GraphService;
+import org.opentripplanner.routing.services.GraphSource;
+import org.opentripplanner.routing.services.StreetVertexIndexFactory;
+import org.opentripplanner.routing.services.StreetVertexIndexService;
+import org.opentripplanner.routing.services.GraphSource.Factory;
 
 import akka.event.Logging;
 import akka.event.LoggingAdapter;
@@ -66,6 +71,8 @@ public class ClusterGraphService implements GraphService {
 			Graph g = gbt.getGraph();
 			
 			g.routerId = graphId;
+			
+			g.index(new DefaultStreetVertexIndexFactory());
 			
 			graphMap.put(graphId,g);
 					
@@ -277,17 +284,7 @@ public class ClusterGraphService implements GraphService {
 		return graphMap.keySet();
 	}
 
-	@Override
-	public boolean registerGraph(String graphId, boolean arg1) {
-		// TODO Auto-generated method stub
-		return graphMap.get(graphId) != null;
-	}
-
-	@Override
-	public boolean registerGraph(String arg0, Graph arg1) {
-		graphMap.put(arg0,  arg1);
-		return  true;
-	}
+	
 
 	@Override
 	public boolean reloadGraphs(boolean arg0) {
@@ -295,13 +292,16 @@ public class ClusterGraphService implements GraphService {
 	}
 
 	@Override
-	public boolean save(String arg0, InputStream arg1) {
+	public Factory getGraphSourceFactory() {
+		return null;
+	}
+
+	@Override
+	public boolean registerGraph(String arg0, GraphSource arg1) {
 		return false;
 	}
 
 	@Override
-	public void setLoadLevel(LoadLevel arg0) {
+	public void setDefaultRouterId(String arg0) {	
 	}
-	
-	
 }
