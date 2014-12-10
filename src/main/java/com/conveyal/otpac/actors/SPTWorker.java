@@ -14,6 +14,7 @@ import akka.actor.UntypedActor;
 import akka.event.Logging;
 import akka.event.LoggingAdapter;
 
+import com.conveyal.otpac.message.OneToManyProfileRequest;
 import com.conveyal.otpac.message.OneToManyRequest;
 import com.conveyal.otpac.message.SetOneToManyContext;
 import com.conveyal.otpac.message.WorkResult;
@@ -85,7 +86,10 @@ public class SPTWorker extends UntypedActor {
 			ProfileRouter rtr = new ProfileRouter(this.graph, message.options);
 			rtr.route();
 			ResultSet min = new ResultSet(this.to, rtr.minSurface);
+			min.id = message.from.getId();
+			
 			ResultSet max = new ResultSet(this.to, rtr.maxSurface);
+			max.id = message.from.getId();
 			
 			// TODO: Central tendency calculation
 			WorkResult result = new WorkResult(true, min, max, null);

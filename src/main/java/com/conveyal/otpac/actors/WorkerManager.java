@@ -22,6 +22,7 @@ import com.conveyal.otpac.message.JobSliceDone;
 import com.conveyal.otpac.message.JobSliceSpec;
 import com.conveyal.otpac.message.JobStatus;
 import com.conveyal.otpac.message.JobStatusQuery;
+import com.conveyal.otpac.message.OneToManyProfileRequest;
 import com.conveyal.otpac.message.OneToManyRequest;
 import com.conveyal.otpac.message.SetOneToManyContext;
 import com.conveyal.otpac.message.StartWorkers;

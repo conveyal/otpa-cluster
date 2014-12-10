@@ -1,4 +1,4 @@
-package com.conveyal.otpac.actors;
+package com.conveyal.otpac.message;
 
 import org.opentripplanner.analyst.PointFeature;
 import org.opentripplanner.api.param.LatLon;
