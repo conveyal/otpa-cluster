@@ -27,8 +27,8 @@ public class WorkResult implements Serializable{
 	
 	/** The result, or the central tendency of the results in profile mode */
 	private ResultSet feat;
-	private ResultSet min;
-	private ResultSet max;
+	private ResultSet bestCase;
+	private ResultSet worstCase;
 	
 	/** Was this request made in profile mode? */
 	public final boolean profile;
@@ -36,16 +36,16 @@ public class WorkResult implements Serializable{
 	public WorkResult(boolean success, ResultSet feat) {
 		this.success = success;
 		this.feat = feat;
-		this.min = null;
-		this.max = null;
+		this.bestCase = null;
+		this.worstCase = null;
 		this.profile = false;
 	}
 	
-	public WorkResult(boolean success, ResultSet min, ResultSet max, ResultSet centralTendency) {
+	public WorkResult(boolean success, ResultSet bestCase, ResultSet worstCase, ResultSet centralTendency) {
 		this.success = success;
 		this.feat = centralTendency;
-		this.min = min;
-		this.max = max;
+		this.bestCase = bestCase;
+		this.worstCase = worstCase;
 		this.profile = true;
 	}
 	
@@ -61,14 +61,14 @@ public class WorkResult implements Serializable{
 		return feat;
 	}
 	
-	/** The minimum of the results in profile mode */
-	public ResultSet getMinimum () {
-		return min;
+	/** The best-case result in profile mode */
+	public ResultSet getBestCase () {
+		return bestCase;
 	}
 	
-	/** The maximum of the results in profile mode */
-	public ResultSet getMaximum () {
-		return max;
+	/** The worst-case result in profile mode */
+	public ResultSet getWorstCase () {
+		return worstCase;
 	}
 
 	public String toJsonString() throws IOException {
@@ -89,8 +89,8 @@ public class WorkResult implements Serializable{
 				jgen.writeNumberField("lon", this.point.getLon());
 				
 				if (profile) {
-					writeHistogramsJson("minimum", jgen, this.min.histograms);
-					writeHistogramsJson("maximum", jgen, this.max.histograms);
+					writeHistogramsJson("bestCase", jgen, this.bestCase.histograms);
+					writeHistogramsJson("worstCase", jgen, this.worstCase.histograms);
 				}
 				else {
 					writeHistogramsJson("histograms", jgen, this.feat.histograms);

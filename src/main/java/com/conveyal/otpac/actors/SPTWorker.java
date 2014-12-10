@@ -85,14 +85,14 @@ public class SPTWorker extends UntypedActor {
 		try {
 			ProfileRouter rtr = new ProfileRouter(this.graph, message.options);
 			rtr.route();
-			ResultSet min = new ResultSet(this.to, rtr.minSurface);
-			min.id = message.from.getId();
+			ResultSet bestCase = new ResultSet(this.to, rtr.minSurface);
+			bestCase.id = message.from.getId();
 			
-			ResultSet max = new ResultSet(this.to, rtr.maxSurface);
-			max.id = message.from.getId();
+			ResultSet worstCase = new ResultSet(this.to, rtr.maxSurface);
+			worstCase.id = message.from.getId();
 			
 			// TODO: Central tendency calculation
-			WorkResult result = new WorkResult(true, min, max, null);
+			WorkResult result = new WorkResult(true, bestCase, worstCase, null);
 			getSender().tell(result, getSelf());
 		} catch (Exception e) {
 			log.debug("failed to calc timesurface for feature {}", message.from.getId());
