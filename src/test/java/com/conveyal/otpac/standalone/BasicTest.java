@@ -179,7 +179,7 @@ public class BasicTest extends TestCase {
 				assertTrue(res.profile);
 				
 				// integrate the opportunities from 0 to 60 minutes
-				Histogram rf = res.getMinimum().histograms.values().iterator().next();
+				Histogram rf = res.getBestCase().histograms.values().iterator().next();
 				for (int i = 0; i < rf.counts.length; i++) {
 					cumulativeOpportunities += rf.counts[i];
 				}
