@@ -82,8 +82,18 @@ public class SPTWorker extends UntypedActor {
 	
 	/** Perform profile routing */
 	private void onMsgOneToManyProfileRequest(OneToManyProfileRequest message) {
+		ProfileRouter rtr;
 		try {
-			ProfileRouter rtr = new ProfileRouter(this.graph, message.options);
+			rtr = new ProfileRouter(this.graph, message.options);
+		} catch (Exception e) {
+			log.debug("failed to calc timesurface for feature {}", message.from.getId());
+			e.printStackTrace();
+			// we use the version with three nulls to imply that it was a profile request
+			getSender().tell(new WorkResult(false, null, null, null), getSelf());
+			return;
+		}
+		
+		try {
 			rtr.route();
 			ResultSet bestCase = new ResultSet(this.to, rtr.minSurface);
 			bestCase.id = message.from.getId();
@@ -99,6 +109,9 @@ public class SPTWorker extends UntypedActor {
 			e.printStackTrace();
 			// we use the version with three nulls to imply that it was a profile request
 			getSender().tell(new WorkResult(false, null, null, null), getSelf());
+		}
+		finally {
+			rtr.cleanup();
 		}
 	}
 
