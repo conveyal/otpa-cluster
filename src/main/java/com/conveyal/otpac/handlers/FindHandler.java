@@ -46,6 +46,9 @@ public class FindHandler extends HttpHandler{
 		String timeStr = request.getParameter("time");
 		String timezoneStr = request.getParameter("tz");
 		String mode = request.getParameter("mode");
+		
+		if (mode == null)
+			mode = "TRANSIT";
 
 		if (bucket == null) {
 			response.setStatus(400);
