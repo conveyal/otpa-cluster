@@ -13,6 +13,10 @@ import org.glassfish.grizzly.http.server.ServerConfiguration;
 import org.glassfish.grizzly.websockets.WebSocketAddOn;
 import org.glassfish.grizzly.websockets.WebSocketEngine;
 
+import scala.concurrent.Await;
+import scala.concurrent.Future;
+import scala.concurrent.duration.Duration;
+
 import com.conveyal.otpac.actors.Executive;
 import com.conveyal.otpac.actors.WorkerManager;
 import com.conveyal.otpac.handlers.AddWorkerHandler;
@@ -24,9 +28,14 @@ import com.conveyal.otpac.workers.WorkerFactory;
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
 
+import akka.actor.ActorIdentity;
 import akka.actor.ActorRef;
+import akka.actor.ActorSelection;
 import akka.actor.ActorSystem;
+import akka.actor.Identify;
 import akka.actor.Props;
+import akka.pattern.Patterns;
+import akka.util.Timeout;
 
 public class Main {
 
@@ -36,7 +45,8 @@ public class Main {
 		options.addOption( "h", true, "hostname");
 		options.addOption( "p", true, "port" );
 		options.addOption("l", "local", false, "Should everything be run locally?");
-		options.addOption("m", "machines", false, "number of machines to use.");
+		options.addOption("m", "machines", true, "number of machines to use.");
+		options.addOption("w", "worker", true, "register as a worker for the given akka url.");
 		
 		
 		// parse command line options
@@ -68,10 +78,10 @@ public class Main {
 
 		ActorSystem system = ActorSystem.create("MySystem", config);
 
-		if (role.equals("taskmaster")) {
+		if (!cmd.hasOption("worker")) {
 			// start the executive actor
 			System.out.println("setting up master");
-			ActorRef executive = system.actorOf(Props.create(Executive.class));
+			ActorRef executive = system.actorOf(Props.create(Executive.class), "executive");
 
 			// start the http server
 			HttpServer server = HttpServer.createSimpleServer("static", hostname, webPort);
@@ -90,7 +100,7 @@ public class Main {
 			ServerConfiguration svCfg = server.getServerConfiguration();
 			svCfg.addHttpHandler(new AddWorkerHandler(executive), "/addworker");
 			svCfg.addHttpHandler(new GetJobResultHandler(executive), "/getstatus");
-			svCfg.addHttpHandler(new FindHandler(executive, chatApplication), "/find");
+			svCfg.addHttpHandler(new FindHandler(executive, chatApplication, system), "/find");
 			svCfg.addHttpHandler(new CancelHandler(executive), "/cancel");
 			
 			WorkerFactory factory;
@@ -108,18 +118,49 @@ public class Main {
 			
 			try {
 				server.start();
+				
+				while (true) {
+					Thread.sleep(72000000);
+				}
+			} catch (Exception e) {
 			} finally {
 				for (ActorRef actorRef : actors) {
-					//factory.terminateWorkerManager(actorRef);
+					factory.terminateWorkerManager(actorRef, executive);
 				}
 			}
 
 			
 		} else {
-			// start up workermanager
-			ActorRef manager = system.actorOf(Props.create(WorkerManager.class), "manager");
-			System.out.println("spinning up actor with path: " + manager.path());
+			// start up workermanager and bind to the named executive
+			ActorSelection executiveSelection = system.actorSelection(cmd.getOptionValue("worker"));
+			
+			// find the executive
+			Timeout timeout = new Timeout(Duration.create(60, "seconds"));
+			Future<Object> future = Patterns.ask(executiveSelection, new Identify("1"), timeout);
+			
+			WorkerFactory factory;
+			ActorRef executive;
+			
+			try {
+				ActorIdentity actorId = (ActorIdentity) Await.result( future, timeout.duration() );
+				executive = actorId.getRef();
+				
+				// create a workermanager
+				factory = new ThreadWorkerFactory(system);
+			} catch (Exception e) {
+				throw new RuntimeException(e);
+			}
+			
+			ActorRef mgr = factory.createWorkerManagers(1, executive).iterator().next();
+			
+			try {
+				while(true) {
+					Thread.sleep(7200000);
+				}
+			} catch (Exception e) {
+			} finally {
+				factory.terminateWorkerManager(mgr, executive);
+			}
 		}
-
 	}
 }

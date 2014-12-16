@@ -1,7 +1,9 @@
 package com.conveyal.otpac.handlers;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 import java.util.TimeZone;
 import java.util.concurrent.TimeoutException;
 
@@ -15,14 +17,16 @@ import scala.concurrent.Await;
 import scala.concurrent.Future;
 import scala.concurrent.duration.Duration;
 
-import com.conveyal.otpac.JobItemCallback;
 import com.conveyal.otpac.JobResultsApplication;
 import com.conveyal.otpac.PrototypeAnalystRequest;
+import com.conveyal.otpac.actors.JobItemActor;
 import com.conveyal.otpac.message.JobId;
 import com.conveyal.otpac.message.JobSpec;
 import com.conveyal.otpac.message.WorkResult;
 
 import akka.actor.ActorRef;
+import akka.actor.ActorSystem;
+import akka.actor.Props;
 import akka.pattern.Patterns;
 import akka.util.Timeout;
 
@@ -30,10 +34,15 @@ public class FindHandler extends HttpHandler{
 
 	private ActorRef executive;
 	private JobResultsApplication statusServer;
+	private ActorSystem system;
 
-	public FindHandler(ActorRef executive, JobResultsApplication statusServer) {
+	/**
+	 * Create a FindHandler for the given executive. An ActorSystem is needed for the registration of callbacks.
+	 */
+	public FindHandler(ActorRef executive, JobResultsApplication statusServer, ActorSystem system) {
 		this.executive = executive;
 		this.statusServer = statusServer;
+		this.system = system;
 	}
 
 	@Override
@@ -119,18 +128,10 @@ public class FindHandler extends HttpHandler{
 			
 			
 			JobSpec js = new JobSpec(bucket, fromPtsLoc, toPtsLoc, rr);
+						
+			js.setCallback(system.actorOf(Props.create(StatusServerJobItemActor.class, statusServer)));
 			
-			js.setCallback( new JobItemCallback(){
-
-				@Override
-				public void onWorkResult(WorkResult res) {
-					try {
-						statusServer.onWorkResult( res );
-					} catch (IOException e) {
-						e.printStackTrace();
-					}
-				}
-			});
+			
 			
 			Timeout timeout = new Timeout(Duration.create(5, "seconds"));
 			Future<Object> future = Patterns.ask(executive, js, timeout);
@@ -144,6 +145,28 @@ public class FindHandler extends HttpHandler{
 			e.printStackTrace();
 			response.setStatus( 500);
 			response.getWriter().write("something went wrong");
+		}
+	}
+	
+	/**
+	 * Notify the status server when there is a workresult.
+	 *  
+	 * @author mattwigway
+	 */
+	public static class StatusServerJobItemActor extends JobItemActor {
+		private JobResultsApplication application;
+		
+		public StatusServerJobItemActor(JobResultsApplication application) {
+			this.application = application;
+		}
+		
+		@Override
+		public void onWorkResult(WorkResult wr) {
+			try {
+				application.onWorkResult(wr);
+			} catch (IOException e) {
+				throw new RuntimeException(e);
+			}
 		}
 	}
 }

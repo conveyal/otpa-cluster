@@ -1,5 +1,7 @@
 package com.conveyal.otpac.message;
 
-public class StartWorkers {
+import java.io.Serializable;
+
+public class StartWorkers implements Serializable {
 
 }

@@ -146,13 +146,7 @@ public class Executive extends UntypedActor {
 	}
 
 	private void onMsgAddWorkerManager(AddWorkerManager aw) throws Exception {
-		ActorSelection remoteManagerSel = context().system().actorSelection(aw.path);
-		
-		// get ActorRef of remote WorkerManager
-		Timeout timeout = new Timeout(Duration.create(60, "seconds"));
-		Future<Object> future = Patterns.ask(remoteManagerSel, new Identify("1"), timeout);
-		ActorIdentity actorId = (ActorIdentity)Await.result( future, timeout.duration() );
-		ActorRef remoteManager = actorId.getRef();
+		ActorRef remoteManager = aw.workerManager;
 		
 		this.wmPathActorRefs.put(remoteManager.path().toString(), remoteManager);
 		
@@ -161,7 +155,8 @@ public class Executive extends UntypedActor {
 		
 		System.out.println("add worker " + remoteManager);
 
-		future = Patterns.ask(remoteManager, new AssignExecutive(), timeout);
+		Timeout timeout = new Timeout(Duration.create(60, "seconds"));
+		Future<Object> future = Patterns.ask(remoteManager, new AssignExecutive(), timeout);
 		Await.result( future, timeout.duration() );
 		remoteManager.tell(new AssignExecutive(), getSelf());
 		

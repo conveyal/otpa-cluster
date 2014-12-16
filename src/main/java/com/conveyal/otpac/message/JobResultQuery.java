@@ -1,6 +1,8 @@
 package com.conveyal.otpac.message;
 
-public class JobResultQuery {
+import java.io.Serializable;
+
+public class JobResultQuery implements Serializable {
 	public int jobId;
 
 	public JobResultQuery(int jobId) {

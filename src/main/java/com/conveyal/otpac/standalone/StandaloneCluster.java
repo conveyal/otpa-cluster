@@ -45,7 +45,7 @@ public class StandaloneCluster {
 	}
 
 	public void registerWorker(StandaloneExecutive exec, StandaloneWorker worker) throws Exception {		
-		exec.registerWorker(worker.getPath().toString());
+		exec.registerWorker(worker.manager);
 	}
 
 	public void stop(StandaloneWorker worker) {

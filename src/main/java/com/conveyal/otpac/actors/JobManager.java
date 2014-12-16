@@ -24,7 +24,6 @@ import com.conveyal.otpac.message.JobStatus;
 import com.conveyal.otpac.message.JobStatusQuery;
 import com.conveyal.otpac.message.RemoveWorkerManager;
 import com.conveyal.otpac.message.WorkResult;
-import com.conveyal.otpac.JobItemCallback;
 import com.google.common.base.Joiner;
 
 import akka.actor.ActorRef;
@@ -43,7 +42,7 @@ public class JobManager extends UntypedActor {
 	
 	private ActorRef executive;
 	private int jobId;
-	private JobItemCallback callback;
+	private ActorRef callback;
 	private PointSetDatastore s3Store;
 
 	JobManager(Boolean workOffline) {
@@ -130,7 +129,7 @@ public class JobManager extends UntypedActor {
 		res.jobId = jobId;
 		
 		if(callback != null){
-			this.callback.onWorkResult( res );
+			this.callback.tell(res, getSelf());
 		}
 		
 		executive.tell(res, getSelf());

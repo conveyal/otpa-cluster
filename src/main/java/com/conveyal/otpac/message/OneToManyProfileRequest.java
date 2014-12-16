@@ -1,5 +1,7 @@
 package com.conveyal.otpac.message;
 
+import java.io.Serializable;
+
 import org.opentripplanner.analyst.PointFeature;
 import org.opentripplanner.api.param.LatLon;
 import org.opentripplanner.profile.ProfileRequest;
@@ -9,7 +11,7 @@ import org.opentripplanner.profile.ProfileRequest;
  * @author mattwigway
  *
  */
-public class OneToManyProfileRequest {
+public class OneToManyProfileRequest implements Serializable {
 	public PointFeature from;
 	public ProfileRequest options;
 

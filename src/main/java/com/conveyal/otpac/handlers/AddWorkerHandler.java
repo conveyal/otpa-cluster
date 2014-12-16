@@ -20,7 +20,7 @@ public class AddWorkerHandler extends HttpHandler{
 	public void service(Request request, Response response) throws Exception {
 		String path = request.getParameterMap().get("path")[0];
 
-		executive.tell(new AddWorkerManager("akka.tcp://" + path), ActorRef.noSender());
+		//executive.tell(new AddWorkerManager("akka.tcp://" + path), ActorRef.noSender());
 
 		response.getWriter().write( "'" + path + "' added to worker pool" );
 	}

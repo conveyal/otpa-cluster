@@ -18,7 +18,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.vividsolutions.jts.geom.Geometry;
 
 
-public class WorkResult implements Serializable{
+public class WorkResult implements Serializable {
 
 	private static final long serialVersionUID = 1701318134569347393L;
 	public boolean success;

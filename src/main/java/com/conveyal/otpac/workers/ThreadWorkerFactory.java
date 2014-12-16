@@ -13,6 +13,7 @@ import akka.actor.Props;
 import com.conveyal.otpac.actors.Executive;
 import com.conveyal.otpac.actors.WorkerManager;
 import com.conveyal.otpac.message.AddWorkerManager;
+import com.conveyal.otpac.message.RemoveWorkerManager;
 import com.conveyal.otpac.standalone.StandaloneWorker;
 
 /**
@@ -35,13 +36,14 @@ public class ThreadWorkerFactory implements WorkerFactory {
 		for (int i = 0; i < number; i++) {
 			ActorRef manager = system.actorOf(Props.create(WorkerManager.class), "manager_" + nextId++);
 			ret.add(manager);
-			executive.tell(new AddWorkerManager(manager.path().toString()), ActorRef.noSender());
+			executive.tell(new AddWorkerManager(manager), ActorRef.noSender());
 		}
 				
 		return ret;
 	}
 
-	public void terminateWorkerManager(ActorRef actor) {
+	public void terminateWorkerManager(ActorRef actor, ActorRef executive) {
+		executive.tell(new RemoveWorkerManager(actor), ActorRef.noSender());
 		system.stop(actor);
 	}
 

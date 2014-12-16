@@ -1,10 +1,14 @@
 package com.conveyal.otpac.message;
 
-public class AddWorkerManager {
-	public String path;
+import java.io.Serializable;
 
-	public AddWorkerManager(String path) {
-		this.path = path;
+import akka.actor.ActorRef;
+
+public class AddWorkerManager implements Serializable {
+	public ActorRef workerManager;
+
+	public AddWorkerManager(ActorRef workerManager) {
+		this.workerManager = workerManager;
 	}
 
 }

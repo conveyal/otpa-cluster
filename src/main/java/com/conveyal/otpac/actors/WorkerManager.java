@@ -112,7 +112,7 @@ public class WorkerManager extends UntypedActor {
 		
 		router = new Router(new RoundRobinRoutingLogic(), routees);
 
-		System.out.println("starting worker-manager with " + nWorkers + " workers");
+		System.out.println("worker-manager: starting " + nWorkers + " workers");
 		status = Status.READY;
 
 	}

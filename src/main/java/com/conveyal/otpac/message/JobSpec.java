@@ -6,7 +6,7 @@ import java.util.List;
 import org.opentripplanner.profile.ProfileRequest;
 import org.opentripplanner.routing.core.RoutingRequest;
 
-import com.conveyal.otpac.JobItemCallback;
+import akka.actor.ActorRef;
 
 public class JobSpec implements Serializable{
 
@@ -26,9 +26,10 @@ public class JobSpec implements Serializable{
 	/** Are we using profile routing? */
 	public boolean profileRouting;
 	
+	/** JobItemActor to call back when we get a WorkResult */
+	public ActorRef callback = null;
+	
 	public List<String> subsetIds = null;
-
-	public JobItemCallback callback=null;
 
 	/**
 	 * Create a job using vanilla routing for the specified RoutingRequest.
@@ -73,9 +74,9 @@ public class JobSpec implements Serializable{
 		
 		this.subsetIds = subsetIds;
 	}
-
-	public void setCallback(JobItemCallback callback) {
-		this.callback = callback;
+	
+	/** Set the JobItemActor callback */
+	public void setCallback(ActorRef jobItemActor) {
+		callback = jobItemActor;
 	}
-
 }
