@@ -1,6 +1,7 @@
 package com.conveyal.otpac;
 
 import java.io.IOException;
+import java.util.Collection;
 
 import org.apache.commons.cli.BasicParser;
 import org.apache.commons.cli.CommandLine;
@@ -18,6 +19,8 @@ import com.conveyal.otpac.handlers.AddWorkerHandler;
 import com.conveyal.otpac.handlers.CancelHandler;
 import com.conveyal.otpac.handlers.FindHandler;
 import com.conveyal.otpac.handlers.GetJobResultHandler;
+import com.conveyal.otpac.workers.ThreadWorkerFactory;
+import com.conveyal.otpac.workers.WorkerFactory;
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
 
@@ -32,6 +35,9 @@ public class Main {
 		Options options = new Options();
 		options.addOption( "h", true, "hostname");
 		options.addOption( "p", true, "port" );
+		options.addOption("l", "local", false, "Should everything be run locally?");
+		options.addOption("m", "machines", false, "number of machines to use.");
+		
 		
 		// parse command line options
 		CommandLineParser parser = new BasicParser();
@@ -86,9 +92,29 @@ public class Main {
 			svCfg.addHttpHandler(new GetJobResultHandler(executive), "/getstatus");
 			svCfg.addHttpHandler(new FindHandler(executive, chatApplication), "/find");
 			svCfg.addHttpHandler(new CancelHandler(executive), "/cancel");
+			
+			WorkerFactory factory;
+			
+			if (cmd.hasOption("local"))
+				// running everything locally; start the appropriate number of WorkerManagers
+				factory = new ThreadWorkerFactory(system);
+			else
+				// TODO: spin up EC2 instances, etc.
+				factory = new ThreadWorkerFactory(system);
 
-			server.start();
+			// start the appropriate number of workermanagers
+			int number = Integer.parseInt(cmd.getOptionValue("machines", "1"));
+			Collection<ActorRef> actors = factory.createWorkerManagers(number, executive);
+			
+			try {
+				server.start();
+			} finally {
+				for (ActorRef actorRef : actors) {
+					//factory.terminateWorkerManager(actorRef);
+				}
+			}
 
+			
 		} else {
 			// start up workermanager
 			ActorRef manager = system.actorOf(Props.create(WorkerManager.class), "manager");
