@@ -8,7 +8,7 @@ public class JobSliceSpec implements Serializable {
 
 	private static final long serialVersionUID = -2994498856080149222L;
 	
-	public String bucket;
+	public String graphId;
 	
 	/** JobSpec for this slice */
 	public JobSpec jobSpec;
@@ -23,11 +23,11 @@ public class JobSliceSpec implements Serializable {
 		this.fromPtsStart = start;
 		this.fromPtsEnd = end;
 		this.jobSpec = js;
-		this.bucket = bucket;
+		this.graphId = bucket;
 	}
 	
 	public String toString(){
-		return "<JobSliceSpec from:" + jobSpec.fromPtsLoc + " to:" + jobSpec.toPtsLoc + " bucket:" + this.bucket + ">";
+		return "<JobSliceSpec from:" + jobSpec.fromPtsLoc + " to:" + jobSpec.toPtsLoc + " bucket:" + this.graphId + ">";
 	}
 
 }

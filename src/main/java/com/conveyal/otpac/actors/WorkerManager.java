@@ -270,9 +270,9 @@ public class WorkerManager extends UntypedActor {
 
 		// if the current graph isn't the graph specified by the job, kick the
 		// graph builder into action
-		if (graph == null || !curGraphId.equals(jobSpec.bucket)) {
-			curGraphId = jobSpec.bucket;
-			graphBuilder.tell(new BuildGraph(jobSpec.bucket), getSelf());
+		if (graph == null || !curGraphId.equals(jobSpec.graphId)) {
+			curGraphId = jobSpec.graphId;
+			graphBuilder.tell(new BuildGraph(jobSpec.graphId), getSelf());
 			status = Status.BUILDING_GRAPH;
 		} else {
 			getSelf().tell(new StartWorkers(), getSelf());
