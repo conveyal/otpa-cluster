@@ -73,8 +73,6 @@ public class Main {
 		// print some server info
 		int akkaPort = config.getInt("akka.remote.netty.tcp.port");
 		System.out.println("running on " + hostname + ":" + akkaPort);
-		String role = config.getString("role");
-		System.out.println("role: " + role);
 
 		ActorSystem system = ActorSystem.create("MySystem", config);
 

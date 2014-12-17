@@ -28,6 +28,7 @@ import com.conveyal.otpac.message.SetOneToManyContext;
 import com.conveyal.otpac.message.StartWorkers;
 import com.conveyal.otpac.message.WorkResult;
 import com.conveyal.otpac.message.AssignExecutive;
+import com.typesafe.config.Config;
 
 import akka.actor.ActorIdentity;
 import akka.actor.ActorRef;
@@ -81,17 +82,23 @@ public class WorkerManager extends UntypedActor {
 	WorkerManager(Integer nWorkers, Boolean workOffline, GraphService graphService) {
 		if(nWorkers == null)
 			nWorkers = Runtime.getRuntime().availableProcessors();
-		
-		String s3ConfigFilename = context().system().settings().config().getString("s3.credentials.filename");
 
+		Config config = context().system().settings().config();
+		String s3ConfigFilename = null;
+
+		if (config.hasPath("s3.credentials.filename"))
+			s3ConfigFilename = config.getString("s3.credentials.filename");
+		
 		this.graphService = graphService; 
 		this.workOffline = workOffline;
 
-		if(this.graphService == null)
-			graphService = new ClusterGraphService(context().system().settings().config().getString("s3.credentials.filename"), workOffline);
+		if (this.graphService == null) {
+			graphService = new ClusterGraphService(s3ConfigFilename, workOffline,
+					config.getString("otpac.bucket.graphs"));
+		}
 		
-		
-		s3Datastore = new PointSetDatastore(10, s3ConfigFilename, workOffline);
+		s3Datastore = new PointSetDatastore(10, s3ConfigFilename, workOffline,
+				config.getString("otpac.bucket.pointsets"));
 		this.nWorkers = nWorkers;
 		this.workers = new ArrayList<ActorRef>();
 

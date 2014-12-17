@@ -36,7 +36,7 @@ public class Executive extends UntypedActor {
 	LoggingAdapter log = Logging.getLogger(getContext().system(), this);
 
 	Executive() {
-		this(true);
+		this(false);
 	}
 	
 	Executive(Boolean workOffline) {
@@ -214,7 +214,7 @@ public class Executive extends UntypedActor {
 
 		// assign the workermanager to the jobmanager; blocking operation
 		Timeout timeout = new Timeout(Duration.create(60, "seconds"));
-		Future<Object> future = Patterns.ask(jobManager, workerManager, timeout);
+		Future<Object> future = Patterns.ask(jobManager, new AssignWorkerManager(workerManager), timeout);
 
 		Boolean success = (Boolean) Await.result(future, timeout.duration());
 

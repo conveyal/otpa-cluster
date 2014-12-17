@@ -40,8 +40,7 @@ public class ClusterGraphService implements GraphService {
 
 	static File GRAPH_DIR = new File("cache", "graphs");
 	
-	// TODO fix hard coded bucket name (config on boot? add to message?)
-	static String graphBucket = "otpac-graphs";
+	private String graphBucket;
 	
 	private Boolean workOffline = false;
 	private AmazonS3Client s3;
@@ -81,15 +80,19 @@ public class ClusterGraphService implements GraphService {
 		return graphMap.get(graphId);
 	}
 
-	public ClusterGraphService(String s3CredentialsFilename) {
-		this(s3CredentialsFilename, false);
-	}
-
-	public ClusterGraphService(String s3CredentialsFilename, Boolean workOffline) {
+	public ClusterGraphService(String s3CredentialsFilename, Boolean workOffline, String bucket) {
 		
 		if(!workOffline) {
-			AWSCredentials creds = new ProfileCredentialsProvider(s3CredentialsFilename, "default").getCredentials();
-			s3 = new AmazonS3Client(creds);
+			if (s3CredentialsFilename != null) {
+				AWSCredentials creds = new ProfileCredentialsProvider(s3CredentialsFilename, "default").getCredentials();
+				s3 = new AmazonS3Client(creds);
+			}
+			else {
+				// S3 credentials propagated to EC2 instances via IAM roles
+				s3 = new AmazonS3Client(); 
+			}
+			
+			this.graphBucket = bucket;
 		}
 		
 		this.workOffline = workOffline;
