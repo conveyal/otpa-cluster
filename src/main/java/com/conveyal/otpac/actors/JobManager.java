@@ -47,25 +47,17 @@ public class JobManager extends UntypedActor {
 	private ActorRef callback;
 	private PointSetDatastore s3Store;
 
-	JobManager(Boolean workOffline) {
+	JobManager(Boolean workOffline, String pointsetBucket) {
 		log.info("Creating job manager");
-		
+
 		Config config = context().system().settings().config();
 		String s3ConfigFilename = null;
-		
+
 		if (config.hasPath("s3.credentials.filename"))
 			s3ConfigFilename = config.getString("s3.credentials.filename");
-		
-		
-		String bucket = null;
-		if (config.hasPath("otpac.bucket.pointsets"))
-			bucket = config.getString("otpac.bucket.pointsets");
-		
-		if (bucket == null && !workOffline)
-			System.out.println("Please configure an S3 bucket and pass it as -Dotpac.bucket.pointsets, or use offline mode");
-		
-		s3Store = new PointSetDatastore(10, s3ConfigFilename, workOffline, bucket);
-		
+
+		s3Store = new PointSetDatastore(10, s3ConfigFilename, workOffline, pointsetBucket);
+
 		workerManagersReady = new HashSet<ActorRef>();
 		workerManagersOut = new HashSet<ActorRef>();
 	}

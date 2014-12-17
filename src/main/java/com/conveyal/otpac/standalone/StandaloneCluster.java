@@ -15,15 +15,18 @@ public class StandaloneCluster {
 	ActorSystem system;
 	
 	Boolean workOffline;
-	GraphService graphService;
 	
-	public StandaloneCluster(String s3configfilename, Boolean workOffline, GraphService graphService){
+	private String pointsetsBucket;
+	private String graphsBucket;
+	
+	public StandaloneCluster(Boolean workOffline, String pointsetsBucket, String graphsBucket){
 		
 		this.workOffline = workOffline;
-		this.graphService = graphService;
 		
-		Config config = ConfigFactory.parseString("s3.credentials.filename=\""+s3configfilename+"\"")
-			    .withFallback(ConfigFactory.defaultOverrides());
+		Config config = ConfigFactory.load();
+		
+		this.pointsetsBucket = pointsetsBucket;
+		this.graphsBucket = graphsBucket;
 		
 		this.system = ActorSystem.create("MySystem", config);
 	}
@@ -31,7 +34,7 @@ public class StandaloneCluster {
 	public StandaloneExecutive createExecutive() {
 		StandaloneExecutive ret = new StandaloneExecutive();
 		
-		ret.executive = system.actorOf(Props.create(Executive.class, workOffline));
+		ret.executive = system.actorOf(Props.create(Executive.class, workOffline, graphsBucket, pointsetsBucket));
 		
 		return ret;
 	}
@@ -39,7 +42,7 @@ public class StandaloneCluster {
 	public StandaloneWorker createWorker() {
 		StandaloneWorker ret = new StandaloneWorker();
 		
-		ret.manager = system.actorOf(Props.create(WorkerManager.class, null, workOffline, graphService), "manager");
+		ret.manager = system.actorOf(Props.create(WorkerManager.class, null, workOffline, graphsBucket, pointsetsBucket), "manager");
 		
 		return ret;
 	}

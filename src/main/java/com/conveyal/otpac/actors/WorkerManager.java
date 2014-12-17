@@ -75,11 +75,7 @@ public class WorkerManager extends UntypedActor {
 	private int nWorkers;
 	private PointSetDatastore s3Datastore;
 
-	WorkerManager() {
-		this(null, false, null);
-	}
-
-	WorkerManager(Integer nWorkers, Boolean workOffline, GraphService graphService) {
+	public WorkerManager(Integer nWorkers, Boolean workOffline, String graphsBucket, String pointsetsBucket) {
 		if(nWorkers == null)
 			nWorkers = Runtime.getRuntime().availableProcessors();
 
@@ -89,16 +85,12 @@ public class WorkerManager extends UntypedActor {
 		if (config.hasPath("s3.credentials.filename"))
 			s3ConfigFilename = config.getString("s3.credentials.filename");
 		
-		this.graphService = graphService; 
 		this.workOffline = workOffline;
 
-		if (this.graphService == null) {
-			graphService = new ClusterGraphService(s3ConfigFilename, workOffline,
-					config.getString("otpac.bucket.graphs"));
-		}
+		graphService = new ClusterGraphService(s3ConfigFilename, workOffline, graphsBucket);
 		
-		s3Datastore = new PointSetDatastore(10, s3ConfigFilename, workOffline,
-				config.getString("otpac.bucket.pointsets"));
+		s3Datastore = new PointSetDatastore(10, s3ConfigFilename, workOffline, pointsetsBucket);
+		
 		this.nWorkers = nWorkers;
 		this.workers = new ArrayList<ActorRef>();
 

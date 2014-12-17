@@ -31,21 +31,22 @@ public class Executive extends UntypedActor {
 	Map<String, Integer> workerManagers; //path->jobid
 	Map<Integer, ActorRef> jobManagers;
 	
+	String pointsetsBucket, graphsBucket;
+	
 	Boolean workOffline;
 
 	LoggingAdapter log = Logging.getLogger(getContext().system(), this);
-
-	Executive() {
-		this(false);
-	}
 	
-	Executive(Boolean workOffline) {
+	public Executive(Boolean workOffline, String graphsBucket, String pointsetsBucket) {
 		jobResults = new HashMap<Integer, ArrayList<WorkResult>>();
 
 		workerManagers = new HashMap<String, Integer>();
 		wmPathActorRefs = new HashMap<String,ActorRef>();
 
 		jobManagers = new HashMap<Integer, ActorRef>();
+				
+		this.graphsBucket = graphsBucket;
+		this.pointsetsBucket = pointsetsBucket;
 
 		this.workOffline = workOffline;
 	}
@@ -191,7 +192,9 @@ public class Executive extends UntypedActor {
 		getSender().tell(new JobId(jobId), getSelf());
 
 		// create a job manager
-		ActorRef jobManager = getContext().actorOf(Props.create(JobManager.class, workOffline), "jobmanager-" + jobId);
+		ActorRef jobManager = getContext().actorOf(
+				Props.create(JobManager.class, workOffline, pointsetsBucket),
+				"jobmanager-" + jobId);
 		
 		jobManagers.put(jobId, jobManager);
 

@@ -48,7 +48,6 @@ public class Main {
 		options.addOption("m", "machines", true, "number of machines to use.");
 		options.addOption("w", "worker", true, "register as a worker for the given akka url.");
 		
-		
 		// parse command line options
 		CommandLineParser parser = new BasicParser();
 		CommandLine cmd = parser.parse(options, args);
@@ -79,7 +78,8 @@ public class Main {
 		if (!cmd.hasOption("worker")) {
 			// start the executive actor
 			System.out.println("setting up master");
-			ActorRef executive = system.actorOf(Props.create(Executive.class), "executive");
+			ActorRef executive = system.actorOf(Props.create(Executive.class, cmd.hasOption("local"), 
+					config.getString("otpac.bucket.graphs"), config.getString("otpac.bucket.pointsets")), "executive");
 
 			// start the http server
 			HttpServer server = HttpServer.createSimpleServer("static", hostname, webPort);
@@ -105,10 +105,10 @@ public class Main {
 			
 			if (cmd.hasOption("local"))
 				// running everything locally; start the appropriate number of WorkerManagers
-				factory = new ThreadWorkerFactory(system);
+				factory = new ThreadWorkerFactory(system, true, config.getString("otpac.bucket.graphs"), config.getString("otpac.bucket.pointsets"));
 			else
 				// TODO: spin up EC2 instances, etc.
-				factory = new ThreadWorkerFactory(system);
+				factory = new ThreadWorkerFactory(system, false, config.getString("otpac.bucket.graphs"), config.getString("otpac.bucket.pointsets"));
 
 			// start the appropriate number of workermanagers
 			int number = Integer.parseInt(cmd.getOptionValue("machines", "1"));
@@ -144,7 +144,8 @@ public class Main {
 				executive = actorId.getRef();
 				
 				// create a workermanager
-				factory = new ThreadWorkerFactory(system);
+				factory = new ThreadWorkerFactory(system, cmd.hasOption("local"),
+						config.getString("otpac.bucket.graphs"), config.getString("otpac.bucket.pointsets"));
 			} catch (Exception e) {
 				throw new RuntimeException(e);
 			}
