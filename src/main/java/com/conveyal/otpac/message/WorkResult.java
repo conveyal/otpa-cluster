@@ -51,7 +51,7 @@ public class WorkResult implements Serializable {
 	
 	public String toString(){
 		if(success)
-			return "<Job success:"+success+" point:"+point+" histograms.size:"+feat.histograms.size()+">";
+			return "<Job success:"+success+" point:"+point+" histograms.size:"+ (profile ? bestCase :feat).histograms.size()+">";
 		else
 			return "<Job success:"+success+">";
 	}

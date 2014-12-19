@@ -266,6 +266,7 @@ public class WorkerManager extends UntypedActor {
 		log.debug("got job slice: {}", jobSpec);
 
 		this.slice = jobSpec;
+		this.curJobId = jobSpec.jobSpec.jobId;
 
 		// if the current graph isn't the graph specified by the job, kick the
 		// graph builder into action

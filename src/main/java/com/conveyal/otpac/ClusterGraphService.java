@@ -104,18 +104,27 @@ public class ClusterGraphService implements GraphService {
 		String graphId = graphFile.getName();
 		
 		if(graphId.endsWith(".zip"))
-			graphId = graphId.substring(0, graphId.length() - 5);
+			graphId = graphId.substring(0, graphId.length() - 4);
 		
-		GRAPH_DIR.mkdirs();
+		File graphDir = new File(GRAPH_DIR, graphId);
+		
+		if (graphDir.exists())
+			graphDir.delete();
+		
+		graphDir.mkdirs();
 		
 		File graphDataZip = new File(GRAPH_DIR, graphId + ".zip");
 				
 		// if directory zip contents  store as zip
+		// either way ensure there is an extracted copy in the local cache
 		if(graphFile.isDirectory()) {
-			zipGraphDir(graphFile, graphDataZip);
+			FileUtils.copyDirectory(graphFile, graphDir);
+			
+			zipGraphDir(graphDir, graphDataZip);
 		}
 		else if(graphFile.getName().endsWith(".zip")) {
 			FileUtils.copyFile(graphFile, graphDataZip);
+			unpackGraphZip(graphDataZip, graphDir, false);
 		}
 		else {
 			graphDataZip = null;
@@ -124,6 +133,8 @@ public class ClusterGraphService implements GraphService {
 		if(!workOffline && graphDataZip != null) {
 			PutObjectResult graphZip = s3.putObject(graphBucket, graphId+".zip", graphDataZip);
 		}
+		
+		graphDataZip.delete();
 		
 	}
 	
@@ -210,6 +221,11 @@ public class ClusterGraphService implements GraphService {
 	}
 
 	private static void unpackGraphZip(File graphZipFile, File extractedGraphDir) throws ZipException, IOException {
+		// delete by default
+		unpackGraphZip(graphZipFile, extractedGraphDir, true);
+	}
+	
+	private static void unpackGraphZip(File graphZipFile, File extractedGraphDir, boolean delete) throws ZipException, IOException {
 		
 		ZipFile zipFile = new ZipFile(graphZipFile);
 		
@@ -235,7 +251,9 @@ public class ClusterGraphService implements GraphService {
 
 		zipFile.close();
 
-		graphZipFile.delete();
+		if (delete) {
+			graphZipFile.delete();
+		}
 	}
 	
 	private static void zipGraphDir(File graphDirectory, File zipGraphFile) throws IOException {

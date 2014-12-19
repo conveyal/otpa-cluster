@@ -31,13 +31,13 @@ public class Executive extends UntypedActor {
 	Map<String, Integer> workerManagers; //path->jobid
 	Map<Integer, ActorRef> jobManagers;
 	
-	String pointsetsBucket, graphsBucket;
+	String pointsetsBucket, graphsBucket, s3ConfigFile;
 	
 	Boolean workOffline;
 
 	LoggingAdapter log = Logging.getLogger(getContext().system(), this);
 	
-	public Executive(Boolean workOffline, String graphsBucket, String pointsetsBucket) {
+	public Executive(Boolean workOffline, String s3ConfigFile, String graphsBucket, String pointsetsBucket) {
 		jobResults = new HashMap<Integer, ArrayList<WorkResult>>();
 
 		workerManagers = new HashMap<String, Integer>();
@@ -47,6 +47,7 @@ public class Executive extends UntypedActor {
 				
 		this.graphsBucket = graphsBucket;
 		this.pointsetsBucket = pointsetsBucket;
+		this.s3ConfigFile = s3ConfigFile;
 
 		this.workOffline = workOffline;
 	}
