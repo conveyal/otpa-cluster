@@ -10,12 +10,13 @@ import org.opentripplanner.analyst.PointSet;
 import org.opentripplanner.util.DateUtils;
 
 import com.conveyal.otpac.PointSetDatastore;
+
 import scala.concurrent.Await;
 import scala.concurrent.Future;
 import scala.concurrent.duration.Duration;
 
+import com.conveyal.otpac.message.AssignWorkerManager;
 import com.conveyal.otpac.message.CancelJob;
-
 import com.conveyal.otpac.message.JobDone;
 import com.conveyal.otpac.message.JobSliceDone;
 import com.conveyal.otpac.message.JobSliceSpec;
@@ -24,8 +25,8 @@ import com.conveyal.otpac.message.JobStatus;
 import com.conveyal.otpac.message.JobStatusQuery;
 import com.conveyal.otpac.message.RemoveWorkerManager;
 import com.conveyal.otpac.message.WorkResult;
-import com.conveyal.otpac.JobItemCallback;
 import com.google.common.base.Joiner;
+import com.typesafe.config.Config;
 
 import akka.actor.ActorRef;
 import akka.actor.Terminated;
@@ -43,22 +44,28 @@ public class JobManager extends UntypedActor {
 	
 	private ActorRef executive;
 	private int jobId;
-	private JobItemCallback callback;
+	private ActorRef callback;
 	private PointSetDatastore s3Store;
 
-	JobManager(Boolean workOffline) {
-		String s3ConfigFilename = context().system().settings().config().getString("s3.credentials.filename");
-		
-		s3Store = new PointSetDatastore(10, s3ConfigFilename, workOffline);
-		
+	JobManager(Boolean workOffline, String pointsetBucket) {
+		log.info("Creating job manager");
+
+		Config config = context().system().settings().config();
+		String s3ConfigFilename = null;
+
+		if (config.hasPath("s3.credentials.filename"))
+			s3ConfigFilename = config.getString("s3.credentials.filename");
+
+		s3Store = new PointSetDatastore(10, s3ConfigFilename, workOffline, pointsetBucket);
+
 		workerManagersReady = new HashSet<ActorRef>();
 		workerManagersOut = new HashSet<ActorRef>();
 	}
 
 	@Override
-	public void onReceive(Object msg) throws Exception {		
-		if (msg instanceof ActorRef) {
-			onMsgActorRef((ActorRef) msg);
+	public void onReceive(Object msg) throws Exception {			
+		if (msg instanceof AssignWorkerManager) {
+			onMsgAssignWorkerManager((AssignWorkerManager) msg);
 		} else if (msg instanceof JobSpec) {
 			onMsgJobSpec((JobSpec) msg);
 		} else if(msg instanceof WorkResult){
@@ -130,7 +137,7 @@ public class JobManager extends UntypedActor {
 		res.jobId = jobId;
 		
 		if(callback != null){
-			this.callback.onWorkResult( res );
+			this.callback.tell(res, getSelf());
 		}
 		
 		executive.tell(res, getSelf());
@@ -190,10 +197,10 @@ public class JobManager extends UntypedActor {
 		
 	}
 
-	private void onMsgActorRef(ActorRef asel) {
+	private void onMsgAssignWorkerManager(AssignWorkerManager awm) {
 		//getContext().watch(asel);
 		
-		workerManagersReady.add(asel);
+		workerManagersReady.add(awm.workerManager);
 		getSender().tell(new Boolean(true), getSelf());
 	}
 

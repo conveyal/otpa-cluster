@@ -28,6 +28,7 @@ import com.conveyal.otpac.message.SetOneToManyContext;
 import com.conveyal.otpac.message.StartWorkers;
 import com.conveyal.otpac.message.WorkResult;
 import com.conveyal.otpac.message.AssignExecutive;
+import com.typesafe.config.Config;
 
 import akka.actor.ActorIdentity;
 import akka.actor.ActorRef;
@@ -74,24 +75,22 @@ public class WorkerManager extends UntypedActor {
 	private int nWorkers;
 	private PointSetDatastore s3Datastore;
 
-	WorkerManager() {
-		this(null, false, null);
-	}
-
-	WorkerManager(Integer nWorkers, Boolean workOffline, GraphService graphService) {
+	public WorkerManager(Integer nWorkers, Boolean workOffline, String graphsBucket, String pointsetsBucket) {
 		if(nWorkers == null)
 			nWorkers = Runtime.getRuntime().availableProcessors() / 2;
 		
-		String s3ConfigFilename = context().system().settings().config().getString("s3.credentials.filename");
+		Config config = context().system().settings().config();
+		String s3ConfigFilename = null;
 
-		this.graphService = graphService; 
+		if (config.hasPath("s3.credentials.filename"))
+			s3ConfigFilename = config.getString("s3.credentials.filename");
+		
 		this.workOffline = workOffline;
 
-		if(this.graphService == null)
-			graphService = new ClusterGraphService(context().system().settings().config().getString("s3.credentials.filename"), workOffline);
+		graphService = new ClusterGraphService(s3ConfigFilename, workOffline, graphsBucket);
 		
+		s3Datastore = new PointSetDatastore(10, s3ConfigFilename, workOffline, pointsetsBucket);
 		
-		s3Datastore = new PointSetDatastore(10, s3ConfigFilename, workOffline);
 		this.nWorkers = nWorkers;
 		this.workers = new ArrayList<ActorRef>();
 
@@ -112,7 +111,7 @@ public class WorkerManager extends UntypedActor {
 		
 		router = new Router(new RoundRobinRoutingLogic(), routees);
 
-		System.out.println("starting worker-manager with " + nWorkers + " workers");
+		System.out.println("worker-manager: starting " + nWorkers + " workers");
 		status = Status.READY;
 
 	}
@@ -267,12 +266,13 @@ public class WorkerManager extends UntypedActor {
 		log.debug("got job slice: {}", jobSpec);
 
 		this.slice = jobSpec;
+		this.curJobId = jobSpec.jobSpec.jobId;
 
 		// if the current graph isn't the graph specified by the job, kick the
 		// graph builder into action
-		if (graph == null || !curGraphId.equals(jobSpec.bucket)) {
-			curGraphId = jobSpec.bucket;
-			graphBuilder.tell(new BuildGraph(jobSpec.bucket), getSelf());
+		if (graph == null || !curGraphId.equals(jobSpec.graphId)) {
+			curGraphId = jobSpec.graphId;
+			graphBuilder.tell(new BuildGraph(jobSpec.graphId), getSelf());
 			status = Status.BUILDING_GRAPH;
 		} else {
 			getSelf().tell(new StartWorkers(), getSelf());

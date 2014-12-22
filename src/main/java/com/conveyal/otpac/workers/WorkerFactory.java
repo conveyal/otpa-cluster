@@ -21,5 +21,5 @@ public interface WorkerFactory {
 	/**
 	 * Terminate a worker.
 	 */
-	public void terminateWorkerManager (ActorRef actor);
+	public void terminateWorkerManager (ActorRef actor, ActorRef executive);
 }

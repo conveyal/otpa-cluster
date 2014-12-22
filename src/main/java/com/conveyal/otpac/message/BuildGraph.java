@@ -1,6 +1,8 @@
 package com.conveyal.otpac.message;
 
-public class BuildGraph {
+import java.io.Serializable;
+
+public class BuildGraph implements Serializable {
 	public String graphId;
 
 	public BuildGraph(String graphId) {

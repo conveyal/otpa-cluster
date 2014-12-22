@@ -18,7 +18,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.vividsolutions.jts.geom.Geometry;
 
 
-public class WorkResult implements Serializable{
+public class WorkResult implements Serializable {
 
 	private static final long serialVersionUID = 1701318134569347393L;
 	public boolean success;
@@ -51,7 +51,7 @@ public class WorkResult implements Serializable{
 	
 	public String toString(){
 		if(success)
-			return "<Job success:"+success+" point:"+point+" histograms.size:"+feat.histograms.size()+">";
+			return "<Job success:"+success+" point:"+point+" histograms.size:"+ (profile ? bestCase :feat).histograms.size()+">";
 		else
 			return "<Job success:"+success+">";
 	}

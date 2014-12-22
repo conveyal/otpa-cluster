@@ -23,32 +23,34 @@ import com.amazonaws.services.s3.AmazonS3Client;
 import com.amazonaws.services.s3.model.ObjectMetadata;
 import com.amazonaws.services.s3.model.PutObjectResult;
 import com.amazonaws.services.s3.model.S3Object;
-import com.google.common.io.Files;
 
 public class PointSetDatastore extends DiskBackedPointSetCache {
 
 	static private File POINT_DIR = new File("cache", "pointsets");
-	static private String pointsetBucket = "otpac-pointsets";
+	private String pointsetBucket;
 	
 	private AmazonS3Client s3;
 	private Boolean workOffline = false;
 	
-	public PointSetDatastore(String s3CredentialsFilename) {
+	public PointSetDatastore(Integer maxCacheSize, String s3CredentialsFilename,
+			Boolean workOffline, String pointsetBucket){
 		
-		// don't work offline by default
-		this(10, s3CredentialsFilename, false);
-	}
-	
-	public PointSetDatastore(Integer maxCacheSize, String s3CredentialsFilename, Boolean workOffline){
 		super(maxCacheSize,POINT_DIR);
 
 		// allow the data store to work offline with cached data and skip S3 connection
 		this.workOffline = workOffline;
 		
+		this.pointsetBucket = pointsetBucket;
+		
 		if(!this.workOffline) {
-			// grab credentials from "~.aws/credentials"
-			AWSCredentials creds = new ProfileCredentialsProvider(s3CredentialsFilename, "default").getCredentials();
-			s3 = new AmazonS3Client(creds);
+			if (s3CredentialsFilename != null) {
+				AWSCredentials creds = new ProfileCredentialsProvider(s3CredentialsFilename, "default").getCredentials();
+				s3 = new AmazonS3Client(creds);
+			}
+			else {
+				// default credentials providers, e.g. IAM role
+				s3 = new AmazonS3Client();
+			}
 		}
 	}
 	

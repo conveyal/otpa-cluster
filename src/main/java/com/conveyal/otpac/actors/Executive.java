@@ -31,21 +31,22 @@ public class Executive extends UntypedActor {
 	Map<String, Integer> workerManagers; //path->jobid
 	Map<Integer, ActorRef> jobManagers;
 	
+	String pointsetsBucket, graphsBucket;
+	
 	Boolean workOffline;
 
 	LoggingAdapter log = Logging.getLogger(getContext().system(), this);
-
-	Executive() {
-		this(true);
-	}
 	
-	Executive(Boolean workOffline) {
+	public Executive(Boolean workOffline, String graphsBucket, String pointsetsBucket) {
 		jobResults = new HashMap<Integer, ArrayList<WorkResult>>();
 
 		workerManagers = new HashMap<String, Integer>();
 		wmPathActorRefs = new HashMap<String,ActorRef>();
 
 		jobManagers = new HashMap<Integer, ActorRef>();
+				
+		this.graphsBucket = graphsBucket;
+		this.pointsetsBucket = pointsetsBucket;
 
 		this.workOffline = workOffline;
 	}
@@ -146,13 +147,7 @@ public class Executive extends UntypedActor {
 	}
 
 	private void onMsgAddWorkerManager(AddWorkerManager aw) throws Exception {
-		ActorSelection remoteManagerSel = context().system().actorSelection(aw.path);
-		
-		// get ActorRef of remote WorkerManager
-		Timeout timeout = new Timeout(Duration.create(60, "seconds"));
-		Future<Object> future = Patterns.ask(remoteManagerSel, new Identify("1"), timeout);
-		ActorIdentity actorId = (ActorIdentity)Await.result( future, timeout.duration() );
-		ActorRef remoteManager = actorId.getRef();
+		ActorRef remoteManager = aw.workerManager;
 		
 		this.wmPathActorRefs.put(remoteManager.path().toString(), remoteManager);
 		
@@ -161,7 +156,8 @@ public class Executive extends UntypedActor {
 		
 		System.out.println("add worker " + remoteManager);
 
-		future = Patterns.ask(remoteManager, new AssignExecutive(), timeout);
+		Timeout timeout = new Timeout(Duration.create(60, "seconds"));
+		Future<Object> future = Patterns.ask(remoteManager, new AssignExecutive(), timeout);
 		Await.result( future, timeout.duration() );
 		remoteManager.tell(new AssignExecutive(), getSelf());
 		
@@ -196,7 +192,9 @@ public class Executive extends UntypedActor {
 		getSender().tell(new JobId(jobId), getSelf());
 
 		// create a job manager
-		ActorRef jobManager = getContext().actorOf(Props.create(JobManager.class, workOffline), "jobmanager-" + jobId);
+		ActorRef jobManager = getContext().actorOf(
+				Props.create(JobManager.class, workOffline, pointsetsBucket),
+				"jobmanager-" + jobId);
 		
 		jobManagers.put(jobId, jobManager);
 
@@ -219,7 +217,7 @@ public class Executive extends UntypedActor {
 
 		// assign the workermanager to the jobmanager; blocking operation
 		Timeout timeout = new Timeout(Duration.create(60, "seconds"));
-		Future<Object> future = Patterns.ask(jobManager, workerManager, timeout);
+		Future<Object> future = Patterns.ask(jobManager, new AssignWorkerManager(workerManager), timeout);
 
 		Boolean success = (Boolean) Await.result(future, timeout.duration());
 
