@@ -80,7 +80,7 @@ public class WorkerManager extends UntypedActor {
 
 	WorkerManager(Integer nWorkers, Boolean workOffline, GraphService graphService) {
 		if(nWorkers == null)
-			nWorkers = Runtime.getRuntime().availableProcessors();
+			nWorkers = Runtime.getRuntime().availableProcessors() / 2;
 		
 		String s3ConfigFilename = context().system().settings().config().getString("s3.credentials.filename");
 
