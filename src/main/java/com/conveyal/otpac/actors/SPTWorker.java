@@ -9,6 +9,7 @@ import org.opentripplanner.routing.algorithm.EarliestArrivalSPTService;
 import org.opentripplanner.routing.error.VertexNotFoundException;
 import org.opentripplanner.routing.graph.Graph;
 import org.opentripplanner.routing.spt.ShortestPathTree;
+import org.opentripplanner.standalone.Router;
 
 import akka.actor.UntypedActor;
 import akka.event.Logging;
@@ -21,7 +22,7 @@ import com.conveyal.otpac.message.WorkResult;
 
 public class SPTWorker extends UntypedActor {
 
-	private Graph graph;
+	private Router router;
 	private SampleSet to;
 	
 	LoggingAdapter log = Logging.getLogger(getContext().system(), this);
@@ -46,7 +47,7 @@ public class SPTWorker extends UntypedActor {
 		log.debug("got req {}", req);
 		
 		try{
-			req.options.setRoutingContext(this.graph);
+			req.options.setRoutingContext(this.router.graph);
 		} catch ( VertexNotFoundException ex ) {
 			log.debug("could not find origin vertex {}", req.options.from);
 			getSender().tell(new WorkResult(false, null), getSelf());
@@ -84,7 +85,7 @@ public class SPTWorker extends UntypedActor {
 	private void onMsgOneToManyProfileRequest(OneToManyProfileRequest message) {
 		ProfileRouter rtr;
 		try {
-			rtr = new ProfileRouter(this.graph, message.options);
+			rtr = new ProfileRouter(this.router.graph, message.options);
 		} catch (Exception e) {
 			log.debug("failed to calc timesurface for feature {}", message.from.getId());
 			e.printStackTrace();
@@ -117,9 +118,9 @@ public class SPTWorker extends UntypedActor {
 
 	private void onMsgSetOneToManyContext(SetOneToManyContext ctx) {		
 		log.debug("setting 1-many context: {}", ctx);
-		log.debug("setting context graph: {}", ctx.graph);
+		log.debug("setting context router: {}", ctx.router);
 		
-		this.graph = ctx.graph;
+		this.router = ctx.router;
 		this.to = ctx.to;
 		
 		getSender().tell(new Boolean(true), getSelf());

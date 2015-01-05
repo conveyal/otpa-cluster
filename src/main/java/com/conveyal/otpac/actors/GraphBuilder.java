@@ -18,6 +18,7 @@ import org.apache.commons.io.IOUtils;
 import org.opentripplanner.graph_builder.GraphBuilderTask;
 import org.opentripplanner.routing.graph.Graph;
 import org.opentripplanner.routing.services.GraphService;
+import org.opentripplanner.standalone.Router;
 
 import ch.qos.logback.core.util.FileUtil;
 
@@ -53,9 +54,9 @@ public class GraphBuilder extends UntypedActor {
 	
 	private void onMsgBuildGraph(BuildGraph bg) throws IOException {
 		
-		Graph gg = graphService.getGraph(bg.graphId);
+		Router r = graphService.getRouter(bg.graphId);
 
-		getSender().tell(gg, getSelf());
+		getSender().tell(r, getSelf());
 	}
 
 	
