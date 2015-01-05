@@ -6,6 +6,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Enumeration;
 import java.util.concurrent.ConcurrentHashMap;
@@ -25,6 +26,8 @@ import org.opentripplanner.routing.services.GraphSource;
 import org.opentripplanner.routing.services.StreetVertexIndexFactory;
 import org.opentripplanner.routing.services.StreetVertexIndexService;
 import org.opentripplanner.routing.services.GraphSource.Factory;
+import org.opentripplanner.standalone.CommandLineParameters;
+import org.opentripplanner.standalone.OTPConfigurator;
 import org.opentripplanner.standalone.Router;
 
 import akka.event.Logging;
@@ -65,7 +68,12 @@ public class ClusterGraphService extends GraphService {
 				e.printStackTrace();
 			}
 			
-			GraphBuilderTask gbt = ClusterGraphBuilder.createBuilder(new File(GRAPH_DIR, graphId));
+			CommandLineParameters params = new CommandLineParameters();
+			params.build = new ArrayList<File>(1);
+			params.build.add(new File(GRAPH_DIR, graphId));
+			params.inMemory = true;
+			params.longDistance = true;
+			GraphBuilderTask gbt = new OTPConfigurator(params).builderFromParameters();
 			
 			gbt.run();
 			
