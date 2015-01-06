@@ -2,7 +2,6 @@ package com.conveyal.otpac.actors;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
@@ -35,16 +34,6 @@ public class Executive extends UntypedActor {
 	String pointsetsBucket, graphsBucket;
 	
 	Boolean workOffline;
-	
-	/**
-	 * A queue for multi-point jobs.
-	 */
-	private List<JobSpec> multiPointQueue;
-	
-	/**
-	 * A queue for single-point jobs.
-	 */
-	//private List<SinglePointJobSpec> singlePointQueue;
 
 	LoggingAdapter log = Logging.getLogger(getContext().system(), this);
 	

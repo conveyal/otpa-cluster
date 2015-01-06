@@ -2,7 +2,6 @@ package com.conveyal.otpac.actors;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashSet;
 
 import org.opentripplanner.analyst.PointFeature;
 import org.opentripplanner.analyst.PointSet;
@@ -16,8 +15,6 @@ import scala.concurrent.duration.Duration;
 
 import com.conveyal.otpac.ClusterGraphService;
 import com.conveyal.otpac.PointSetDatastore;
-import com.conveyal.otpac.message.AnalystClusterRequest;
-import com.conveyal.otpac.message.BufferFillRequest;
 import com.conveyal.otpac.message.BuildGraph;
 import com.conveyal.otpac.message.CancelJob;
 import com.conveyal.otpac.message.DoneAssigningExecutive;
@@ -27,7 +24,6 @@ import com.conveyal.otpac.message.JobStatus;
 import com.conveyal.otpac.message.JobStatusQuery;
 import com.conveyal.otpac.message.OneToManyProfileRequest;
 import com.conveyal.otpac.message.OneToManyRequest;
-import com.conveyal.otpac.message.ProcessClusterRequests;
 import com.conveyal.otpac.message.SetOneToManyContext;
 import com.conveyal.otpac.message.StartWorkers;
 import com.conveyal.otpac.message.WorkResult;
@@ -83,19 +79,9 @@ public class WorkerManager extends UntypedActor {
 	private int nWorkers;
 	private PointSetDatastore s3Datastore;
 
-	/** How many requests are outstanding? */
-	private int outstandingRequests;
-	
-	public final int maxQueueSize, minQueueSize;
-
 	public WorkerManager(Integer nWorkers, Boolean workOffline, String graphsBucket, String pointsetsBucket) {
 		if(nWorkers == null)
 			nWorkers = Runtime.getRuntime().availableProcessors() / 2;
-
-		
-		// keep 3 requests per worker on hand
-		minQueueSize = 3 * nWorkers;
-		maxQueueSize = 10 * nWorkers;
 		
 		Config config = context().system().settings().config();
 		String s3ConfigFilename = null;
@@ -136,12 +122,14 @@ public class WorkerManager extends UntypedActor {
 
 	@Override
 	public void onReceive(Object message) throws Exception {		
-		if (message instanceof ProcessClusterRequests) {
-			onMsgProcessClusterRequests((ProcessClusterRequests) message);
+		if (message instanceof JobSliceSpec) {
+			onMsgJobSliceSpec((JobSliceSpec) message);
 		} else if (message instanceof AssignExecutive) {
 			onMsgAssignExecutive((AssignExecutive) message);
 		} else if (message instanceof org.opentripplanner.standalone.Router) {
 			onMsgGetRouter((org.opentripplanner.standalone.Router) message);
+		} else if (message instanceof StartWorkers) {
+			onMsgStartWorkers();
 		} else if (message instanceof WorkResult) {
 			onMsgWorkResult((WorkResult) message);
 		} else if (message instanceof JobStatusQuery) {
@@ -154,16 +142,6 @@ public class WorkerManager extends UntypedActor {
 			onMsgActorIdentity((ActorIdentity)message);
 		} else {
 			unhandled(message);
-		}
-	}
-
-	/** Enqueue some requests */
-	private void onMsgProcessClusterRequests(ProcessClusterRequests pcr) {
-		outstandingRequests += pcr.requests.length;
-		
-		for (AnalystClusterRequest req : pcr.requests) {
-			// NOTE: the queue will never empty if req is of a type not handled by SPTWorker.
-			router.route(req, getSelf());
 		}
 	}
 
@@ -213,17 +191,67 @@ public class WorkerManager extends UntypedActor {
 	}
 
 	private void onMsgWorkResult(WorkResult res) throws IOException {
-		outstandingRequests -= 1;
+		jobsReturned += 1;
+		log.debug("got: {}", res);
+		log.debug("{}/{} jobs returned", jobsReturned, jobSize);
 
 		if (res.success) {
 			jobManager.forward(res, getContext());
 		}
 
-		// use == to ensure this only happens once each time the queue runs low.
-		if (outstandingRequests == minQueueSize) {
-			// we need to get more requests!
-			BufferFillRequest r = new BufferFillRequest(maxQueueSize, graphService.getRouterIds());
-			this.executive.tell(r, getSelf());
+		if (jobsReturned == jobSize) {
+			jobManager.tell(new JobSliceDone(), getSelf());
+		}
+	}
+
+	private void onMsgStartWorkers() throws Exception {
+		log.debug("set the workers doing their thing");
+		
+		if(workers.isEmpty()){
+			createAndRouteWorkers();
+		}
+
+		PointSet fromAll = s3Datastore.getPointset(this.slice.jobSpec.fromPtsLoc);
+		PointSet fromPts;
+		
+		if (this.slice.fromPtsStart == null && this.slice.fromPtsEnd == null && this.slice.jobSpec.subsetIds != null)
+			fromPts = fromAll.slice(this.slice.jobSpec.subsetIds);
+		
+		else if (this.slice.fromPtsStart != null && this.slice.fromPtsEnd != null && this.slice.jobSpec.subsetIds != null)
+			// we slice by indices first, because the indices will change when we slice by IDs. Some of the IDs will
+			// no longer be in the point set, which is fine as pointset.slice(List<String>) simply ignores them.
+			// (confirmed)
+			fromPts = fromAll.slice(this.slice.fromPtsStart, this.slice.fromPtsEnd).slice(this.slice.jobSpec.subsetIds);
+		
+		else if (this.slice.fromPtsStart != null && this.slice.fromPtsEnd != null && this.slice.jobSpec.subsetIds == null)
+			fromPts = fromAll.slice(this.slice.fromPtsStart, this.slice.fromPtsEnd);
+		
+		else
+			fromPts = fromAll;
+		
+		PointSet toPts = s3Datastore.getPointset(this.slice.jobSpec.toPtsLoc);
+
+		SampleSet sampleSet = toPts.getSampleSet(otpRouter.graph);
+
+		// send graph to all workers
+		for (ActorRef worker : workers) {
+
+			Timeout timeout = new Timeout(Duration.create(10, "seconds"));
+			Future<Object> future = Patterns.ask(worker, new SetOneToManyContext(this.otpRouter, sampleSet), timeout);
+			Await.result(future, timeout.duration());
+		}
+
+		this.jobSize = 0;
+		this.jobsReturned = 0;
+		for (int i = 0; i < fromPts.featureCount(); i++) {
+			PointFeature from = fromPts.getFeature(i);
+			
+			if (this.slice.jobSpec.profileRouting)
+				router.route(new OneToManyProfileRequest(from, this.slice.jobSpec.profileOptions), getSelf());
+			else
+				router.route(new OneToManyRequest(from, this.slice.jobSpec.options), getSelf());
+			
+			this.jobSize += 1;
 		}
 	}
 
@@ -234,4 +262,26 @@ public class WorkerManager extends UntypedActor {
 		status = Status.READY;
 		getSelf().tell(new StartWorkers(), getSelf());
 	}
+
+	private void onMsgJobSliceSpec(JobSliceSpec jobSpec) {
+		// bond to the jobmanager that sent this message
+		this.jobManager = getSender();
+
+		log.debug("got job slice: {}", jobSpec);
+
+		this.slice = jobSpec;
+		this.curJobId = jobSpec.jobSpec.jobId;
+
+		// if the current graph isn't the graph specified by the job, kick the
+		// graph builder into action
+		if (otpRouter == null || !otpRouter.id.equals(jobSpec.graphId)) {
+			otpRouter = null;
+			graphBuilder.tell(new BuildGraph(jobSpec.graphId), getSelf());
+			status = Status.BUILDING_GRAPH;
+		} else {
+			getSelf().tell(new StartWorkers(), getSelf());
+		}
+
+	}
+
 }
