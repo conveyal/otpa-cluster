@@ -11,7 +11,7 @@ import org.opentripplanner.profile.ProfileRequest;
  * @author mattwigway
  *
  */
-public class OneToManyProfileRequest implements Serializable {
+public class OneToManyProfileRequest implements AnalystClusterRequest, Serializable {
 	public PointFeature from;
 	public ProfileRequest options;
 
