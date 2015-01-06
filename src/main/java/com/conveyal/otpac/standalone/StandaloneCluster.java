@@ -24,7 +24,15 @@ public class StandaloneCluster {
 		this.workOffline = workOffline;
 		
 		Config config = ConfigFactory.load();
-		
+
+		if (workOffline) {
+			// disable remoting when working offline
+			config = ConfigFactory
+					.parseString("akka.actor.provider = akka.actor.LocalActorRefProvider\n" +
+							"akka.remote.enabled-transports = []")
+					.withFallback(config);
+		}
+						
 		this.pointsetsBucket = pointsetsBucket;
 		this.graphsBucket = graphsBucket;
 		

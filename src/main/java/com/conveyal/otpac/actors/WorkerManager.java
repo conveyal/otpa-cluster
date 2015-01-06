@@ -60,15 +60,19 @@ public class WorkerManager extends UntypedActor {
 
 	private ArrayList<ActorRef> workers;
 	private Router router;
+	
+	/**
+	 * This router contains the graph and the graph ID.
+	 * It is unfortunate that there is a name collision between OTP and Akka.
+	 */
+	private org.opentripplanner.standalone.Router otpRouter;
 	private ActorRef jobManager;
 	private ActorRef graphBuilder;
 	private ActorRef executive;
 	
 	private Boolean workOffline;
 
-	private String curGraphId = null;
 	private GraphService graphService = null;
-	private Graph graph = null;
 	private Status status;
 
 	private JobSliceSpec slice = null;
@@ -122,8 +126,8 @@ public class WorkerManager extends UntypedActor {
 			onMsgJobSliceSpec((JobSliceSpec) message);
 		} else if (message instanceof AssignExecutive) {
 			onMsgAssignExecutive((AssignExecutive) message);
-		} else if (message instanceof Graph) {
-			onMsgGetGraph((Graph) message);
+		} else if (message instanceof org.opentripplanner.standalone.Router) {
+			onMsgGetRouter((org.opentripplanner.standalone.Router) message);
 		} else if (message instanceof StartWorkers) {
 			onMsgStartWorkers();
 		} else if (message instanceof WorkResult) {
@@ -227,13 +231,13 @@ public class WorkerManager extends UntypedActor {
 		
 		PointSet toPts = s3Datastore.getPointset(this.slice.jobSpec.toPtsLoc);
 
-		SampleSet sampleSet = new SampleSet(toPts, this.graph.getSampleFactory());
+		SampleSet sampleSet = toPts.getSampleSet(otpRouter.graph);
 
 		// send graph to all workers
 		for (ActorRef worker : workers) {
 
 			Timeout timeout = new Timeout(Duration.create(10, "seconds"));
-			Future<Object> future = Patterns.ask(worker, new SetOneToManyContext(this.graph, sampleSet), timeout);
+			Future<Object> future = Patterns.ask(worker, new SetOneToManyContext(this.otpRouter, sampleSet), timeout);
 			Await.result(future, timeout.duration());
 		}
 
@@ -251,10 +255,10 @@ public class WorkerManager extends UntypedActor {
 		}
 	}
 
-	private void onMsgGetGraph(Graph graph) {
-		log.debug("got graph: {}", graph);
+	private void onMsgGetRouter(org.opentripplanner.standalone.Router router) {
+		log.debug("got router: {}", router);
 
-		this.graph = graph;
+		this.otpRouter = router;
 		status = Status.READY;
 		getSelf().tell(new StartWorkers(), getSelf());
 	}
@@ -270,8 +274,8 @@ public class WorkerManager extends UntypedActor {
 
 		// if the current graph isn't the graph specified by the job, kick the
 		// graph builder into action
-		if (graph == null || !curGraphId.equals(jobSpec.graphId)) {
-			curGraphId = jobSpec.graphId;
+		if (otpRouter == null || !otpRouter.id.equals(jobSpec.graphId)) {
+			otpRouter = null;
 			graphBuilder.tell(new BuildGraph(jobSpec.graphId), getSelf());
 			status = Status.BUILDING_GRAPH;
 		} else {

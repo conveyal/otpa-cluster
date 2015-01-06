@@ -11,12 +11,15 @@ import org.opentripplanner.profile.ProfileRequest;
 import org.opentripplanner.routing.core.RoutingRequest;
 import org.opentripplanner.routing.core.TraverseModeSet;
 
-import com.conveyal.otpac.JobItemCallback;
+import akka.actor.ActorRef;
+import akka.actor.Props;
+
 import com.conveyal.otpac.PrototypeAnalystProfileRequest;
 import com.conveyal.otpac.PrototypeAnalystRequest;
 import com.conveyal.otpac.standalone.StandaloneCluster;
 import com.conveyal.otpac.standalone.StandaloneExecutive;
 import com.conveyal.otpac.standalone.StandaloneWorker;
+import com.conveyal.otpac.actors.JobItemActor;
 import com.conveyal.otpac.message.JobSpec;
 import com.conveyal.otpac.message.JobStatus;
 import com.conveyal.otpac.message.WorkResult;
@@ -26,7 +29,7 @@ import junit.framework.TestCase;
 
 public class BasicTest extends TestCase {
 	public void testBasicSetup() throws Exception {
-		StandaloneCluster cluster = new StandaloneCluster("s3credentials", true, null);
+		StandaloneCluster cluster = new StandaloneCluster(true, null, null);
 
 		StandaloneExecutive exec = cluster.createExecutive();
 		StandaloneWorker worker = cluster.createWorker();
@@ -40,7 +43,7 @@ public class BasicTest extends TestCase {
 
 	public void testJob() throws Exception {
 		// start up cluster
-		StandaloneCluster cluster = new StandaloneCluster("s3credentials", true, null);
+		StandaloneCluster cluster = new StandaloneCluster(true, null, null);
 
 		StandaloneExecutive exec = cluster.createExecutive();
 		StandaloneWorker worker = cluster.createWorker();
@@ -67,7 +70,8 @@ public class BasicTest extends TestCase {
 		};
 		
 		CounterCallback callback = new CounterCallback();
-		js.setCallback(callback);
+		ActorRef cbRef = cluster.system.actorOf(Props.create(CallbackActor.class, callback));
+		js.setCallback(cbRef);
 
 		// start the job
 		exec.find(js);
@@ -82,7 +86,7 @@ public class BasicTest extends TestCase {
 	
 	public void testShapefile() throws Exception {
 		// start up cluster
-		StandaloneCluster cluster = new StandaloneCluster("s3credentials", true, null);
+		StandaloneCluster cluster = new StandaloneCluster(true, null, null);
 
 		StandaloneExecutive exec = cluster.createExecutive();
 		StandaloneWorker worker = cluster.createWorker();
@@ -129,7 +133,8 @@ public class BasicTest extends TestCase {
 		}
 		;
 		CounterCallback callback = new CounterCallback();
-		js.setCallback(callback);
+		ActorRef cbRef = cluster.system.actorOf(Props.create(CallbackActor.class, callback));
+		js.setCallback(cbRef);
 
 		// start the job
 		exec.find(js);
@@ -142,9 +147,14 @@ public class BasicTest extends TestCase {
 		cluster.stop(worker);
 	}
 	
-	public void testProfile() throws Exception {
+	/**
+	 * Test profile routing.
+	 * Currently commented out because new-style analyst profile routing requires
+	 * a frequency based graph, and we don't have one handy to run tests against.
+	 */
+	/*public void testProfile() throws Exception {
 		// start up cluster
-		StandaloneCluster cluster = new StandaloneCluster("s3credentials", true, null);
+		StandaloneCluster cluster = new StandaloneCluster(true, null, null);
 
 		StandaloneExecutive exec = cluster.createExecutive();
 		StandaloneWorker worker = cluster.createWorker();
@@ -164,6 +174,7 @@ public class BasicTest extends TestCase {
 		
 		
 		JobSpec js = new JobSpec("austin", "austin.csv", "austin.csv", opts);
+
 
 		// plus a callback that registers how many work items have returned
 		class CounterCallback implements JobItemCallback {
@@ -187,7 +198,8 @@ public class BasicTest extends TestCase {
 		};
 		
 		CounterCallback callback = new CounterCallback();
-		js.setCallback(callback);
+		ActorRef cbRef = cluster.system.actorOf(Props.create(CallbackActor.class, callback));
+		js.setCallback(cbRef);
 
 		// start the job
 		exec.find(js);
@@ -201,5 +213,31 @@ public class BasicTest extends TestCase {
 		assertTrue(callback.cumulativeOpportunities > 0);
 		
 		cluster.stop(worker);
+	}*/
+	
+	/**
+	 * Glue class to call a local callback on a work result.
+	 * This only works when remoting is not being used.
+	 * @author matthewc
+	 *
+	 */
+	public static class CallbackActor extends JobItemActor {
+		JobItemCallback callback;
+		
+		public CallbackActor (JobItemCallback callback) {
+			this.callback = callback;
+		}
+
+		@Override
+		public void onWorkResult(WorkResult wr) {
+			callback.onWorkResult(wr);
+		}
+	}
+	
+	/**
+	 * A local callback.
+	 */
+	public static interface JobItemCallback {
+		public void onWorkResult(WorkResult wr);
 	}
 }

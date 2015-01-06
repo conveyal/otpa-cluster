@@ -4,14 +4,15 @@ import java.io.Serializable;
 
 import org.opentripplanner.analyst.SampleSet;
 import org.opentripplanner.routing.graph.Graph;
+import org.opentripplanner.standalone.Router;
 
 public class SetOneToManyContext implements Serializable {
 
-	public Graph graph;
+	public Router router;
 	public SampleSet to;
 
-	public SetOneToManyContext(Graph graph, SampleSet sampleSet) {
-		this.graph = graph;
+	public SetOneToManyContext(Router router, SampleSet sampleSet) {
+		this.router = router;
 		this.to = sampleSet;
 	}
 
