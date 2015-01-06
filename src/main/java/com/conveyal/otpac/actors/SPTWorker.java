@@ -4,7 +4,7 @@ import org.opentripplanner.analyst.ResultSet;
 import org.opentripplanner.analyst.SampleSet;
 import org.opentripplanner.analyst.TimeSurface;
 import org.opentripplanner.profile.ProfileResponse;
-import org.opentripplanner.profile.ProfileRouter;
+import org.opentripplanner.profile.AnalystProfileRouterPrototype;
 import org.opentripplanner.routing.algorithm.EarliestArrivalSPTService;
 import org.opentripplanner.routing.error.VertexNotFoundException;
 import org.opentripplanner.routing.graph.Graph;
@@ -83,33 +83,39 @@ public class SPTWorker extends UntypedActor {
 	
 	/** Perform profile routing */
 	private void onMsgOneToManyProfileRequest(OneToManyProfileRequest message) {
-		ProfileRouter rtr;
+		AnalystProfileRouterPrototype rtr;
 		try {
-			rtr = new ProfileRouter(this.router.graph, message.options);
+			rtr = new AnalystProfileRouterPrototype(this.router.graph, message.options);
 		} catch (Exception e) {
 			log.debug("failed to calc timesurface for feature {}", message.from.getId());
 			e.printStackTrace();
 			// we use the version with three nulls to imply that it was a profile request
-			getSender().tell(new WorkResult(false, null, null, null), getSelf());
+			getSender().tell(new WorkResult(false, null, null, null, null), getSelf());
 			return;
 		}
 		
 		try {
 			rtr.route();
-			ResultSet bestCase = new ResultSet(this.to, rtr.minSurface);
+
+			TimeSurface.RangeSet result = rtr.route();
+
+			ResultSet bestCase = new ResultSet(this.to, result.min);
 			bestCase.id = message.from.getId();
+
+			ResultSet avgCase = new ResultSet(this.to, result.avg);
+			avgCase.id = message.from.getId();
 			
-			ResultSet worstCase = new ResultSet(this.to, rtr.maxSurface);
+			ResultSet worstCase = new ResultSet(this.to, result.max);
 			worstCase.id = message.from.getId();
 			
 			// TODO: Central tendency calculation
-			WorkResult result = new WorkResult(true, bestCase, worstCase, null);
-			getSender().tell(result, getSelf());
+			WorkResult result1 = new WorkResult(true, bestCase, avgCase, worstCase, null);
+			getSender().tell(result1, getSelf());
 		} catch (Exception e) {
 			log.debug("failed to calc timesurface for feature {}", message.from.getId());
 			e.printStackTrace();
 			// we use the version with three nulls to imply that it was a profile request
-			getSender().tell(new WorkResult(false, null, null, null), getSelf());
+			getSender().tell(new WorkResult(false, null, null, null, null), getSelf());
 		}
 		finally {
 			rtr.cleanup();

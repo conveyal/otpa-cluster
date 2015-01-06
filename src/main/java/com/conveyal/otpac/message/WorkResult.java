@@ -28,6 +28,7 @@ public class WorkResult implements Serializable {
 	/** The result, or the central tendency of the results in profile mode */
 	private ResultSet feat;
 	private ResultSet bestCase;
+	private ResultSet avgCase;
 	private ResultSet worstCase;
 	
 	/** Was this request made in profile mode? */
@@ -41,10 +42,11 @@ public class WorkResult implements Serializable {
 		this.profile = false;
 	}
 	
-	public WorkResult(boolean success, ResultSet bestCase, ResultSet worstCase, ResultSet centralTendency) {
+	public WorkResult(boolean success, ResultSet bestCase,  ResultSet avgCase, ResultSet worstCase, ResultSet centralTendency) {
 		this.success = success;
 		this.feat = centralTendency;
 		this.bestCase = bestCase;
+		this.avgCase = avgCase;
 		this.worstCase = worstCase;
 		this.profile = true;
 	}
@@ -65,7 +67,12 @@ public class WorkResult implements Serializable {
 	public ResultSet getBestCase () {
 		return bestCase;
 	}
-	
+
+	/** The best-case result in profile mode */
+	public ResultSet getAvgCase () {
+		return avgCase;
+	}
+
 	/** The worst-case result in profile mode */
 	public ResultSet getWorstCase () {
 		return worstCase;
