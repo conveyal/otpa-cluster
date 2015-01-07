@@ -1,4 +1,4 @@
-	package com.conveyal.otpac.actors;
+package com.conveyal.otpac.actors;
 
 import org.opentripplanner.analyst.ResultSet;
 import org.opentripplanner.analyst.SampleSet;
@@ -85,7 +85,7 @@ public class SPTWorker extends UntypedActor {
 	private void onMsgOneToManyProfileRequest(OneToManyProfileRequest message) {
 		AnalystProfileRouterPrototype rtr;
 		try {
-			rtr = new AnalystProfileRouterPrototype(this.router.graph, message.options);
+				rtr = new AnalystProfileRouterPrototype(this.router.graph, message.options);
 		} catch (Exception e) {
 			log.debug("failed to calc timesurface for feature {}", message.from.getId());
 			e.printStackTrace();
@@ -95,8 +95,6 @@ public class SPTWorker extends UntypedActor {
 		}
 		
 		try {
-			rtr.route();
-
 			TimeSurface.RangeSet result = rtr.route();
 
 			ResultSet bestCase = new ResultSet(this.to, result.min);
@@ -107,8 +105,7 @@ public class SPTWorker extends UntypedActor {
 			
 			ResultSet worstCase = new ResultSet(this.to, result.max);
 			worstCase.id = message.from.getId();
-			
-			// TODO: Central tendency calculation
+
 			WorkResult result1 = new WorkResult(true, bestCase, avgCase, worstCase, null);
 			getSender().tell(result1, getSelf());
 		} catch (Exception e) {

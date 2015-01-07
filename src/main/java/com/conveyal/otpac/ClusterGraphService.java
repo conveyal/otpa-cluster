@@ -82,6 +82,8 @@ public class ClusterGraphService extends GraphService {
 			g.routerId = graphId;
 			
 			g.index(new DefaultStreetVertexIndexFactory());
+
+			g.index.clusterStopsAsNeeded();
 			
 			Router r = new Router(graphId, g);
 			
