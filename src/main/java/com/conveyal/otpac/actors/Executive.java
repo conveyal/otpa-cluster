@@ -1,7 +1,9 @@
 package com.conveyal.otpac.actors;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
@@ -31,6 +33,9 @@ public class Executive extends UntypedActor {
 	Map<String, Integer> workerManagers; //path->jobid
 	Map<Integer, ActorRef> jobManagers;
 	
+	/** The queue of jobs */
+	private List<JobSpec> queue;
+	
 	String pointsetsBucket, graphsBucket;
 	
 	Boolean workOffline;
@@ -44,6 +49,8 @@ public class Executive extends UntypedActor {
 		wmPathActorRefs = new HashMap<String,ActorRef>();
 
 		jobManagers = new HashMap<Integer, ActorRef>();
+		
+		queue = new ArrayList<JobSpec>();
 				
 		this.graphsBucket = graphsBucket;
 		this.pointsetsBucket = pointsetsBucket;
@@ -111,12 +118,7 @@ public class Executive extends UntypedActor {
 		return this.workerManagers.get(dead.path().toString());
 	}
 
-	private void onMsgJobDone(JobDone jd) {
-		// free up WorkerManagers
-		for (ActorRef workerManager : jd.workerManagers) {
-			freeWorkerManager(workerManager.path().toString());
-		}
-
+	private void onMsgJobDone(JobDone jd) throws Exception {
 		// deallocate job manager
 		jobManagers.put(jd.jobId, null);
 		getContext().system().stop(getSender());
@@ -125,6 +127,29 @@ public class Executive extends UntypedActor {
 			log.debug("{} says job {} done", getSender(), jd.jobId);
 		} else if (jd.status == JobDone.Status.CANCELLED ){
 			log.debug("{} says job {} cancelled", getSender(), jd.jobId);
+		}
+		
+		synchronized (workerManagers) {
+			// free up WorkerManagers
+			for (ActorRef workerManager : jd.workerManagers) {
+				freeWorkerManager(workerManager.path().toString());
+			}
+			
+			// if there are jobs in the queue, run them.
+			// this is inside the sync block so that more jobs can't be added to the queue
+			// while we're doing this. The only place jobs are enqueued is also in a
+			// synchronized (workerManagers) block.
+			
+			Collection<String> freeWorkerManagers = getFreeWorkerManagers();
+			
+			// this should always be true, because the job that just finished must
+			// have had workermanagers.
+			if (freeWorkerManagers.size() > 0 && queue.size() > 0) {
+				runJob(queue.remove(0), getFreeWorkerManagers());
+			}
+			else {
+				log.error("No free worker managers after job completion; some jobs may not complete!");
+			}
 		}
 	}
 
@@ -190,23 +215,43 @@ public class Executive extends UntypedActor {
 
 		// send the job id to the client
 		getSender().tell(new JobId(jobId), getSelf());
+		
+		synchronized (workerManagers) {
+			Collection<String> freeWorkerManagers = getFreeWorkerManagers();
+			
+			if (freeWorkerManagers.size() == 0) {
+				log.info("enqueing job " + jobId);
+				queue.add(jobSpec);
+				return;
+			}
+			else {
+				runJob(jobSpec, freeWorkerManagers);
+			}
+		}
+		
+		jobId++;
+	}
+	
+	/**
+	 * Start a job running on the specified worker managers.
+	 * @throws Exception 
+	 */
+	public void runJob(JobSpec jobSpec, Collection<String> freeWorkerManagers) throws Exception {
 
 		// create a job manager
 		ActorRef jobManager = getContext().actorOf(
 				Props.create(JobManager.class, workOffline, pointsetsBucket),
-				"jobmanager-" + jobId);
+				"jobmanager-" + jobSpec.jobId);
 		
-		jobManagers.put(jobId, jobManager);
-
+		jobManagers.put(jobSpec.jobId, jobManager);
+		
 		// assign some managers to the job manager
-		for (String manager : getFreeWorkerManagers()) {
-			assignWorkerManager(jobId, manager);
+		for (String manager : freeWorkerManagers) {
+			assignWorkerManager(jobSpec.jobId, manager);
 		}
 
 		// kick off the job
 		jobManager.tell(jobSpec, getSelf());
-
-		jobId += 1;
 	}
 
 	private boolean assignWorkerManager(int jobId, String managerPath) throws Exception {
