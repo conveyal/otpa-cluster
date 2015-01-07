@@ -87,11 +87,16 @@ public class ClusterGraphService extends GraphService {
 			
 			Router r = new Router(graphId, g);
 			
-			graphMap.put(graphId,r);
+			// temporarily disable graph caching so we don't run out of RAM.
+			// Long-term we will use an actual cache for this.
+			//graphMap.put(graphId,r);
+			
+			return r;
 					
 		}
-		
-		return graphMap.get(graphId);
+		else {
+			return graphMap.get(graphId);
+		}
 	}
 
 	public ClusterGraphService(String s3CredentialsFilename, Boolean workOffline, String bucket) {
