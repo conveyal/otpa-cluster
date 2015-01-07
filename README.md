@@ -1,18 +1,21 @@
-    $ gradle shadowjar (version 1.12+ required)
+# OTPA Cluster: Run OpenTripPlanner Analyst queries on distributed compute infrastructure
 
-    start master
-    $ java -jar ./build/libs/otpa-cluster-all.jar
+Graphs and pointsets are stored in S3.
 
-    start worker
-    $ java -jar -Dconfig.resource=worker.conf ./build/libs/otpa-cluster-all.jar
+## Build
 
-   	register worker with master
-   	http://localhost:8080/addworker/?path=MySystem@127.0.0.1:2553/user/manager
-   	
-   	start a job
-   	http://localhost:8080/find?gtfs=/otpac/austin/capitalmetro.zip&osm=/otpac/austin/austin.osm.pbf
+    $ gradle build fatJar
 
-    or alternatively start a job with the web UI:
-    http://localhost:8080/index.html
+## Use
+### Start an executive
 
-    Convenient defaults are already in place. Just click 'submit' and result show up on the map as they're returned from workers.
+    java -Xmx[several]G -Dotpac.bucket.pointsets=POINTSET_BUCKET -Dotpac.bucket.graphs=GRAPH_BUCKET [-Ds3.credentials.filename=/path/to/s3credentials] -jar build/libs/otpa-cluster-all.jar -h [hostname] -p port
+
+### Start a worker
+
+  java -Xmx[several]G -Dotpac.bucket.pointsets=POINTSET_BUCKET -Dotpac.bucket.graphs=GRAPH_BUCKET [-Ds3.credentials.filename=/path/to/s3credentials] -jar build/libs/otpa-cluster-all.jar -w akka.tcp://<executive>/user/executive
+
+### Use with analyst-server
+
+Generally you'll use this with [analyst-server](https://github.com/conveyal/analyst-server). In that case, the executive is
+started by analyst server. See the documentation there for how to start the cluster worker.
