@@ -3,8 +3,11 @@ package com.conveyal.otpac.message;
 import java.io.Serializable;
 import java.util.List;
 
+import org.opentripplanner.analyst.PointSet;
 import org.opentripplanner.profile.ProfileRequest;
 import org.opentripplanner.routing.core.RoutingRequest;
+
+import com.conveyal.otpac.PointSetDatastore;
 
 import akka.actor.ActorRef;
 
@@ -16,6 +19,11 @@ public class JobSpec implements Serializable{
 	public int jobId;
 	public String fromPtsLoc;
 	public String toPtsLoc;
+	
+	/**
+	 * The filtered and sliced pointset used for this job.
+	 */
+	private transient PointSet origins;
 
 	/** Vanilla routing: routing parameters */
 	public RoutingRequest options;
@@ -78,5 +86,35 @@ public class JobSpec implements Serializable{
 	/** Set the JobItemActor callback */
 	public void setCallback(ActorRef jobItemActor) {
 		callback = jobItemActor;
+	}
+	
+	/**
+	 * Get the origin pointset for this jobspec, sliced, diced and subsetted as needed.
+	 */
+	public PointSet getOrigins (PointSetDatastore store) {
+		if (origins == null) {
+			buildPointSet(store);
+		}
+		
+		return origins;
+	}
+		
+	/** Build the origin point set. */
+	public synchronized void buildPointSet (PointSetDatastore store) {
+		PointSet all;
+		try {
+			all = store.getPointset(this.fromPtsLoc);
+		} catch (Exception e) {
+			e.printStackTrace();
+			origins = null;
+			return;
+		}
+		
+		if (subsetIds != null && subsetIds.size() > 0) {
+			origins = all.slice(subsetIds);
+		}
+		else {
+			origins = all;
+		}	
 	}
 }
