@@ -1,6 +1,7 @@
 package com.conveyal.otpac.actors;
 
 import org.opentripplanner.analyst.ResultSet;
+import org.opentripplanner.analyst.ResultSetWithTimes;
 import org.opentripplanner.analyst.SampleSet;
 import org.opentripplanner.analyst.TimeSurface;
 import org.opentripplanner.profile.ProfileResponse;
@@ -68,12 +69,24 @@ public class SPTWorker extends UntypedActor {
 			
 			TimeSurface ts = new TimeSurface( spt );
 			
-			ResultSet ind = new ResultSet(this.to, ts);
-			ind.id = req.from.getId();
+			// temporarily use environment to decide whether to include times
+			// or not.
+			if (context().system().settings().config().getBoolean("includeTimes")) {
+				ResultSet ind = new ResultSetWithTimes(this.to, ts);
+				ind.id = req.from.getId();
+	
+				WorkResult res = new WorkResult(true, ind);
+				res.point = req.from;
+				getSender().tell(res, getSelf());
+			}
+			else {
+				ResultSet ind = new ResultSet(this.to, ts);
+				ind.id = req.from.getId();
 
-			WorkResult res = new WorkResult(true, ind);
-			res.point = req.from;
-			getSender().tell(res, getSelf());
+				WorkResult res = new WorkResult(true, ind);
+				res.point = req.from;
+				getSender().tell(res, getSelf());
+			}
 		}
 		catch(Exception e) {
 			log.debug("failed to calc timesurface for feature {}", req.from.getId());
@@ -97,17 +110,35 @@ public class SPTWorker extends UntypedActor {
 		try {
 			TimeSurface.RangeSet result = rtr.route();
 
-			ResultSet bestCase = new ResultSet(this.to, result.min);
-			bestCase.id = message.from.getId();
+			// temporarily use environment to decide whether to include times
+			// or not.
+			if (context().system().settings().config().getBoolean("includeTimes")) {				
+				ResultSet bestCase = new ResultSetWithTimes(this.to, result.min);
+				bestCase.id = message.from.getId();
+	
+				ResultSet avgCase = new ResultSetWithTimes(this.to, result.avg);
+				avgCase.id = message.from.getId();
+				
+				ResultSet worstCase = new ResultSetWithTimes(this.to, result.max);
+				worstCase.id = message.from.getId();
+	
+				WorkResult result1 = new WorkResult(true, bestCase, avgCase, worstCase, null);
+				getSender().tell(result1, getSelf());
+			}
+			else {
+				
+				ResultSet bestCase = new ResultSet(this.to, result.min);
+				bestCase.id = message.from.getId();
 
-			ResultSet avgCase = new ResultSet(this.to, result.avg);
-			avgCase.id = message.from.getId();
-			
-			ResultSet worstCase = new ResultSet(this.to, result.max);
-			worstCase.id = message.from.getId();
+				ResultSet avgCase = new ResultSet(this.to, result.avg);
+				avgCase.id = message.from.getId();
+				
+				ResultSet worstCase = new ResultSet(this.to, result.max);
+				worstCase.id = message.from.getId();
 
-			WorkResult result1 = new WorkResult(true, bestCase, avgCase, worstCase, null);
-			getSender().tell(result1, getSelf());
+				WorkResult result1 = new WorkResult(true, bestCase, avgCase, worstCase, null);
+				getSender().tell(result1, getSelf());
+			}
 		} catch (Exception e) {
 			log.debug("failed to calc timesurface for feature {}", message.from.getId());
 			e.printStackTrace();
