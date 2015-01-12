@@ -72,6 +72,8 @@ public class SPTWorker extends UntypedActor {
 			// temporarily use environment to decide whether to include times
 			// or not.
 			if (context().system().settings().config().getBoolean("includeTimes")) {
+				log.info("including times in result");
+				
 				ResultSet ind = new ResultSetWithTimes(this.to, ts);
 				ind.id = req.from.getId();
 	
@@ -112,7 +114,8 @@ public class SPTWorker extends UntypedActor {
 
 			// temporarily use environment to decide whether to include times
 			// or not.
-			if (context().system().settings().config().getBoolean("includeTimes")) {				
+			if (context().system().settings().config().getBoolean("includeTimes")) {
+				log.info("Including times in result");
 				ResultSet bestCase = new ResultSetWithTimes(this.to, result.min);
 				bestCase.id = message.from.getId();
 	
