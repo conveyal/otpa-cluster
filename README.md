@@ -4,7 +4,7 @@ Graphs and pointsets are stored in S3.
 
 ## Build
 
-    $ gradle build fatJar
+    gradle build shadowJar
 
 ## Use
 ### Start an executive
