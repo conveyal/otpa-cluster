@@ -1,4 +1,4 @@
 language: java
 jdk:
   - openjdk7
-install: gradle assemble --stacktrace
+install: ./gradlew assemble --stacktrace
