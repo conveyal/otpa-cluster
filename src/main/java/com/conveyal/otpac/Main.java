@@ -47,6 +47,7 @@ public class Main {
 		options.addOption("l", "local", false, "Should everything be run locally?");
 		options.addOption("m", "machines", true, "number of machines to use.");
 		options.addOption("w", "worker", true, "register as a worker for the given akka url.");
+		options.addOption("t", "threads", true, "number of threads to run");
 		
 		// parse command line options
 		CommandLineParser parser = new BasicParser();
@@ -74,6 +75,17 @@ public class Main {
 		System.out.println("running on " + hostname + ":" + akkaPort);
 
 		ActorSystem system = ActorSystem.create("MySystem", config);
+		
+		Integer nWorkers = null;
+		
+		try {
+			nWorkers = Integer.parseInt(cmd.getOptionValue("threads"));
+		} catch (Exception e) {
+			// do nothing
+		}
+		
+		if (nWorkers != null && nWorkers <= 0)
+			nWorkers = null;
 
 		if (!cmd.hasOption("worker")) {
 			// start the executive actor
@@ -105,10 +117,12 @@ public class Main {
 			
 			if (cmd.hasOption("local"))
 				// running everything locally; start the appropriate number of WorkerManagers
-				factory = new ThreadWorkerFactory(system, true, config.getString("otpac.bucket.graphs"), config.getString("otpac.bucket.pointsets"));
+				factory = new ThreadWorkerFactory(system, true,
+						config.getString("otpac.bucket.graphs"), config.getString("otpac.bucket.pointsets"), nWorkers);
 			else
 				// TODO: spin up EC2 instances, etc.
-				factory = new ThreadWorkerFactory(system, false, config.getString("otpac.bucket.graphs"), config.getString("otpac.bucket.pointsets"));
+				factory = new ThreadWorkerFactory(system, false,
+						config.getString("otpac.bucket.graphs"), config.getString("otpac.bucket.pointsets"), nWorkers);
 
 			// start the appropriate number of workermanagers
 			int number = Integer.parseInt(cmd.getOptionValue("machines", "1"));
@@ -145,7 +159,8 @@ public class Main {
 				
 				// create a workermanager
 				factory = new ThreadWorkerFactory(system, cmd.hasOption("local"),
-						config.getString("otpac.bucket.graphs"), config.getString("otpac.bucket.pointsets"));
+						config.getString("otpac.bucket.graphs"), config.getString("otpac.bucket.pointsets"),
+						nWorkers);
 			} catch (Exception e) {
 				throw new RuntimeException(e);
 			}

@@ -27,19 +27,33 @@ public class ThreadWorkerFactory implements WorkerFactory {
 	public final String pointsetsBucket, graphsBucket;
 	public final Boolean workOffline;
 	private static int nextId = 0;
+	public final Integer nWorkers;
 	
 	public ThreadWorkerFactory(ActorSystem system, Boolean workOffline, String graphsBucket, String pointsetsBucket) {
+		this(system, workOffline, graphsBucket, pointsetsBucket, null);
+	}
+	
+	/**
+	 * Create a new thread worker factory
+	 * @param system Actor system in which to create the worker
+	 * @param workOffline Should the actors run offline (i.e. no S3)
+	 * @param graphsBucket S3 bucket where graphs are stored
+	 * @param pointsetsBucket S3 bucket where pointsets are stored 
+	 * @param nWorkers number of threads to create (null for number of available processors)
+	 */
+	public ThreadWorkerFactory(ActorSystem system, Boolean workOffline, String graphsBucket, String pointsetsBucket, Integer nWorkers) {
 		this.system = system;
 		this.graphsBucket = graphsBucket;
 		this.pointsetsBucket = pointsetsBucket;
 		this.workOffline = workOffline;
+		this.nWorkers = nWorkers;
 	}
 	
 	public Collection<ActorRef> createWorkerManagers(int number, ActorRef executive) {
 		List<ActorRef> ret = new ArrayList<ActorRef>();
 		
 		for (int i = 0; i < number; i++) {
-			ActorRef manager = system.actorOf(Props.create(WorkerManager.class, null, workOffline, graphsBucket, pointsetsBucket), "manager_" + nextId++);
+			ActorRef manager = system.actorOf(Props.create(WorkerManager.class, nWorkers, workOffline, graphsBucket, pointsetsBucket), "manager_" + nextId++);
 			ret.add(manager);
 			executive.tell(new AddWorkerManager(manager), ActorRef.noSender());
 		}

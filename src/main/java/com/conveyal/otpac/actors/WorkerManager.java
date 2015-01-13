@@ -81,7 +81,7 @@ public class WorkerManager extends UntypedActor {
 
 	public WorkerManager(Integer nWorkers, Boolean workOffline, String graphsBucket, String pointsetsBucket) {
 		if(nWorkers == null)
-			nWorkers = Runtime.getRuntime().availableProcessors() / 2;
+			nWorkers = Runtime.getRuntime().availableProcessors();
 
 		Config config = context().system().settings().config();
 		String s3ConfigFilename = null;
