@@ -163,11 +163,6 @@ public class Executive extends UntypedActor {
 		getContext().watch(remoteManager);
 		System.out.println("add worker " + remoteManager);
 		
-		//Timeout timeout = new Timeout(Duration.create(60, "seconds"));
-		//Future<Object> future = Patterns.ask(remoteManager, new AssignExecutive(), timeout);
-		//Await.result( future, timeout.duration() );
-		
-		// not clear why we do this twice.
 		remoteManager.tell(new AssignExecutive(), getSelf());
 		workerManagers.put(remoteManager.path().toString(), null);
 		
