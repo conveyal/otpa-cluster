@@ -32,6 +32,7 @@ import com.conveyal.otpac.message.SetOneToManyContext;
 import com.conveyal.otpac.message.StartWorkers;
 import com.conveyal.otpac.message.WorkResult;
 import com.conveyal.otpac.message.AssignExecutive;
+import com.sun.corba.se.spi.orbutil.fsm.Guard.Result;
 import com.typesafe.config.Config;
 
 import akka.actor.ActorIdentity;
@@ -242,6 +243,7 @@ public class WorkerManager extends UntypedActor {
 
 	private void onMsgWorkResult(WorkResult res) throws IOException {
 		outstandingRequests -= 1;
+		this.executive.tell(res, getSelf());
 
 		if (res.success) {
 			jobManager.forward(res, getContext());
@@ -258,8 +260,6 @@ public class WorkerManager extends UntypedActor {
 			// build the graph
 			graphBuilder.tell(new BuildGraph(stalledRequests.graphId), getSelf());
 		}
-		
-		this.executive.tell(res, getSelf());
 	}
 
 	/**
