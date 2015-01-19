@@ -13,11 +13,11 @@ public class BufferFillRequest implements Serializable {
 	 */
 	public int size;
 	
-	/** The routerIds available on the workermanager */
-	public Collection<String> routerIds;
+	/** The routerId available on the workermanager */
+	public String routerId;
 	
-	public BufferFillRequest(int size, Collection<String> routerIds) {
+	public BufferFillRequest(int size, String id) {
 		this.size = size;
-		this.routerIds = routerIds;
+		this.routerId = id;
 	}
 }

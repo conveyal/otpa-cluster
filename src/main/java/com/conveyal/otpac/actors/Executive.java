@@ -1,12 +1,22 @@
 package com.conveyal.otpac.actors;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
+import org.opentripplanner.analyst.PointFeature;
+import org.opentripplanner.analyst.PointSet;
+
+import com.conveyal.otpac.PointSetDatastore;
 import com.conveyal.otpac.message.*;
+import com.google.common.collect.ImmutableSet;
+import com.typesafe.config.Config;
 
 import scala.concurrent.Await;
 import scala.concurrent.Future;
@@ -15,7 +25,6 @@ import akka.actor.ActorIdentity;
 import akka.actor.ActorRef;
 import akka.actor.ActorSelection;
 import akka.actor.Identify;
-import akka.actor.Props;
 import akka.actor.Terminated;
 import akka.actor.UntypedActor;
 import akka.event.Logging;
@@ -25,21 +34,32 @@ import akka.util.Timeout;
 
 public class Executive extends UntypedActor {
 
-	int tasksOut;
-	int jobId = 0;
-	Map<Integer, ArrayList<WorkResult>> jobResults;
-	Map<String,ActorRef> wmPathActorRefs; //path->canonical actorref
-	Map<String, Integer> workerManagers; //path->jobid
-	Map<Integer, ActorRef> jobManagers;
+	private Map<Integer, ArrayList<WorkResult>> jobResults;
+	private Map<String,ActorRef> wmPathActorRefs; // path->canonical actorref
+	private Map<String, String> workerManagers; // path -> current router ID 
+	private Map<String, Long> graphLastUsedTime; // the last time a graph was used for a single point request
+	private Set<String> freeWorkerManagers; // worker managers not currently being used
 	
-	String pointsetsBucket, graphsBucket;
-	
-	Boolean workOffline;
+	private static int nextJobId = 0;
 	
 	/**
-	 * A queue for multi-point jobs.
+	 * Multipoint query queues (per graph)
 	 */
-	private List<JobSpec> multiPointQueue;
+	private Map<String, List<JobSpec>> multipointQueues;
+	
+	/**
+	 * Index of job specs by job ID.
+	 */
+	private Map<Integer, JobSpec> jobSpecsByJobId;
+	
+	/**
+	 * Pointsets come from here.
+	 */
+	private PointSetDatastore pointsetDatastore;
+	
+	String pointsetsBucket, graphsBucket, s3CredentialsFilename;
+	
+	Boolean workOffline;
 	
 	/**
 	 * A queue for single-point jobs.
@@ -51,15 +71,26 @@ public class Executive extends UntypedActor {
 	public Executive(Boolean workOffline, String graphsBucket, String pointsetsBucket) {
 		jobResults = new HashMap<Integer, ArrayList<WorkResult>>();
 
-		workerManagers = new HashMap<String, Integer>();
 		wmPathActorRefs = new HashMap<String,ActorRef>();
-
-		jobManagers = new HashMap<Integer, ActorRef>();
+		workerManagers = new HashMap<String, String>();
+		freeWorkerManagers = new HashSet<String>();
+		graphLastUsedTime = new HashMap<String, Long>();
+		jobSpecsByJobId = new HashMap<Integer, JobSpec>();
 				
 		this.graphsBucket = graphsBucket;
 		this.pointsetsBucket = pointsetsBucket;
+		
+		Config config = context().system().settings().config();
+		String s3ConfigFilename = null;
+
+		if (config.hasPath("s3.credentials.filename"))
+			s3ConfigFilename = config.getString("s3.credentials.filename");
+		
+		this.pointsetDatastore = new PointSetDatastore(10, s3ConfigFilename, workOffline, pointsetsBucket);
 
 		this.workOffline = workOffline;
+		
+		this.multipointQueues = new ConcurrentHashMap<String, List<JobSpec>>(4);
 	}
 
 	@Override
@@ -73,9 +104,9 @@ public class Executive extends UntypedActor {
 		} else if (msg instanceof AddWorkerManager) {
 			onMsgAddWorkerManager((AddWorkerManager) msg);
 		} else if (msg instanceof JobStatusQuery) {
-			onMsgJobStatusQuery();
-		} else if (msg instanceof JobDone) {
-			onMsgJobDone((JobDone) msg);
+			onMsgJobStatusQuery((JobStatusQuery) msg);
+		} else if (msg instanceof BufferFillRequest) {
+			onMsgBufferFillRequest((BufferFillRequest) msg);
 		} else if (msg instanceof CancelJob) {
 			onMsgCancelJob((CancelJob) msg);
 		} else if (msg instanceof Terminated) {
@@ -85,19 +116,20 @@ public class Executive extends UntypedActor {
 		} 
 	}
 
+	private void onMsgBufferFillRequest(BufferFillRequest msg) {
+		sendJobsToWorkerManager(msg.routerId, getSender().path().toString(), msg.size);
+	}
+
 	private void onMsgCancelJob(CancelJob msg) {
-		
-		ActorRef jm = getJobManager( msg.jobid );
-		if(jm==null){
-			return;
-		}
-		
-		jm.tell( new CancelJob(), getSelf() );
-		
+		// remove from queue. don't worry about the small number of requests
+		// in workermanagers queues; they will complete before we could reasonably do
+		// anything about it anyhow. We'll ignore the work results when they come back.
+		// TODO: implement
 	}
 
 	private void onMsgTerminated() {
-		ActorRef dead = getSender();
+		// TODO: implement
+		/*ActorRef dead = getSender();
 		
 		// if the workermanager is assigned to a jobmanager, tell the jobmanager to remove it
 		Integer jobId = getWorkerManagerJob( dead );
@@ -107,72 +139,39 @@ public class Executive extends UntypedActor {
 		}
 		
 		// delete the workermanager from the roster
-		deleteWorkerManager(dead);
+		deleteWorkerManager(dead);*/
 	}
 
 	private void deleteWorkerManager(ActorRef dead) {
 		this.workerManagers.remove(dead.path().toString());
 	}
 
-	private ActorRef getJobManager(Integer jobId) {
-		return this.jobManagers.get(jobId);
-	}
-
-	private Integer getWorkerManagerJob(ActorRef dead) {
-		return this.workerManagers.get(dead.path().toString());
-	}
-
-	private void onMsgJobDone(JobDone jd) {
-		// free up WorkerManagers
-		for (ActorRef workerManager : jd.workerManagers) {
-			freeWorkerManager(workerManager.path().toString());
-		}
-
-		// deallocate job manager
-		jobManagers.put(jd.jobId, null);
-		getContext().system().stop(getSender());
-
-		if( jd.status == JobDone.Status.SUCCESS ){
-			log.debug("{} says job {} done", getSender(), jd.jobId);
-		} else if (jd.status == JobDone.Status.CANCELLED ){
-			log.debug("{} says job {} cancelled", getSender(), jd.jobId);
-		}
-	}
-
-	private void freeWorkerManager(String workerManagerPath) {
-		workerManagers.put(workerManagerPath, null);
-	}
-
-	private void onMsgJobStatusQuery() throws Exception {
-		ArrayList<JobStatus> ret = new ArrayList<JobStatus>();
-
-		for (String workerManagerPath : workerManagers.keySet()) {
-			ActorRef workerManager = this.wmPathActorRefs.get( workerManagerPath );
-			
-			Timeout timeout = new Timeout(Duration.create(60, "seconds"));
-			Future<Object> future = Patterns.ask(workerManager, new JobStatusQuery(), timeout);
-			JobStatus result = (JobStatus) Await.result(future, timeout.duration());
-			ret.add(result);
-		}
-		getSender().tell(ret, getSelf());
+	private void onMsgJobStatusQuery(JobStatusQuery qry) throws Exception {
+		JobSpec js = jobSpecsByJobId.get(qry.jobId);
+		// this is not inefficient because the pointset is cached
+		long total = js.getOrigins(pointsetDatastore).capacity;
+		long complete = js.jobsSentToWorkers;
+		JobStatus stat = new JobStatus(qry.jobId, total, complete);
+		getSender().tell(stat, getSelf());
 	}
 
 	private void onMsgAddWorkerManager(AddWorkerManager aw) throws Exception {
 		ActorRef remoteManager = aw.workerManager;
-		
 		this.wmPathActorRefs.put(remoteManager.path().toString(), remoteManager);
 		
 		// watch for termination
 		getContext().watch(remoteManager);
-		
 		System.out.println("add worker " + remoteManager);
-
-		Timeout timeout = new Timeout(Duration.create(60, "seconds"));
-		Future<Object> future = Patterns.ask(remoteManager, new AssignExecutive(), timeout);
-		Await.result( future, timeout.duration() );
-		remoteManager.tell(new AssignExecutive(), getSelf());
 		
+		//Timeout timeout = new Timeout(Duration.create(60, "seconds"));
+		//Future<Object> future = Patterns.ask(remoteManager, new AssignExecutive(), timeout);
+		//Await.result( future, timeout.duration() );
+		
+		// not clear why we do this twice.
+		remoteManager.tell(new AssignExecutive(), getSelf());
 		workerManagers.put(remoteManager.path().toString(), null);
+		
+		freeWorkerManagers.add(remoteManager.path().toString());
 		
 		getSender().tell(new Boolean(true), getSelf());
 	}
@@ -186,70 +185,122 @@ public class Executive extends UntypedActor {
 		jobResults.get(wr.jobId).add(wr);
 	}
 
+	/**
+	 * Send up to count jobs for the specified graph to the specified worker manager.
+	 * Return the number of jobs sent.
+	 */
+	private int sendJobsToWorkerManager (String graphId, String workerManager, int count) {
+		if (count == 0)
+			return 0;
+		
+		// pull some jobs off the queue
+		List<JobSpec> queue = multipointQueues.get(graphId);
+		
+		List<AnalystClusterRequest> reqs = new ArrayList<AnalystClusterRequest>(count);
+		
+		while (reqs.size() < count && queue.size() > 0) {
+			// pull one job off the queue
+			JobSpec js = queue.get(0);
+			PointSet origins = js.getOrigins(this.pointsetDatastore);
+			
+			while (js.jobsSentToWorkers < origins.capacity && reqs.size() < count) {
+				PointFeature origin = origins.getFeature(js.jobsSentToWorkers);
+
+				if (js.profileRouting) {
+					reqs.add(new OneToManyProfileRequest(origin, js.toPtsLoc, js.profileOptions, js.graphId));
+				}
+				else {
+					reqs.add(new OneToManyRequest(origin, js.toPtsLoc, js.options, js.graphId));
+				}
+				
+				js.jobsSentToWorkers++;
+			}
+		}
+		
+		// mark the workermanager as busy or not.
+		if (reqs.size() == 0) {
+			freeWorkerManagers.add(workerManager);
+		}
+		else {
+			freeWorkerManagers.remove(workerManager);
+		}
+		
+		ProcessClusterRequests pcr =
+				new ProcessClusterRequests(graphId, reqs.toArray(new AnalystClusterRequest[reqs.size()]));
+		
+		wmPathActorRefs.get(workerManager).tell(pcr, getSelf());
+		
+		// TODO: record what we gave the worker manager so that we can keep track when it
+		// comes back and restart if need be.
+		
+		return reqs.size();
+	}
+	
 	private void onMsgJobSpec(JobSpec jobSpec) throws Exception {
-		// if there are no workers to route to, bail
-		if (workerManagers.size() == 0) {
-			getSender().tell(new JobId(-1), getSelf());
-			return;
-		}
-
-		// the executive gives jobs ids
-		jobSpec.jobId = jobId;
-
+		jobSpec.jobId = nextJobId++;
+		
+		// add to queue
+		if (!multipointQueues.containsKey(jobSpec.graphId))
+			multipointQueues.put(jobSpec.graphId, new ArrayList<JobSpec>(1)); 
+		
+		multipointQueues.get(jobSpec.graphId).add(jobSpec);
+		
 		// make a place to catch the results of the job
-		jobResults.put(jobId, new ArrayList<WorkResult>());
-
-		// send the job id to the client
-		getSender().tell(new JobId(jobId), getSelf());
-
-		// create a job manager
-		ActorRef jobManager = getContext().actorOf(
-				Props.create(JobManager.class, workOffline, pointsetsBucket),
-				"jobmanager-" + jobId);
+		jobResults.put(jobSpec.jobId, new ArrayList<WorkResult>());
 		
-		jobManagers.put(jobId, jobManager);
-
-		// assign some managers to the job manager
-		for (String manager : getFreeWorkerManagers()) {
-			assignWorkerManager(jobId, manager);
-		}
-
-		// kick off the job
-		jobManager.tell(jobSpec, getSelf());
-
-		jobId += 1;
-	}
-
-	private boolean assignWorkerManager(int jobId, String managerPath) throws Exception {
-		// get the job manager for this job id
-		ActorRef jobManager = jobManagers.get(jobId);
+		// should we send jobs now, or are there a workers working on this already?
+		Set<String> activeWorkerManagers = getWorkerManagersForGraph(jobSpec.graphId);
 		
-		ActorRef workerManager = wmPathActorRefs.get( managerPath );
-
-		// assign the workermanager to the jobmanager; blocking operation
-		Timeout timeout = new Timeout(Duration.create(60, "seconds"));
-		Future<Object> future = Patterns.ask(jobManager, new AssignWorkerManager(workerManager), timeout);
-
-		Boolean success = (Boolean) Await.result(future, timeout.duration());
-
-		// if it worked, register the manager as busy
-		if (success) {
-			this.workerManagers.put(managerPath, jobId);
-		}
-
-		return success;
-	}
-
-	private ArrayList<String> getFreeWorkerManagers() {
-		ArrayList<String> ret = new ArrayList<String>();
-
-		for (Entry<String, Integer> entry : this.workerManagers.entrySet()) {
-			if (entry.getValue() == null) {
-				ret.add(entry.getKey());
+		for (String workerManager : activeWorkerManagers) {
+			if (freeWorkerManagers.contains(workerManager)) {
+				// this manager is free, send it some bits of this job
+				// we don't know how much buffer it has, so send it 32 jobs to start
+				sendJobsToWorkerManager(jobSpec.graphId, workerManager, 32);
 			}
 		}
 
+		if (activeWorkerManagers.size() == 0) {
+			// find the free worker manager with the oldest graph, and give it this graph.
+			long min = Long.MAX_VALUE;
+			String best = null;
+			
+			for (String freeWorkerManager : freeWorkerManagers) {
+				Long lastUsedTime = graphLastUsedTime.get(workerManagers.get(freeWorkerManager));
+				
+				if (lastUsedTime == null) {
+					min = 0;
+					best = freeWorkerManager;
+					break;
+				}
+				
+				if (lastUsedTime < min) {
+					min = lastUsedTime;
+					best = freeWorkerManager;
+				}
+			}
+		
+			// if there are no free worker managers, this job will have to wait.
+			// it will be run when a worker manager becomes free.
+			if (best != null) {
+				sendJobsToWorkerManager(jobSpec.graphId, best, 32);
+			}
+		}
+		
+		getSender().tell(new JobId(jobSpec.jobId), getSelf());
+	}
+	
+	/**
+	 * Return the worker managers that are currently working on this graph.
+	 */
+	private Set<String> getWorkerManagersForGraph(String graphId) {
+		Set<String> ret = new HashSet<String>();
+		
+		for (Entry<String, String> entry : workerManagers.entrySet()) {
+			if (graphId.equals(entry.getValue())) {
+				ret.add(entry.getKey());
+			}
+		}
+		
 		return ret;
 	}
-
 }

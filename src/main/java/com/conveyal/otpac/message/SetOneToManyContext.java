@@ -9,11 +9,9 @@ import org.opentripplanner.standalone.Router;
 public class SetOneToManyContext implements Serializable {
 
 	public Router router;
-	public SampleSet to;
 
-	public SetOneToManyContext(Router router, SampleSet sampleSet) {
+	public SetOneToManyContext(Router router) {
 		this.router = router;
-		this.to = sampleSet;
 	}
 
 }

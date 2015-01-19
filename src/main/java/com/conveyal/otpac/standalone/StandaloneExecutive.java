@@ -28,9 +28,9 @@ public class StandaloneExecutive {
 	}
 
 	@SuppressWarnings("unchecked")
-	public ArrayList<JobStatus> getJobStatus() throws Exception {
+	public ArrayList<JobStatus> getJobStatus(int jobId) throws Exception {
 		Timeout timeout = new Timeout(Duration.create(5, "seconds"));
-		Future<Object> future = Patterns.ask(executive, new JobStatusQuery(), timeout);
+		Future<Object> future = Patterns.ask(executive, new JobStatusQuery(jobId), timeout);
 		ArrayList<JobStatus> result = (ArrayList<JobStatus>) Await.result(future, timeout.duration());
 		
 		return result;

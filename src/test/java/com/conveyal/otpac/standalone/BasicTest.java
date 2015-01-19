@@ -172,9 +172,7 @@ public class BasicTest extends TestCase {
 		opts.accessModes = opts.egressModes = opts.directModes = new TraverseModeSet("WALK");
 		opts.transitModes = new TraverseModeSet("TRANSIT");
 		
-		
 		JobSpec js = new JobSpec("austin", "austin.csv", "austin.csv", opts);
-
 
 		// plus a callback that registers how many work items have returned
 		class CounterCallback implements JobItemCallback {

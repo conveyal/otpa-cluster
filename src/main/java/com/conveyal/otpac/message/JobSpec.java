@@ -20,11 +20,6 @@ public class JobSpec implements Serializable{
 	public String fromPtsLoc;
 	public String toPtsLoc;
 	
-	/**
-	 * The filtered and sliced pointset used for this job.
-	 */
-	private transient PointSet origins;
-
 	/** Vanilla routing: routing parameters */
 	public RoutingRequest options;
 	
@@ -39,6 +34,17 @@ public class JobSpec implements Serializable{
 	
 	public List<String> subsetIds = null;
 
+	// transient variables below are used to track state in the executive
+	/**
+	 * The filtered and sliced pointset used for this job.
+	 */
+	private transient PointSet origins;
+
+	/**
+	 * How many of the jobs have been sent out for computation so far?
+	 */
+	public transient int jobsSentToWorkers;	
+	
 	/**
 	 * Create a job using vanilla routing for the specified RoutingRequest.
 	 */

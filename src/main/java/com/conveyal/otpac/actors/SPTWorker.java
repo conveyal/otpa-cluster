@@ -15,6 +15,7 @@ import akka.actor.UntypedActor;
 import akka.event.Logging;
 import akka.event.LoggingAdapter;
 
+import com.conveyal.otpac.PointSetDatastore;
 import com.conveyal.otpac.message.OneToManyProfileRequest;
 import com.conveyal.otpac.message.OneToManyRequest;
 import com.conveyal.otpac.message.SetOneToManyContext;
@@ -23,11 +24,19 @@ import com.conveyal.otpac.message.WorkResult;
 public class SPTWorker extends UntypedActor {
 
 	private Router router;
-	private SampleSet to;
 	
 	LoggingAdapter log = Logging.getLogger(getContext().system(), this);
+	
+	private PointSetDatastore s3Datastore;
 
-	SPTWorker() {
+	/**
+	 * Create a new SPTWorker using the given PointSetDatastore
+	 * It's safe to hand these around in class constructors because SPTWorkers are always in
+	 * the same JVM as their WorkerManager. This allows shared caching of pointsets and samplesets.
+	 * @param s3Datastore
+	 */
+	SPTWorker(PointSetDatastore s3Datastore) {
+		this.s3Datastore = s3Datastore;
 	}
 
 	@Override
@@ -68,7 +77,12 @@ public class SPTWorker extends UntypedActor {
 			
 			TimeSurface ts = new TimeSurface( spt );
 			
-			ResultSet ind = new ResultSet(this.to, ts);
+			// This is not inefficient, because after the first request the pointset and the sample
+			// set will be cached.
+			// TODO: thread safety? Are we fetching n times at the start, in different threads?
+			SampleSet to = s3Datastore.get(req.destinationPointsetId).getSampleSet(this.router.id);
+			
+			ResultSet ind = new ResultSet(to, ts);
 			ind.id = req.from.getId();
 
 			WorkResult res = new WorkResult(true, ind);
@@ -98,14 +112,17 @@ public class SPTWorker extends UntypedActor {
 			rtr.route();
 
 			TimeSurface.RangeSet result = rtr.route();
+			
+			// see note above about efficiency
+			SampleSet to = s3Datastore.get(message.destinationPointsetId).getSampleSet(this.router.id);
 
-			ResultSet bestCase = new ResultSet(this.to, result.min);
+			ResultSet bestCase = new ResultSet(to, result.min);
 			bestCase.id = message.from.getId();
 
-			ResultSet avgCase = new ResultSet(this.to, result.avg);
+			ResultSet avgCase = new ResultSet(to, result.avg);
 			avgCase.id = message.from.getId();
 			
-			ResultSet worstCase = new ResultSet(this.to, result.max);
+			ResultSet worstCase = new ResultSet(to, result.max);
 			worstCase.id = message.from.getId();
 			
 			// TODO: Central tendency calculation
@@ -127,7 +144,6 @@ public class SPTWorker extends UntypedActor {
 		log.debug("setting context router: {}", ctx.router);
 		
 		this.router = ctx.router;
-		this.to = ctx.to;
 		
 		getSender().tell(new Boolean(true), getSelf());
 	}

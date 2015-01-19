@@ -86,6 +86,12 @@ public class WorkerManager extends UntypedActor {
 	/** How many requests are outstanding? */
 	private int outstandingRequests;
 	
+	/** Are we waiting for the queue to empty so we can swap out the graph? */
+	private boolean waitingForQueueToEmptyAndGraphToBuild = false;
+	
+	/** What do we need to do once we get the new graph? */
+	private ProcessClusterRequests stalledRequests;
+	
 	public final int maxQueueSize, minQueueSize;
 
 	public WorkerManager(Integer nWorkers, Boolean workOffline, String graphsBucket, String pointsetsBucket) {
@@ -122,7 +128,7 @@ public class WorkerManager extends UntypedActor {
 		ArrayList<Routee> routees = new ArrayList<Routee>();
 		
 		for (int i = 0; i < this.nWorkers; i++) {
-			ActorRef worker = getContext().actorOf(Props.create(SPTWorker.class), "worker-" + i);
+			ActorRef worker = getContext().actorOf(Props.create(SPTWorker.class, s3Datastore), "worker-" + i);
 			routees.add(new ActorRefRoutee(worker));
 			workers.add(worker);
 		}
@@ -157,8 +163,29 @@ public class WorkerManager extends UntypedActor {
 		}
 	}
 
-	/** Enqueue some requests */
+	/** Process requests */
 	private void onMsgProcessClusterRequests(ProcessClusterRequests pcr) {
+		System.out.println("Process cluster requests.");
+		
+		if (workers.isEmpty())
+			createAndRouteWorkers();
+		
+		if (this.otpRouter == null || pcr.graphId != this.otpRouter.id) {
+			this.waitingForQueueToEmptyAndGraphToBuild = true;
+			this.stalledRequests = pcr;
+			
+			if (outstandingRequests == 0) {
+				// no need to wait to build graph
+				graphBuilder.tell(new BuildGraph(stalledRequests.graphId), getSelf());
+			}
+		}
+		else {
+			enqueueRequests(pcr);
+		}
+	}
+	
+	/** Enqueue requests for processing */
+	public void enqueueRequests (ProcessClusterRequests pcr) {
 		outstandingRequests += pcr.requests.length;
 		
 		for (AnalystClusterRequest req : pcr.requests) {
@@ -208,6 +235,7 @@ public class WorkerManager extends UntypedActor {
 		// get an ActorRef for the executive via official safe channels
 		this.executive.tell(new Identify("1"), getSelf());
 				
+		// TODO: should this be in actor identity?
 		getContext().watch(this.executive);
 		
 	}
@@ -220,18 +248,47 @@ public class WorkerManager extends UntypedActor {
 		}
 
 		// use == to ensure this only happens once each time the queue runs low.
-		if (outstandingRequests == minQueueSize) {
+		if (outstandingRequests == minQueueSize && !waitingForQueueToEmptyAndGraphToBuild) {
 			// we need to get more requests!
-			BufferFillRequest r = new BufferFillRequest(maxQueueSize, graphService.getRouterIds());
+			BufferFillRequest r = new BufferFillRequest(maxQueueSize, this.otpRouter.id);
 			this.executive.tell(r, getSelf());
 		}
+		else if (waitingForQueueToEmptyAndGraphToBuild && outstandingRequests == 0) {
+			// the queue has emptied
+			// build the graph
+			graphBuilder.tell(new BuildGraph(stalledRequests.graphId), getSelf());
+		}
+		
+		this.executive.tell(res, getSelf());
 	}
 
-	private void onMsgGetRouter(org.opentripplanner.standalone.Router router) {
+	/**
+	 * A graph has been built and now we should use it.
+	 */
+	private void onMsgGetRouter(org.opentripplanner.standalone.Router router) throws Exception {
 		log.debug("got router: {}", router);
 
-		this.otpRouter = router;
-		status = Status.READY;
-		getSelf().tell(new StartWorkers(), getSelf());
+		// if requests are not stalled, we don't want to change graphs mid-stream
+		if (!waitingForQueueToEmptyAndGraphToBuild)
+			return;
+				
+		// make sure it's the right graph
+		if (!router.id.equals(stalledRequests.graphId)) {
+			// build it again
+			graphBuilder.tell(new BuildGraph(stalledRequests.graphId), getSelf());
+		}
+		else {
+			this.otpRouter = router;
+
+			// send graph to all workers
+			for (ActorRef worker : workers) {
+				Timeout timeout = new Timeout(Duration.create(10, "seconds"));
+				Future<Object> future = Patterns.ask(worker, new SetOneToManyContext(this.otpRouter), timeout);
+				Await.result(future, timeout.duration());
+			}
+			
+			enqueueRequests(this.stalledRequests);
+			this.waitingForQueueToEmptyAndGraphToBuild = false;
+		}
 	}
 }
