@@ -80,7 +80,7 @@ public class SPTWorker extends UntypedActor {
 			// This is not inefficient, because after the first request the pointset and the sample
 			// set will be cached.
 			// TODO: thread safety? Are we fetching n times at the start, in different threads?
-			SampleSet to = s3Datastore.get(req.destinationPointsetId).getSampleSet(this.router.id);
+			SampleSet to = s3Datastore.getPointset(req.destinationPointsetId).getSampleSet(this.router.id);
 			
 			ResultSet ind = new ResultSet(to, ts);
 			ind.id = req.from.getId();
@@ -114,7 +114,7 @@ public class SPTWorker extends UntypedActor {
 			TimeSurface.RangeSet result = rtr.route();
 			
 			// see note above about efficiency
-			SampleSet to = s3Datastore.get(message.destinationPointsetId).getSampleSet(this.router.id);
+			SampleSet to = s3Datastore.getPointset(message.destinationPointsetId).getSampleSet(this.router.id);
 
 			ResultSet bestCase = new ResultSet(to, result.min);
 			bestCase.id = message.from.getId();

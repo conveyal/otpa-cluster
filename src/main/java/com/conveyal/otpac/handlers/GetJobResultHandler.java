@@ -11,6 +11,7 @@ import scala.concurrent.duration.Duration;
 import com.conveyal.otpac.message.JobResult;
 import com.conveyal.otpac.message.JobResultQuery;
 import com.conveyal.otpac.message.WorkResult;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import akka.actor.ActorRef;
 import akka.pattern.Patterns;
@@ -19,15 +20,17 @@ import akka.util.Timeout;
 public class GetJobResultHandler extends HttpHandler{
 
 	private ActorRef executive;
+	
+	private ObjectMapper om;
 
 	public GetJobResultHandler(ActorRef executive) {
 		this.executive = executive;
+		om = new ObjectMapper();
 	}
 
 	@Override
 	public void service(Request request, Response response) throws Exception {
 		String jobIdStr = request.getParameter("jobid");
-		String workIndexStr = request.getParameter("i");
 
 		if( jobIdStr==null ){
 			response.setStatus(400);
@@ -42,19 +45,9 @@ public class GetJobResultHandler extends HttpHandler{
 			Future<Object> future = Patterns.ask(executive, new JobResultQuery(jobId), timeout);
 			JobResult result = (JobResult) Await.result(future, timeout.duration());
 
-			if(workIndexStr != null){
-				int workItemIndex = Integer.parseInt(workIndexStr);
-				WorkResult wr = result.res.get(workItemIndex);
-				
-				StringBuilder sb = new StringBuilder();
-				sb.append( "WorkResult\n" );
-				sb.append( wr.point+"\n" );
-				response.getWriter().write( sb.toString() );
-				return;
-			} else {
-				response.getWriter().write( "result.size:"+result.res.size() );
-				return;
-			}
+			response.setStatus(200);
+			response.setContentType("application/json");
+			response.getWriter().write(om.writeValueAsString(result));
 		} catch (Exception e) {
 			e.printStackTrace();
 			response.setStatus( 500);

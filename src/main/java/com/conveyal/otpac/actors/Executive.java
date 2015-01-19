@@ -217,7 +217,7 @@ public class Executive extends UntypedActor {
 		JobSpec js = jobSpecsByJobId.get(qry.jobId);
 		// this is not inefficient because the pointset is cached
 		long total = js.getOrigins(pointsetDatastore).capacity;
-		long complete = js.jobsSentToWorkers;
+		long complete = jobResults.get(js.jobId).size();
 		JobStatus stat = new JobStatus(qry.jobId, total, complete);
 		getSender().tell(stat, getSelf());
 	}
@@ -247,6 +247,10 @@ public class Executive extends UntypedActor {
 
 	private void onMsgWorkResult(WorkResult wr) {
 		jobResults.get(wr.jobId).add(wr);
+		JobSpec js = jobSpecsByJobId.get(wr.jobId);
+		if (js.callback != null) {
+			js.callback.tell(wr, getSelf());
+		}
 	}
 
 	/**
@@ -322,6 +326,9 @@ public class Executive extends UntypedActor {
 		
 		// make a place to catch the results of the job
 		jobResults.put(jobSpec.jobId, new ArrayList<WorkResult>());
+		
+		// save the job spec
+		jobSpecsByJobId.put(jobSpec.jobId, jobSpec);
 		
 		getSender().tell(new JobId(jobSpec.jobId), getSelf());
 	}

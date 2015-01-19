@@ -44,11 +44,6 @@ public class WorkerManager extends UntypedActor {
 		READY, BUILDING_GRAPH, WORKING
 	};
 
-	private int curJobId = -1;
-
-	private long jobSize = -1;
-	private long jobsReturned = 0;
-
 	private ArrayList<ActorRef> workers;
 	private Router router;
 	
