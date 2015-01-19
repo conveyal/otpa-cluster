@@ -2,44 +2,14 @@ package com.conveyal.otpac.actors;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashSet;
 
-import org.opentripplanner.analyst.PointFeature;
-import org.opentripplanner.analyst.PointSet;
-import org.opentripplanner.analyst.SampleSet;
-import org.opentripplanner.routing.graph.Graph;
 import org.opentripplanner.routing.services.GraphService;
 
 import scala.concurrent.Await;
 import scala.concurrent.Future;
 import scala.concurrent.duration.Duration;
-
-import com.conveyal.otpac.ClusterGraphService;
-import com.conveyal.otpac.PointSetDatastore;
-import com.conveyal.otpac.message.AnalystClusterRequest;
-import com.conveyal.otpac.message.BufferFillRequest;
-import com.conveyal.otpac.message.BuildGraph;
-import com.conveyal.otpac.message.CancelJob;
-import com.conveyal.otpac.message.DoneAssigningExecutive;
-import com.conveyal.otpac.message.GetWorkerStatus;
-import com.conveyal.otpac.message.JobSliceDone;
-import com.conveyal.otpac.message.JobSliceSpec;
-import com.conveyal.otpac.message.JobStatus;
-import com.conveyal.otpac.message.JobStatusQuery;
-import com.conveyal.otpac.message.OneToManyProfileRequest;
-import com.conveyal.otpac.message.OneToManyRequest;
-import com.conveyal.otpac.message.ProcessClusterRequests;
-import com.conveyal.otpac.message.SetOneToManyContext;
-import com.conveyal.otpac.message.StartWorkers;
-import com.conveyal.otpac.message.WorkResult;
-import com.conveyal.otpac.message.AssignExecutive;
-import com.conveyal.otpac.message.WorkerStatus;
-import com.sun.corba.se.spi.orbutil.fsm.Guard.Result;
-import com.typesafe.config.Config;
-
 import akka.actor.ActorIdentity;
 import akka.actor.ActorRef;
-import akka.actor.ActorSelection;
 import akka.actor.Identify;
 import akka.actor.Props;
 import akka.actor.Terminated;
@@ -52,6 +22,20 @@ import akka.routing.RoundRobinRoutingLogic;
 import akka.routing.Routee;
 import akka.routing.Router;
 import akka.util.Timeout;
+
+import com.conveyal.otpac.ClusterGraphService;
+import com.conveyal.otpac.PointSetDatastore;
+import com.conveyal.otpac.message.AnalystClusterRequest;
+import com.conveyal.otpac.message.AssignExecutive;
+import com.conveyal.otpac.message.BuildGraph;
+import com.conveyal.otpac.message.CancelJob;
+import com.conveyal.otpac.message.DoneAssigningExecutive;
+import com.conveyal.otpac.message.GetWorkerStatus;
+import com.conveyal.otpac.message.ProcessClusterRequests;
+import com.conveyal.otpac.message.SetOneToManyContext;
+import com.conveyal.otpac.message.WorkResult;
+import com.conveyal.otpac.message.WorkerStatus;
+import com.typesafe.config.Config;
 
 public class WorkerManager extends UntypedActor {
 	LoggingAdapter log = Logging.getLogger(getContext().system(), this);
@@ -73,7 +57,6 @@ public class WorkerManager extends UntypedActor {
 	 * It is unfortunate that there is a name collision between OTP and Akka.
 	 */
 	private org.opentripplanner.standalone.Router otpRouter;
-	private ActorRef jobManager;
 	private ActorRef graphBuilder;
 	private ActorRef executive;
 	
@@ -82,7 +65,6 @@ public class WorkerManager extends UntypedActor {
 	private GraphService graphService = null;
 	private Status status;
 
-	private JobSliceSpec slice = null;
 	private int nWorkers;
 	private PointSetDatastore s3Datastore;
 
