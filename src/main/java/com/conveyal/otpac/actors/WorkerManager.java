@@ -105,8 +105,8 @@ public class WorkerManager extends UntypedActor {
 		Config config = context().system().settings().config();
 		String s3ConfigFilename = null;
 		
-		/** Chunk size starts small. If we see buffer underruns we up it dynamically */
-		chunkSize = 32;
+		/** Chunk size starts average. If we see buffer over- or underruns we change it dynamically */
+		chunkSize = 100;
 
 		if (config.hasPath("s3.credentials.filename"))
 			s3ConfigFilename = config.getString("s3.credentials.filename");
@@ -152,8 +152,6 @@ public class WorkerManager extends UntypedActor {
 			onMsgGetRouter((org.opentripplanner.standalone.Router) message);
 		} else if (message instanceof WorkResult) {
 			onMsgWorkResult((WorkResult) message);
-		} else if (message instanceof JobStatusQuery) {
-			getSender().tell(new JobStatus(getSelf(), curJobId, jobSize, jobsReturned), getSelf());
 		} else if (message instanceof CancelJob ){
 			onMsgCancelJob((CancelJob)message);
 		} else if (message instanceof Terminated){
@@ -170,6 +168,10 @@ public class WorkerManager extends UntypedActor {
 	/** Report our status back to the executive */
 	private void onMsgGetWorkerStatus(GetWorkerStatus message) {
 		String id = this.otpRouter != null ? this.otpRouter.id : null;
+		
+		// the buffer is backing up
+		if (outstandingRequests > chunkSize)
+			chunkSize *= 0.667;
 		
 		getSender().tell(new WorkerStatus(outstandingRequests, chunkSize, id,
 				waitingForQueueToEmptyAndGraphToBuild), getSelf());
