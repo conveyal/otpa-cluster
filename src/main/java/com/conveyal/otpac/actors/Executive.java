@@ -1,5 +1,9 @@
 package com.conveyal.otpac.actors;
 
+import gnu.trove.map.TObjectLongMap;
+import gnu.trove.map.hash.TObjectIntHashMap;
+import gnu.trove.map.hash.TObjectLongHashMap;
+
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -24,6 +28,7 @@ import scala.concurrent.duration.Duration;
 import akka.actor.ActorIdentity;
 import akka.actor.ActorRef;
 import akka.actor.ActorSelection;
+import akka.actor.ActorSystem;
 import akka.actor.Identify;
 import akka.actor.Terminated;
 import akka.actor.UntypedActor;
@@ -46,6 +51,13 @@ public class Executive extends UntypedActor {
 	 * Multipoint query queues (per graph)
 	 */
 	private Map<String, List<JobSpec>> multipointQueues;
+	
+	/**
+	 * Multipoint queue sizes, per graph.
+	 * We can't just use the length of multipointQueues, because that is the number of job specs,
+	 * which are made up of thousands of jobs and may vary widely in size.
+	 */
+	private TObjectLongMap<String> multipointQueueSize = new TObjectLongHashMap<String>(4);
 	
 	/**
 	 * Index of job specs by job ID.
@@ -91,6 +103,11 @@ public class Executive extends UntypedActor {
 		this.workOffline = workOffline;
 		
 		this.multipointQueues = new ConcurrentHashMap<String, List<JobSpec>>(4);
+		
+		// set up polling on the workers
+		ActorSystem system = getContext().system();
+		system.scheduler().schedule(Duration.create(10, "seconds"), Duration.create(5, "seconds"),
+				getSelf(), new Poll(), system.dispatcher(), null);
 	}
 
 	@Override
@@ -105,19 +122,69 @@ public class Executive extends UntypedActor {
 			onMsgAddWorkerManager((AddWorkerManager) msg);
 		} else if (msg instanceof JobStatusQuery) {
 			onMsgJobStatusQuery((JobStatusQuery) msg);
-		} else if (msg instanceof BufferFillRequest) {
-			onMsgBufferFillRequest((BufferFillRequest) msg);
 		} else if (msg instanceof CancelJob) {
 			onMsgCancelJob((CancelJob) msg);
 		} else if (msg instanceof Terminated) {
 			onMsgTerminated();
+		} else if (msg instanceof Poll) {
+			onMsgPoll();
+		// TODO: dead code?
 		} else if(msg instanceof String){
 			getSender().tell(msg, getSelf());
-		} 
+		} else if (msg instanceof WorkerStatus) {
+			onMsgWorkerStatus((WorkerStatus) msg);
+		}
 	}
 
-	private void onMsgBufferFillRequest(BufferFillRequest msg) {
-		sendJobsToWorkerManager(msg.routerId, getSender().path().toString(), msg.size);
+	private void onMsgWorkerStatus(WorkerStatus msg) {
+		String workerManager = getSender().path().toString();
+		
+		workerManagers.put(workerManager, msg.graph);
+		
+		// If the queue is draining, send some more requests
+		if (msg.queueSize < msg.chunkSize && !msg.buildingGraph) {
+			// decide what to do: more from the same graph?
+			if (msg.graph != null && multipointQueues.get(msg.graph).size() > 0) {
+				sendJobsToWorkerManager(msg.graph, workerManager, msg.chunkSize);
+			}
+			else {
+				// TODO: don't evict graphs that are needed for single point mode
+				// first: any non-empty queues without a worker
+				// next: largest queue/worker ratio
+				// we cannot divide by zero; if any queue had no workers it would have gotten caught by the previous
+				// loop.
+				String chosenGraph = null;
+				
+				// jobs per worker
+				long worstRatio = 0;
+				
+				for (String graph : multipointQueueSize.keys(new String[multipointQueueSize.size()])) {
+					long queueSize = multipointQueueSize.get(graph);
+					
+					if (queueSize == 0)
+						// nothing queued, no need to assign any workers to this graph
+						continue;
+					
+					int nWorkers = getWorkerManagersForGraph(graph).size();
+					
+					// no workers on a given job
+					if (nWorkers == 0) {
+						chosenGraph = graph;
+						break;
+					}
+					
+					long ratio = queueSize / nWorkers;
+					
+					if (ratio > worstRatio) {
+						worstRatio = queueSize;
+						chosenGraph = graph;
+					}
+				}
+				
+				if (chosenGraph != null)
+					sendJobsToWorkerManager(chosenGraph, workerManager, msg.chunkSize);
+			}
+		}
 	}
 
 	private void onMsgCancelJob(CancelJob msg) {
@@ -169,6 +236,8 @@ public class Executive extends UntypedActor {
 		freeWorkerManagers.add(remoteManager.path().toString());
 		
 		getSender().tell(new Boolean(true), getSelf());
+		
+		// it will get shuffled into the rotation on the next poll, do nothing more.
 	}
 
 	private void onMsgJobResultQuery(JobResultQuery jr) {
@@ -225,6 +294,9 @@ public class Executive extends UntypedActor {
 		
 		wmPathActorRefs.get(workerManager).tell(pcr, getSelf());
 		
+		// make the queue smaller
+		multipointQueueSize.put(graphId, multipointQueueSize.get(graphId) - reqs.size());
+		
 		// TODO: record what we gave the worker manager so that we can keep track when it
 		// comes back and restart if need be.
 		
@@ -235,51 +307,21 @@ public class Executive extends UntypedActor {
 		jobSpec.jobId = nextJobId++;
 		
 		// add to queue
-		if (!multipointQueues.containsKey(jobSpec.graphId))
-			multipointQueues.put(jobSpec.graphId, new ArrayList<JobSpec>(1)); 
+		if (!multipointQueues.containsKey(jobSpec.graphId)) {
+			multipointQueues.put(jobSpec.graphId, new ArrayList<JobSpec>(1));
+			multipointQueueSize.put(jobSpec.graphId, 0);
+		}
+		
+		// we need the origins to know job size, and this will fetch the point set or grab it from RAM.
+		// it's fine to do this repeatedly, because the point set cache should be large enough that
+		// subsequent calls are very fast (in-memory reference passing fast).
+		PointSet origins = jobSpec.getOrigins(this.pointsetDatastore);
 		
 		multipointQueues.get(jobSpec.graphId).add(jobSpec);
+		multipointQueueSize.put(jobSpec.graphId, multipointQueueSize.get(jobSpec.graphId) + origins.capacity);		
 		
 		// make a place to catch the results of the job
 		jobResults.put(jobSpec.jobId, new ArrayList<WorkResult>());
-		
-		// should we send jobs now, or are there a workers working on this already?
-		Set<String> activeWorkerManagers = getWorkerManagersForGraph(jobSpec.graphId);
-		
-		for (String workerManager : activeWorkerManagers) {
-			if (freeWorkerManagers.contains(workerManager)) {
-				// this manager is free, send it some bits of this job
-				// we don't know how much buffer it has, so send it 32 jobs to start
-				sendJobsToWorkerManager(jobSpec.graphId, workerManager, 32);
-			}
-		}
-
-		if (activeWorkerManagers.size() == 0) {
-			// find the free worker manager with the oldest graph, and give it this graph.
-			long min = Long.MAX_VALUE;
-			String best = null;
-			
-			for (String freeWorkerManager : freeWorkerManagers) {
-				Long lastUsedTime = graphLastUsedTime.get(workerManagers.get(freeWorkerManager));
-				
-				if (lastUsedTime == null) {
-					min = 0;
-					best = freeWorkerManager;
-					break;
-				}
-				
-				if (lastUsedTime < min) {
-					min = lastUsedTime;
-					best = freeWorkerManager;
-				}
-			}
-		
-			// if there are no free worker managers, this job will have to wait.
-			// it will be run when a worker manager becomes free.
-			if (best != null) {
-				sendJobsToWorkerManager(jobSpec.graphId, best, 32);
-			}
-		}
 		
 		getSender().tell(new JobId(jobSpec.jobId), getSelf());
 	}
@@ -298,4 +340,26 @@ public class Executive extends UntypedActor {
 		
 		return ret;
 	}
+	
+	/**
+	 * Poll the worker managers to make sure that there aren't any free worker managers we don't
+	 * know about.
+	 * 
+	 * This doesn't handle terminations, as the failure detector will generate Terminated messages
+	 * for terminated actors. This is to ensure that there are no worker managers with empty
+	 * queues.
+	 */
+	private void onMsgPoll () {
+		for (ActorRef wm : wmPathActorRefs.values()) {
+			wm.tell(new GetWorkerStatus(), getSelf());
+		}
+	}
+	
+	/**
+	 * This message is sent to the executive by the scheduler every minute
+	 * to poll the workers for their statuses in case any messages have gotten lost.
+	 * @author matthewc
+	 *
+	 */
+	private static class Poll { /* nothing */ }
 }

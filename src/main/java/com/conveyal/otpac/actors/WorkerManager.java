@@ -21,6 +21,7 @@ import com.conveyal.otpac.message.BufferFillRequest;
 import com.conveyal.otpac.message.BuildGraph;
 import com.conveyal.otpac.message.CancelJob;
 import com.conveyal.otpac.message.DoneAssigningExecutive;
+import com.conveyal.otpac.message.GetWorkerStatus;
 import com.conveyal.otpac.message.JobSliceDone;
 import com.conveyal.otpac.message.JobSliceSpec;
 import com.conveyal.otpac.message.JobStatus;
@@ -32,6 +33,7 @@ import com.conveyal.otpac.message.SetOneToManyContext;
 import com.conveyal.otpac.message.StartWorkers;
 import com.conveyal.otpac.message.WorkResult;
 import com.conveyal.otpac.message.AssignExecutive;
+import com.conveyal.otpac.message.WorkerStatus;
 import com.sun.corba.se.spi.orbutil.fsm.Guard.Result;
 import com.typesafe.config.Config;
 
@@ -93,19 +95,18 @@ public class WorkerManager extends UntypedActor {
 	/** What do we need to do once we get the new graph? */
 	private ProcessClusterRequests stalledRequests;
 	
-	public final int maxQueueSize, minQueueSize;
+	/** The number of requests this worker manager gets at a time */
+	public int chunkSize;
 
 	public WorkerManager(Integer nWorkers, Boolean workOffline, String graphsBucket, String pointsetsBucket) {
 		if(nWorkers == null)
 			nWorkers = Runtime.getRuntime().availableProcessors() / 2;
-
-		
-		// keep 3 requests per worker on hand
-		minQueueSize = 3 * nWorkers;
-		maxQueueSize = 10 * nWorkers;
 		
 		Config config = context().system().settings().config();
 		String s3ConfigFilename = null;
+		
+		/** Chunk size starts small. If we see buffer underruns we up it dynamically */
+		chunkSize = 32;
 
 		if (config.hasPath("s3.credentials.filename"))
 			s3ConfigFilename = config.getString("s3.credentials.filename");
@@ -159,9 +160,19 @@ public class WorkerManager extends UntypedActor {
 			onMsgTerminated((Terminated)message);
 		} else if (message instanceof ActorIdentity){
 			onMsgActorIdentity((ActorIdentity)message);
+		} else if (message instanceof GetWorkerStatus) {
+			onMsgGetWorkerStatus((GetWorkerStatus) message);
 		} else {
 			unhandled(message);
 		}
+	}
+
+	/** Report our status back to the executive */
+	private void onMsgGetWorkerStatus(GetWorkerStatus message) {
+		String id = this.otpRouter != null ? this.otpRouter.id : null;
+		
+		getSender().tell(new WorkerStatus(outstandingRequests, chunkSize, id,
+				waitingForQueueToEmptyAndGraphToBuild), getSelf());
 	}
 
 	/** Process requests */
@@ -171,7 +182,7 @@ public class WorkerManager extends UntypedActor {
 		if (workers.isEmpty())
 			createAndRouteWorkers();
 		
-		if (this.otpRouter == null || pcr.graphId != this.otpRouter.id) {
+		if (this.otpRouter == null || !this.otpRouter.id.equals(pcr.graphId)) {
 			this.waitingForQueueToEmptyAndGraphToBuild = true;
 			this.stalledRequests = pcr;
 			
@@ -245,20 +256,10 @@ public class WorkerManager extends UntypedActor {
 		outstandingRequests -= 1;
 		this.executive.tell(res, getSelf());
 
-		if (res.success) {
-			jobManager.forward(res, getContext());
-		}
-
-		// use == to ensure this only happens once each time the queue runs low.
-		if (outstandingRequests == minQueueSize && !waitingForQueueToEmptyAndGraphToBuild) {
-			// we need to get more requests!
-			BufferFillRequest r = new BufferFillRequest(maxQueueSize, this.otpRouter.id);
-			this.executive.tell(r, getSelf());
-		}
-		else if (waitingForQueueToEmptyAndGraphToBuild && outstandingRequests == 0) {
-			// the queue has emptied
-			// build the graph
-			graphBuilder.tell(new BuildGraph(stalledRequests.graphId), getSelf());
+		if (outstandingRequests == 0) {
+			// grow the queue size so we don't underrun again
+			// TODO: need to shrink queue size if requests get slower
+			chunkSize *= 1.5;
 		}
 	}
 
