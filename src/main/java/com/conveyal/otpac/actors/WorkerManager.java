@@ -150,6 +150,10 @@ public class WorkerManager extends UntypedActor {
 		if (outstandingRequests > chunkSize)
 			chunkSize *= 0.667;
 		
+		// don't let the chunk size get too small
+		if (chunkSize < 10)
+			chunkSize = 10;
+		
 		System.out.println("get status: " + outstandingRequests + " requests outstanding, " + chunkSize + " chunk size" +
 				(waitingForQueueToEmptyAndGraphToBuild ? ", building graph" : ""));
 		
