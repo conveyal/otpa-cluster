@@ -35,7 +35,6 @@ import com.conveyal.otpac.message.BuildGraph;
 import com.conveyal.otpac.message.CancelJob;
 import com.conveyal.otpac.message.DoneAssigningExecutive;
 import com.conveyal.otpac.message.GetWorkerStatus;
-import com.conveyal.otpac.message.ProcessClusterRequests;
 import com.conveyal.otpac.message.SetOneToManyContext;
 import com.conveyal.otpac.message.WorkResult;
 import com.conveyal.otpac.message.WorkerStatus;
