@@ -21,12 +21,10 @@ public class OneToManyProfileRequest extends AnalystClusterRequest implements Se
 		this.from = from;
 		this.options = options.clone();
 		this.options.analyst = true;
-		// putting the lat lons into a string is ugly, but there's not really a better
-		// way to do it without major changes in OTP.
-		this.options.from = new LatLon(String.format("%f,%f", from.getLat(), from.getLon()));
 		
 		// Even though we're making an analyst request, OTP requires a to location
 		// which will be ignored
-		this.options.to = this.options.from;
+		this.options.fromLat = this.options.toLat = from.getLat();
+		this.options.fromLon = this.options.toLon = from.getLon();
 	}
 }
