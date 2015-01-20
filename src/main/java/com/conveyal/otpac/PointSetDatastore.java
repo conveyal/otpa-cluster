@@ -85,10 +85,10 @@ public class PointSetDatastore extends DiskBackedPointSetCache {
 		
 		if(!this.workOffline) {
 			// get pointset metadata from S3
-			S3Object obj = s3.getObject(pointsetBucket, pointSetId);
-			ObjectMetadata objMet = obj.getObjectMetadata();
 			cachedFile = new File(POINT_DIR, pointSetId);
 			if(!cachedFile.exists()){
+				S3Object obj = s3.getObject(pointsetBucket, pointSetId);
+				ObjectMetadata objMet = obj.getObjectMetadata();
 				Util.saveFile( cachedFile, obj.getObjectContent(), objMet.getContentLength(), true);
 			}
 		}
