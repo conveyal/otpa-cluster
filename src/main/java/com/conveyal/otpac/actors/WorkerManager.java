@@ -150,6 +150,9 @@ public class WorkerManager extends UntypedActor {
 		if (outstandingRequests > chunkSize)
 			chunkSize *= 0.667;
 		
+		System.out.println("get status: " + outstandingRequests + " requests outstanding, " + chunkSize + " chunk size" +
+				(waitingForQueueToEmptyAndGraphToBuild ? ", building graph" : ""));
+		
 		getSender().tell(new WorkerStatus(outstandingRequests, chunkSize, id,
 				waitingForQueueToEmptyAndGraphToBuild), getSelf());
 	}
@@ -178,7 +181,9 @@ public class WorkerManager extends UntypedActor {
 	/** Enqueue requests for processing */
 	public void enqueueRequests (ProcessClusterRequests pcr) {
 		outstandingRequests += pcr.requests.length;
-		
+
+		log.info("Enqueuing " + pcr.requests.length + " requests, queue size now " + outstandingRequests);
+
 		for (AnalystClusterRequest req : pcr.requests) {
 			// NOTE: the queue will never empty if req is of a type not handled by SPTWorker.
 			router.route(req, getSelf());
@@ -237,7 +242,6 @@ public class WorkerManager extends UntypedActor {
 
 		if (outstandingRequests == 0) {
 			// grow the queue size so we don't underrun again
-			// TODO: need to shrink queue size if requests get slower
 			chunkSize *= 1.5;
 		}
 	}
