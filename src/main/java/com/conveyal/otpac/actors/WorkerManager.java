@@ -2,7 +2,11 @@ package com.conveyal.otpac.actors;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 
+import org.opentripplanner.analyst.PointSet;
+import org.opentripplanner.analyst.SampleSet;
 import org.opentripplanner.routing.services.GraphService;
 
 import scala.concurrent.Await;
@@ -69,11 +73,19 @@ public class WorkerManager extends UntypedActor {
 	/** Are we waiting for the queue to empty so we can swap out the graph? */
 	private boolean waitingForQueueToEmptyAndGraphToBuild = false;
 	
-	/** What do we need to do once we get the new graph? */
-	private ProcessClusterRequests stalledRequests;
+	/** The graph to build once the queue empties */
+	private String graphToBuild;
 	
 	/** The number of requests this worker manager gets at a time */
 	public int chunkSize;
+	
+	/** A cache of sample sets by point set ID for the current graph */
+	// We could use Guava caching, but this is cleared each time we get a new graph so shouldn't grow too large
+	private Map<String, SampleSet> sampleSetCache = new HashMap<String, SampleSet>();
+	
+	/** Have we received requests since the last poll? */
+	// init to false so that we don't immediately expand the queue
+	private boolean receivedRequestsSinceLastPoll = false; 
 
 	public WorkerManager(Integer nWorkers, Boolean workOffline, String graphsBucket, String pointsetsBucket) {
 		if(nWorkers == null)
@@ -100,6 +112,9 @@ public class WorkerManager extends UntypedActor {
 		graphBuilder = getContext().actorOf(Props.create(GraphBuilder.class, graphService), "builder");
 
 		System.out.println("starting worker-manager with " + nWorkers + " workers");
+		
+		createAndRouteWorkers();
+		
 		status = Status.READY;
 	}
 
@@ -107,7 +122,7 @@ public class WorkerManager extends UntypedActor {
 		ArrayList<Routee> routees = new ArrayList<Routee>();
 		
 		for (int i = 0; i < this.nWorkers; i++) {
-			ActorRef worker = getContext().actorOf(Props.create(SPTWorker.class, s3Datastore), "worker-" + i);
+			ActorRef worker = getContext().actorOf(Props.create(SPTWorker.class), "worker-" + i);
 			routees.add(new ActorRefRoutee(worker));
 			workers.add(worker);
 		}
@@ -121,9 +136,7 @@ public class WorkerManager extends UntypedActor {
 
 	@Override
 	public void onReceive(Object message) throws Exception {		
-		if (message instanceof ProcessClusterRequests) {
-			onMsgProcessClusterRequests((ProcessClusterRequests) message);
-		} else if (message instanceof AssignExecutive) {
+		if (message instanceof AssignExecutive) {
 			onMsgAssignExecutive((AssignExecutive) message);
 		} else if (message instanceof org.opentripplanner.standalone.Router) {
 			onMsgGetRouter((org.opentripplanner.standalone.Router) message);
@@ -131,6 +144,10 @@ public class WorkerManager extends UntypedActor {
 			onMsgWorkResult((WorkResult) message);
 		} else if (message instanceof CancelJob ){
 			onMsgCancelJob((CancelJob)message);
+		} else if (message instanceof BuildGraph) {
+			onMsgBuildGraph((BuildGraph) message);
+		} else if (message instanceof AnalystClusterRequest) {
+			onMsgAnalystClusterRequest((AnalystClusterRequest) message);
 		} else if (message instanceof Terminated){
 			onMsgTerminated((Terminated)message);
 		} else if (message instanceof ActorIdentity){
@@ -150,9 +167,21 @@ public class WorkerManager extends UntypedActor {
 		if (outstandingRequests > chunkSize)
 			chunkSize *= 0.667;
 		
+		// buffer underrun, ask for more this time
+		if (outstandingRequests == 0 && receivedRequestsSinceLastPoll && !waitingForQueueToEmptyAndGraphToBuild)
+			// do this here not in onWorkResult so that the queue cannot grow unbounded
+			// suppose that the requests are being processed as fast as they are coming in
+			// the queue expands 1.5x each time.
+			chunkSize *= 1.5;
+		
+		receivedRequestsSinceLastPoll = false;
+		
 		// don't let the chunk size get too small
 		if (chunkSize < 10)
 			chunkSize = 10;
+		
+		if (chunkSize > 1000)
+			chunkSize = 1000;
 		
 		System.out.println("get status: " + outstandingRequests + " requests outstanding, " + chunkSize + " chunk size" +
 				(waitingForQueueToEmptyAndGraphToBuild ? ", building graph" : ""));
@@ -161,37 +190,43 @@ public class WorkerManager extends UntypedActor {
 				waitingForQueueToEmptyAndGraphToBuild), getSelf());
 	}
 
-	/** Process requests */
-	private void onMsgProcessClusterRequests(ProcessClusterRequests pcr) {
-		System.out.println("Process cluster requests.");
+	/** Build a graph in preparation for processing requests */
+	private void onMsgBuildGraph(BuildGraph msg) {
+		log.info("building graph: " + msg.graphId);
 		
-		if (workers.isEmpty())
-			createAndRouteWorkers();
+		if (this.otpRouter != null && msg.graphId.equals(this.otpRouter.id))
+			log.warning("Got request to buid graph already contained in memory.");
 		
-		if (this.otpRouter == null || !this.otpRouter.id.equals(pcr.graphId)) {
-			this.waitingForQueueToEmptyAndGraphToBuild = true;
-			this.stalledRequests = pcr;
-			
-			if (outstandingRequests == 0) {
-				// no need to wait to build graph
-				graphBuilder.tell(new BuildGraph(stalledRequests.graphId), getSelf());
-			}
-		}
-		else {
-			enqueueRequests(pcr);
+		this.graphToBuild = msg.graphId;
+		this.waitingForQueueToEmptyAndGraphToBuild = true;
+		
+		if (outstandingRequests == 0) {
+			// no need to wait to build graph
+			graphBuilder.tell(new BuildGraph(graphToBuild), getSelf());
 		}
 	}
 	
-	/** Enqueue requests for processing */
-	public void enqueueRequests (ProcessClusterRequests pcr) {
-		outstandingRequests += pcr.requests.length;
-
-		log.info("Enqueuing " + pcr.requests.length + " requests, queue size now " + outstandingRequests);
-
-		for (AnalystClusterRequest req : pcr.requests) {
-			// NOTE: the queue will never empty if req is of a type not handled by SPTWorker.
-			router.route(req, getSelf());
+	/**
+	 * Set the SPT workers processing this cluster request.
+	 * @throws Exception 
+	 */
+	private void onMsgAnalystClusterRequest(AnalystClusterRequest req) throws Exception {
+		if (waitingForQueueToEmptyAndGraphToBuild) {
+			log.error("Got cluster request during graph build; ignoring");
+			return;
 		}
+		this.receivedRequestsSinceLastPoll = true;
+		
+		// this should be extremely fast after the first time
+		if (!sampleSetCache.containsKey(req.destinationPointsetId)) {
+			PointSet ps = s3Datastore.getPointset(req.destinationPointsetId);
+			sampleSetCache.put(req.destinationPointsetId, ps.getSampleSet(this.otpRouter.graph));
+		}
+		
+		req.destinations = sampleSetCache.get(req.destinationPointsetId);
+		
+		outstandingRequests++;
+		router.route(req, getSelf());
 	}
 
 	private void onMsgActorIdentity(ActorIdentity actorId) {
@@ -244,9 +279,9 @@ public class WorkerManager extends UntypedActor {
 		outstandingRequests -= 1;
 		this.executive.tell(res, getSelf());
 
-		if (outstandingRequests == 0) {
-			// grow the queue size so we don't underrun again
-			chunkSize *= 1.5;
+		if (outstandingRequests == 0 && waitingForQueueToEmptyAndGraphToBuild) {
+			// build the graph
+			graphBuilder.tell(new BuildGraph(graphToBuild), getSelf());
 		}
 	}
 
@@ -261,9 +296,9 @@ public class WorkerManager extends UntypedActor {
 			return;
 				
 		// make sure it's the right graph
-		if (!router.id.equals(stalledRequests.graphId)) {
+		if (!router.id.equals(graphToBuild)) {
 			// build it again
-			graphBuilder.tell(new BuildGraph(stalledRequests.graphId), getSelf());
+			graphBuilder.tell(new BuildGraph(graphToBuild), getSelf());
 		}
 		else {
 			this.otpRouter = router;
@@ -275,7 +310,6 @@ public class WorkerManager extends UntypedActor {
 				Await.result(future, timeout.duration());
 			}
 			
-			enqueueRequests(this.stalledRequests);
 			this.waitingForQueueToEmptyAndGraphToBuild = false;
 		}
 	}

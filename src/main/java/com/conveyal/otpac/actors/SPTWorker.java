@@ -1,5 +1,6 @@
 	package com.conveyal.otpac.actors;
 
+import org.opentripplanner.analyst.PointSet;
 import org.opentripplanner.analyst.ResultSet;
 import org.opentripplanner.analyst.SampleSet;
 import org.opentripplanner.analyst.TimeSurface;
@@ -26,18 +27,6 @@ public class SPTWorker extends UntypedActor {
 	private Router router;
 	
 	LoggingAdapter log = Logging.getLogger(getContext().system(), this);
-	
-	private PointSetDatastore s3Datastore;
-
-	/**
-	 * Create a new SPTWorker using the given PointSetDatastore
-	 * It's safe to hand these around in class constructors because SPTWorkers are always in
-	 * the same JVM as their WorkerManager. This allows shared caching of pointsets and samplesets.
-	 * @param s3Datastore
-	 */
-	SPTWorker(PointSetDatastore s3Datastore) {
-		this.s3Datastore = s3Datastore;
-	}
 
 	@Override
 	public void onReceive(Object message) {
@@ -77,12 +66,7 @@ public class SPTWorker extends UntypedActor {
 			
 			TimeSurface ts = new TimeSurface( spt );
 			
-			// This is not inefficient, because after the first request the pointset and the sample
-			// set will be cached.
-			// TODO: thread safety? Are we fetching n times at the start, in different threads?
-			SampleSet to = s3Datastore.getPointset(req.destinationPointsetId).getSampleSet(this.router.id);
-			
-			ResultSet ind = new ResultSet(to, ts);
+			ResultSet ind = new ResultSet(req.destinations, ts);
 			ind.id = req.from.getId();
 
 			WorkResult res = new WorkResult(true, ind);
@@ -113,18 +97,15 @@ public class SPTWorker extends UntypedActor {
 		try {
 			rtr.route();
 
-			TimeSurface.RangeSet result = rtr.route();
-			
-			// see note above about efficiency
-			SampleSet to = s3Datastore.getPointset(message.destinationPointsetId).getSampleSet(this.router.id);
+			TimeSurface.RangeSet result = rtr.route();			
 
-			ResultSet bestCase = new ResultSet(to, result.min);
+			ResultSet bestCase = new ResultSet(message.destinations, result.min);
 			bestCase.id = message.from.getId();
 
-			ResultSet avgCase = new ResultSet(to, result.avg);
+			ResultSet avgCase = new ResultSet(message.destinations, result.avg);
 			avgCase.id = message.from.getId();
 			
-			ResultSet worstCase = new ResultSet(to, result.max);
+			ResultSet worstCase = new ResultSet(message.destinations, result.max);
 			worstCase.id = message.from.getId();
 			
 			// TODO: Central tendency calculation

@@ -29,6 +29,7 @@ import akka.actor.ActorIdentity;
 import akka.actor.ActorRef;
 import akka.actor.ActorSelection;
 import akka.actor.ActorSystem;
+import akka.actor.Cancellable;
 import akka.actor.Identify;
 import akka.actor.Terminated;
 import akka.actor.UntypedActor;
@@ -78,6 +79,14 @@ public class Executive extends UntypedActor {
 	 */
 	//private List<SinglePointJobSpec> singlePointQueue;
 
+	/**
+	 * Worker polling
+	 */
+	private final Cancellable poll = getContext().system().scheduler().schedule(
+			Duration.create(5,  "seconds"), 
+			Duration.create(3, "seconds"),
+			getSelf(), new Poll(), getContext().dispatcher(), null);
+	
 	LoggingAdapter log = Logging.getLogger(getContext().system(), this);
 	
 	public Executive(Boolean workOffline, String graphsBucket, String pointsetsBucket) {
@@ -103,11 +112,6 @@ public class Executive extends UntypedActor {
 		this.workOffline = workOffline;
 		
 		this.multipointQueues = new ConcurrentHashMap<String, List<JobSpec>>(4);
-		
-		// set up polling on the workers
-		ActorSystem system = getContext().system();
-		system.scheduler().schedule(Duration.create(10, "seconds"), Duration.create(3, "seconds"),
-				getSelf(), new Poll(), system.dispatcher(), null);
 	}
 
 	@Override
@@ -137,6 +141,8 @@ public class Executive extends UntypedActor {
 	}
 
 	private void onMsgWorkerStatus(WorkerStatus msg) {
+		System.out.println("got worker status: " + msg.toString());
+		
 		String workerManager = getSender().path().toString();
 		
 		workerManagers.put(workerManager, msg.graph);
@@ -181,8 +187,11 @@ public class Executive extends UntypedActor {
 					}
 				}
 				
-				if (chosenGraph != null)
-					sendJobsToWorkerManager(chosenGraph, workerManager, msg.chunkSize);
+				if (chosenGraph != null) {
+					// tell the worker to switch graphs
+					// we will send it some requests once it is done and we poll it again
+					getSender().tell(new BuildGraph(chosenGraph), getSelf());
+				}	
 			}
 		}
 	}
@@ -283,6 +292,11 @@ public class Executive extends UntypedActor {
 				
 				js.jobsSentToWorkers++;
 			}
+			
+			if (js.jobsSentToWorkers == origins.capacity) {
+				// this job is done
+				queue.remove(0);
+			}
 		}
 		
 		// mark the workermanager as busy or not.
@@ -293,10 +307,10 @@ public class Executive extends UntypedActor {
 			freeWorkerManagers.remove(workerManager);
 		}
 		
-		ProcessClusterRequests pcr =
-				new ProcessClusterRequests(graphId, reqs.toArray(new AnalystClusterRequest[reqs.size()]));
-		
-		wmPathActorRefs.get(workerManager).tell(pcr, getSelf());
+		ActorRef wmar = wmPathActorRefs.get(workerManager);
+		for (AnalystClusterRequest req : reqs) {
+			wmar.tell(req, getSelf());
+		}
 		
 		// make the queue smaller
 		multipointQueueSize.put(graphId, multipointQueueSize.get(graphId) - reqs.size());
@@ -357,9 +371,19 @@ public class Executive extends UntypedActor {
 	 * queues.
 	 */
 	private void onMsgPoll () {
+		System.out.println("Polling");
 		for (ActorRef wm : wmPathActorRefs.values()) {
 			wm.tell(new GetWorkerStatus(), getSelf());
 		}
+	}
+	
+	/**
+	 * Stop polling.
+	 */
+	@Override
+	public void postStop() {
+		System.out.println("Shutting down executive.");
+		poll.cancel();
 	}
 	
 	/**

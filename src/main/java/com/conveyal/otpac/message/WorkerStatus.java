@@ -26,4 +26,8 @@ public class WorkerStatus implements Serializable {
 		this.graph = graph;
 		this.buildingGraph = buildingGraph;
 	}
+	
+	public String toString () {
+		return "Status " + queueSize + " queued items, chunk size " + chunkSize + " on graph " + graph + (buildingGraph ? ", building" : "");
+	}
 }
