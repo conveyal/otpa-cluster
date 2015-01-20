@@ -91,7 +91,9 @@ public class SPTWorker extends UntypedActor {
 		}
 		catch(Exception e) {
 			log.debug("failed to calc timesurface for feature {}", req.from.getId());
-			getSender().tell(new WorkResult(false, null), getSelf());
+			WorkResult res = new WorkResult(false, null);
+			res.point = req.from;
+			getSender().tell(res, getSelf());
 		}
 	}
 	
@@ -127,12 +129,15 @@ public class SPTWorker extends UntypedActor {
 			
 			// TODO: Central tendency calculation
 			WorkResult result1 = new WorkResult(true, bestCase, avgCase, worstCase, null);
+			result1.point = message.from;
 			getSender().tell(result1, getSelf());
 		} catch (Exception e) {
 			log.debug("failed to calc timesurface for feature {}", message.from.getId());
 			e.printStackTrace();
 			// we use the version with three nulls to imply that it was a profile request
-			getSender().tell(new WorkResult(false, null, null, null, null), getSelf());
+			WorkResult res = new WorkResult(false, null, null, null, null);
+			res.point = message.from;
+			getSender().tell(res, getSelf());
 		}
 		finally {
 			rtr.cleanup();
