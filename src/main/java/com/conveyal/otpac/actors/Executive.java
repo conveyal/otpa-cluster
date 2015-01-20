@@ -106,7 +106,7 @@ public class Executive extends UntypedActor {
 		
 		// set up polling on the workers
 		ActorSystem system = getContext().system();
-		system.scheduler().schedule(Duration.create(10, "seconds"), Duration.create(5, "seconds"),
+		system.scheduler().schedule(Duration.create(10, "seconds"), Duration.create(3, "seconds"),
 				getSelf(), new Poll(), system.dispatcher(), null);
 	}
 
@@ -364,7 +364,7 @@ public class Executive extends UntypedActor {
 	
 	/**
 	 * This message is sent to the executive by the scheduler every minute
-	 * to poll the workers for their statuses in case any messages have gotten lost.
+	 * to poll the workers for their statuses.
 	 * @author matthewc
 	 *
 	 */
