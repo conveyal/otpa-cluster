@@ -1,18 +1,23 @@
 package com.conveyal.otpac.actors;
 
+import gnu.trove.map.TIntIntMap;
 import gnu.trove.map.TObjectLongMap;
+import gnu.trove.map.hash.TIntIntHashMap;
 import gnu.trove.map.hash.TObjectIntHashMap;
 import gnu.trove.map.hash.TObjectLongHashMap;
 
+import java.util.AbstractQueue;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 import org.opentripplanner.analyst.PointFeature;
 import org.opentripplanner.analyst.PointSet;
@@ -39,14 +44,29 @@ import akka.pattern.Patterns;
 import akka.util.Timeout;
 
 public class Executive extends UntypedActor {
-
-	private Map<Integer, ArrayList<WorkResult>> jobResults;
 	private Map<String,ActorRef> wmPathActorRefs; // path->canonical actorref
 	private Map<String, String> workerManagers; // path -> current router ID 
-	private Map<String, Long> graphLastUsedTime; // the last time a graph was used for a single point request
-	private Set<String> freeWorkerManagers; // worker managers not currently being used
 	
-	private static int nextJobId = 0;
+	/**
+	 * These are multipoint job components that were sent to workers and should have come back but
+	 * didn't (because the message got dropped or the worker died), and thus should be sent again.
+	 */
+	private Map<String, Set<MultipointJobComponent>> overdueResponses = new HashMap<String, Set<MultipointJobComponent>>();
+	
+	/** Jobs that have been sent to a worker */
+	private AbstractQueue<MultipointJobComponent> sent = new ConcurrentLinkedQueue<MultipointJobComponent>();
+	
+	/**
+	 * Jobs that have been sent to a worker and have not returned. This is effectively a view of the
+	 * above in HashSet format (although it does actually have distinct data backing it up).
+	 * We do this so that we can remove things/compare things very quickly, but we still have
+	 * the FIFO qualities of a queue.  
+	 */
+	private Set<MultipointJobComponent> backlog = new HashSet<MultipointJobComponent>();
+	
+	// the first job ID is 1 not 0, because there was once an unfortunate bug where job IDs weren't properly
+	// passed but because Java initialized them to zero everything worked---until there were multiple jobs.
+	private static int nextJobId = 1;
 	
 	/**
 	 * Multipoint query queues (per graph)
@@ -64,6 +84,12 @@ public class Executive extends UntypedActor {
 	 * Index of job specs by job ID.
 	 */
 	private Map<Integer, JobSpec> jobSpecsByJobId;
+	
+	/**
+	 * The number of requests on workers for each job ID.
+	 * Used to calculate job status.
+	 */
+	private TIntIntMap backlogByJobId = new TIntIntHashMap();
 	
 	/**
 	 * Pointsets come from here.
@@ -90,12 +116,8 @@ public class Executive extends UntypedActor {
 	LoggingAdapter log = Logging.getLogger(getContext().system(), this);
 	
 	public Executive(Boolean workOffline, String graphsBucket, String pointsetsBucket) {
-		jobResults = new HashMap<Integer, ArrayList<WorkResult>>();
-
 		wmPathActorRefs = new HashMap<String,ActorRef>();
 		workerManagers = new HashMap<String, String>();
-		freeWorkerManagers = new HashSet<String>();
-		graphLastUsedTime = new HashMap<String, Long>();
 		jobSpecsByJobId = new HashMap<Integer, JobSpec>();
 				
 		this.graphsBucket = graphsBucket;
@@ -120,8 +142,6 @@ public class Executive extends UntypedActor {
 			onMsgJobSpec((JobSpec) msg);
 		} else if (msg instanceof WorkResult) {
 			onMsgWorkResult((WorkResult) msg);
-		} else if (msg instanceof JobResultQuery) {
-			onMsgJobResultQuery((JobResultQuery) msg);
 		} else if (msg instanceof AddWorkerManager) {
 			onMsgAddWorkerManager((AddWorkerManager) msg);
 		} else if (msg instanceof JobStatusQuery) {
@@ -226,7 +246,7 @@ public class Executive extends UntypedActor {
 		JobSpec js = jobSpecsByJobId.get(qry.jobId);
 		// this is not inefficient because the pointset is cached
 		long total = js.getOrigins(pointsetDatastore).capacity;
-		long complete = jobResults.get(js.jobId).size();
+		long complete = js.jobsSentToWorkers - backlogByJobId.get(js.jobId);
 		JobStatus stat = new JobStatus(qry.jobId, total, complete);
 		getSender().tell(stat, getSelf());
 	}
@@ -242,23 +262,32 @@ public class Executive extends UntypedActor {
 		remoteManager.tell(new AssignExecutive(), getSelf());
 		workerManagers.put(remoteManager.path().toString(), null);
 		
-		freeWorkerManagers.add(remoteManager.path().toString());
-		
 		getSender().tell(new Boolean(true), getSelf());
 		
 		// it will get shuffled into the rotation on the next poll, do nothing more.
 	}
 
-	private void onMsgJobResultQuery(JobResultQuery jr) {
-		ArrayList<WorkResult> res = jobResults.get(jr.jobId);
-		getSender().tell(new JobResult(res), getSelf());
-	}
-
 	private void onMsgWorkResult(WorkResult wr) {
-		jobResults.get(wr.jobId).add(wr);
 		JobSpec js = jobSpecsByJobId.get(wr.jobId);
-		if (js.callback != null) {
-			js.callback.tell(wr, getSelf());
+		
+		// remove it from the backlog
+		// it will be removed from the queue by onMsgPoll, in due course
+		// time does not matter as it is not used in equality (on purpose)
+		MultipointJobComponent c = new MultipointJobComponent(wr.jobId, wr.point, 0);
+		
+		// we decrement and call the callback only if we removed it from the backlog.
+		// it is possible to get the same result twice if a job was restarted and then the original job returned.
+		// this way the caller can rely on only receiving a message once.
+		if (backlog.remove(c)) {
+			backlogByJobId.adjustValue(wr.jobId, -1);
+			
+			if (backlogByJobId.get(wr.jobId) < 0)
+				log.error("received work result and decremented backlog below 0");
+			
+		
+			if (js.callback != null) {
+				js.callback.tell(wr, getSelf());
+			}
 		}
 	}
 
@@ -275,7 +304,32 @@ public class Executive extends UntypedActor {
 		
 		List<AnalystClusterRequest> reqs = new ArrayList<AnalystClusterRequest>(count);
 		
-		while (reqs.size() < count && queue.size() > 0) {
+		while (reqs.size() < count && multipointQueueSize.get(graphId) > 0) {
+			// if there are any jobs that need to be re-run, re-run them
+			if (overdueResponses.get(graphId).size() > 0) {
+				Iterator<MultipointJobComponent> it = overdueResponses.get(graphId).iterator();
+				while (it.hasNext() && reqs.size() < count) {
+					MultipointJobComponent c = it.next();
+					// we will enqueue it again shortly
+					it.remove();
+					
+					JobSpec js = jobSpecsByJobId.get(c.jobId);
+					if (js.profileRouting) {
+						reqs.add(new OneToManyProfileRequest(c.from, js.toPtsLoc, js.profileOptions, js.graphId, js.jobId));
+					}
+					else {
+						reqs.add(new OneToManyRequest(c.from, js.toPtsLoc, js.options, js.graphId, js.jobId));
+					}
+					
+					// make the queue smaller
+					multipointQueueSize.adjustValue(graphId, -1);
+				}
+				
+				// start again so we don't try to grab something off the multipoint queue if there
+				// is nothing to be had.
+				continue;
+			}
+			
 			// pull one job off the queue
 			JobSpec js = queue.get(0);
 			PointSet origins = js.getOrigins(this.pointsetDatastore);
@@ -284,13 +338,14 @@ public class Executive extends UntypedActor {
 				PointFeature origin = origins.getFeature(js.jobsSentToWorkers);
 
 				if (js.profileRouting) {
-					reqs.add(new OneToManyProfileRequest(origin, js.toPtsLoc, js.profileOptions, js.graphId));
+					reqs.add(new OneToManyProfileRequest(origin, js.toPtsLoc, js.profileOptions, js.graphId, js.jobId));
 				}
 				else {
-					reqs.add(new OneToManyRequest(origin, js.toPtsLoc, js.options, js.graphId));
+					reqs.add(new OneToManyRequest(origin, js.toPtsLoc, js.options, js.graphId, js.jobId));
 				}
 				
 				js.jobsSentToWorkers++;
+				multipointQueueSize.adjustValue(graphId, -1);
 			}
 			
 			if (js.jobsSentToWorkers == origins.capacity) {
@@ -299,24 +354,20 @@ public class Executive extends UntypedActor {
 			}
 		}
 		
-		// mark the workermanager as busy or not.
-		if (reqs.size() == 0) {
-			freeWorkerManagers.add(workerManager);
-		}
-		else {
-			freeWorkerManagers.remove(workerManager);
-		}
-		
 		ActorRef wmar = wmPathActorRefs.get(workerManager);
+		
+		// when we send a block of requests to a worker, we expect them all to return
+		// within 30 seconds. If they don't, we re-send them.
+		
+		long sendTime = System.currentTimeMillis(); 
 		for (AnalystClusterRequest req : reqs) {
 			wmar.tell(req, getSelf());
+			MultipointJobComponent c = new MultipointJobComponent(req.jobId, req.from, sendTime);
+			sent.add(c);
+			if (!backlog.add(c))
+				log.error("backlog already contained " + c);
+			backlogByJobId.increment(req.jobId);
 		}
-		
-		// make the queue smaller
-		multipointQueueSize.put(graphId, multipointQueueSize.get(graphId) - reqs.size());
-		
-		// TODO: record what we gave the worker manager so that we can keep track when it
-		// comes back and restart if need be.
 		
 		return reqs.size();
 	}
@@ -328,6 +379,8 @@ public class Executive extends UntypedActor {
 		if (!multipointQueues.containsKey(jobSpec.graphId)) {
 			multipointQueues.put(jobSpec.graphId, new ArrayList<JobSpec>(1));
 			multipointQueueSize.put(jobSpec.graphId, 0);
+			overdueResponses.put(jobSpec.graphId, new HashSet<MultipointJobComponent>());
+			backlogByJobId.put(jobSpec.jobId, 0);
 		}
 		
 		// we need the origins to know job size, and this will fetch the point set or grab it from RAM.
@@ -337,9 +390,6 @@ public class Executive extends UntypedActor {
 		
 		multipointQueues.get(jobSpec.graphId).add(jobSpec);
 		multipointQueueSize.put(jobSpec.graphId, multipointQueueSize.get(jobSpec.graphId) + origins.capacity);		
-		
-		// make a place to catch the results of the job
-		jobResults.put(jobSpec.jobId, new ArrayList<WorkResult>());
 		
 		// save the job spec
 		jobSpecsByJobId.put(jobSpec.jobId, jobSpec);
@@ -372,6 +422,32 @@ public class Executive extends UntypedActor {
 	 */
 	private void onMsgPoll () {
 		System.out.println("Polling");
+		
+		// while we're at it, mark any overdue requests for reprocessing
+		long now = System.currentTimeMillis();
+		// pull out all the items that are taking more than 30 seconds to process.
+		while (sent.size() > 0 && now - sent.peek().sentTime > 30 * 1000) {
+			MultipointJobComponent next = sent.poll();
+			
+			if (!backlog.contains(next))
+				// yay! job has come back
+				continue;
+			
+			// otherwise, enqueue it for reprocessing
+			JobSpec js = jobSpecsByJobId.get(next.jobId);
+			this.overdueResponses.get(js.graphId).add(next);
+			// bump up the queue size
+			this.multipointQueueSize.increment(js.graphId);
+			log.warning("Reprocessing request because it did not return after 30 seconds " + next);
+			
+			// it's no longer backlogged, now it's queued
+			this.backlogByJobId.adjustValue(js.jobId, -1);
+			this.backlog.remove(next);
+			
+			if (this.backlogByJobId.get(js.jobId) < 0)
+				log.error("decrementing backlog below 0 on reprocessing");
+		}
+		
 		for (ActorRef wm : wmPathActorRefs.values()) {
 			wm.tell(new GetWorkerStatus(), getSelf());
 		}
@@ -393,4 +469,43 @@ public class Executive extends UntypedActor {
 	 *
 	 */
 	private static class Poll { /* nothing */ }
+	
+	/**
+	 * This represents a single unit of work sent to a worker manager.
+	 */
+	private static class MultipointJobComponent {
+		/** The job ID */
+		public final int jobId;
+		
+		/** The from location */
+		public final PointFeature from;
+		
+		/** The time this was sent */
+		public final long sentTime;
+		
+		public MultipointJobComponent (int jobId, PointFeature from, long sentTime) {
+			this.jobId = jobId;
+			this.from = from;
+			this.sentTime = sentTime;
+		}
+		
+		public int hashCode () {
+			// time not included as it's not included in equality.
+			return jobId + from.getId().hashCode();
+		}
+		
+		public boolean equals(Object o) {
+			if (o instanceof MultipointJobComponent) {
+				MultipointJobComponent c = (MultipointJobComponent) o;
+				// we intentionally don't include time, as when a request comes back we don't know nor
+				// care what time it was sent.
+				return c.jobId == this.jobId && c.from.getId().equals(this.from.getId());
+			}
+			return false;
+		}
+		
+		public String toString () {
+			return "job component, job " + jobId + ", feature " + from.getId();
+		}
+	}
 }
