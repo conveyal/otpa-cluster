@@ -485,7 +485,7 @@ public class Executive extends UntypedActor {
 		
 		public int hashCode () {
 			// time not included as it's not included in equality.
-			return jobId + from.getId().hashCode();
+			return jobId + (from == null ? 0 : from.hashCode());
 		}
 		
 		public boolean equals(Object o) {
@@ -493,7 +493,7 @@ public class Executive extends UntypedActor {
 				MultipointJobComponent c = (MultipointJobComponent) o;
 				// we intentionally don't include time, as when a request comes back we don't know nor
 				// care what time it was sent.
-				return c.jobId == this.jobId && c.from.getId().equals(this.from.getId());
+				return c.jobId == this.jobId && (c.from == this.from || c.from != null && c.from.equals(this.from));
 			}
 			return false;
 		}
