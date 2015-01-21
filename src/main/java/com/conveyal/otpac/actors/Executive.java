@@ -92,6 +92,14 @@ public class Executive extends UntypedActor {
 	private TIntIntMap backlogByJobId = new TIntIntHashMap();
 	
 	/**
+	 * The number of results we've gotten back for each job ID.
+	 * Used to calculate job status.
+	 */
+	private TIntIntMap completePointsByJobId = new TIntIntHashMap();
+	
+	
+	
+	/**
 	 * Pointsets come from here.
 	 */
 	private PointSetDatastore pointsetDatastore;
@@ -225,8 +233,6 @@ public class Executive extends UntypedActor {
 
 	private void onMsgTerminated() {
 		String dead = getSender().path().toString();
-		workerManagers.remove(dead);
-		wmPathActorRefs.remove(dead);
 		
 		log.info("disconnected from " + dead);
 	}
@@ -235,7 +241,7 @@ public class Executive extends UntypedActor {
 		JobSpec js = jobSpecsByJobId.get(qry.jobId);
 		// this is not inefficient because the pointset is cached
 		long total = js.getOrigins(pointsetDatastore).capacity;
-		long complete = js.jobsSentToWorkers - backlogByJobId.get(js.jobId);
+		long complete = completePointsByJobId.get(js.jobId);
 		JobStatus stat = new JobStatus(qry.jobId, total, complete);
 		getSender().tell(stat, getSelf());
 	}
@@ -246,14 +252,14 @@ public class Executive extends UntypedActor {
 		
 		// watch for termination
 		getContext().watch(remoteManager);
-		System.out.println("add worker " + remoteManager);
 		
-		remoteManager.tell(new AssignExecutive(), getSelf());
-		workerManagers.put(remoteManager.path().toString(), null);
+		// generate an ack back to the worker so it unblocks
+		// note that we use getSender not the direct reference, because otherwise
+		// Patterns.ask never completes; evidently there is a request ID burned into the sender
+		// or something.
+		getSender().tell(Boolean.TRUE, getSelf());		
 		
-		getSender().tell(new Boolean(true), getSelf());
-		
-		// it will get shuffled into the rotation on the next poll, do nothing more.
+		// this manager will get shuffled into the rotation on the next poll, do nothing more.
 	}
 
 	private void onMsgWorkResult(WorkResult wr) {
@@ -268,6 +274,9 @@ public class Executive extends UntypedActor {
 		// it is possible to get the same result twice if a job was restarted and then the original job returned.
 		// this way the caller can rely on only receiving a message once.
 		if (backlog.remove(c)) {
+			// keep track of how many have returned
+			completePointsByJobId.increment(wr.jobId);
+			
 			backlogByJobId.adjustValue(wr.jobId, -1);
 			
 			if (backlogByJobId.get(wr.jobId) < 0)
@@ -370,6 +379,7 @@ public class Executive extends UntypedActor {
 			multipointQueueSize.put(jobSpec.graphId, 0);
 			overdueResponses.put(jobSpec.graphId, new HashSet<MultipointJobComponent>());
 			backlogByJobId.put(jobSpec.jobId, 0);
+			completePointsByJobId.put(jobSpec.jobId, 0);
 		}
 		
 		// we need the origins to know job size, and this will fetch the point set or grab it from RAM.
