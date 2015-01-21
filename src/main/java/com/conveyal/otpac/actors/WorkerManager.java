@@ -12,14 +12,16 @@ import org.opentripplanner.routing.services.GraphService;
 import scala.concurrent.Await;
 import scala.concurrent.Future;
 import scala.concurrent.duration.Duration;
-import akka.actor.ActorIdentity;
 import akka.actor.ActorRef;
-import akka.actor.Identify;
+import akka.actor.OneForOneStrategy;
 import akka.actor.Props;
+import akka.actor.SupervisorStrategy;
+import akka.actor.SupervisorStrategy.Directive;
 import akka.actor.Terminated;
 import akka.actor.UntypedActor;
 import akka.event.Logging;
 import akka.event.LoggingAdapter;
+import akka.japi.Function;
 import akka.pattern.Patterns;
 import akka.routing.ActorRefRoutee;
 import akka.routing.RoundRobinRoutingLogic;
@@ -29,11 +31,9 @@ import akka.util.Timeout;
 
 import com.conveyal.otpac.ClusterGraphService;
 import com.conveyal.otpac.PointSetDatastore;
+import com.conveyal.otpac.message.AddWorkerManager;
 import com.conveyal.otpac.message.AnalystClusterRequest;
-import com.conveyal.otpac.message.AssignExecutive;
 import com.conveyal.otpac.message.BuildGraph;
-import com.conveyal.otpac.message.CancelJob;
-import com.conveyal.otpac.message.DoneAssigningExecutive;
 import com.conveyal.otpac.message.GetWorkerStatus;
 import com.conveyal.otpac.message.SetOneToManyContext;
 import com.conveyal.otpac.message.WorkResult;
@@ -43,9 +43,24 @@ import com.typesafe.config.Config;
 public class WorkerManager extends UntypedActor {
 	LoggingAdapter log = Logging.getLogger(getContext().system(), this);
 
-	public enum Status {
+	public static enum Status {
 		READY, BUILDING_GRAPH, WORKING
 	};
+	
+	/**
+	 * The supervision strategy. Since crashes in workermanagers are expected to be rare, we escalate all errors
+	 * so that the entire workermanager is restarted.
+	 * 
+	 * This throws away some state (notably the graph), but we'd rather know we have a clean slate.
+	 */
+	private static SupervisorStrategy supervisorStrategy =
+			new OneForOneStrategy(5, Duration.create("1 minute"),
+					new Function<Throwable, SupervisorStrategy.Directive>() {
+						@Override
+						public Directive apply(Throwable arg0) throws Exception {
+							return SupervisorStrategy.escalate();
+						}
+					});
 
 	private ArrayList<ActorRef> workers;
 	private Router router;
@@ -86,14 +101,17 @@ public class WorkerManager extends UntypedActor {
 	// init to false so that we don't immediately expand the queue
 	private boolean receivedRequestsSinceLastPoll = false; 
 
-	public WorkerManager(Integer nWorkers, Boolean workOffline, String graphsBucket, String pointsetsBucket) {
+	public WorkerManager(ActorRef executive, Integer nWorkers, Boolean workOffline,
+			String graphsBucket, String pointsetsBucket) {
 		if(nWorkers == null)
 			nWorkers = Runtime.getRuntime().availableProcessors() / 2;
 		
 		Config config = context().system().settings().config();
 		String s3ConfigFilename = null;
 		
-		/** Chunk size starts average. If we see buffer over- or underruns we change it dynamically */
+		this.executive = executive;
+		
+		// Chunk size starts average. If we see buffer over- or underruns we change it dynamically
 		chunkSize = 100;
 
 		if (config.hasPath("s3.credentials.filename"))
@@ -115,6 +133,9 @@ public class WorkerManager extends UntypedActor {
 		createAndRouteWorkers();
 		
 		status = Status.READY;
+		
+		// connect to our executive, to get some jobs
+		getSelf().tell(new ConnectToExecutive(), getSelf());
 	}
 
 	private void createAndRouteWorkers() {
@@ -135,27 +156,42 @@ public class WorkerManager extends UntypedActor {
 
 	@Override
 	public void onReceive(Object message) throws Exception {		
-		if (message instanceof AssignExecutive) {
-			onMsgAssignExecutive((AssignExecutive) message);
-		} else if (message instanceof org.opentripplanner.standalone.Router) {
+		if (message instanceof org.opentripplanner.standalone.Router) {
 			onMsgGetRouter((org.opentripplanner.standalone.Router) message);
+		} else if (message instanceof ConnectToExecutive) {
+			onMsgConnectToExecutive();
 		} else if (message instanceof WorkResult) {
 			onMsgWorkResult((WorkResult) message);
-		} else if (message instanceof CancelJob ){
-			onMsgCancelJob((CancelJob)message);
 		} else if (message instanceof BuildGraph) {
 			onMsgBuildGraph((BuildGraph) message);
 		} else if (message instanceof AnalystClusterRequest) {
 			onMsgAnalystClusterRequest((AnalystClusterRequest) message);
 		} else if (message instanceof Terminated){
 			onMsgTerminated((Terminated)message);
-		} else if (message instanceof ActorIdentity){
-			onMsgActorIdentity((ActorIdentity)message);
 		} else if (message instanceof GetWorkerStatus) {
 			onMsgGetWorkerStatus((GetWorkerStatus) message);
 		} else {
 			unhandled(message);
 		}
+	}
+	
+	/**
+	 * Connect to the executive, in a blocking way. This is
+	 * done on receipt of a message from self, so that if it crashes, this actor is restarted again,
+	 * rather than the entire actorsystem coming crashing to the ground.
+	 * @throws Exception
+	 */
+	public void onMsgConnectToExecutive () throws Exception {
+		// tell the executive to be ready for us
+		// note that if we are restarting, this will just replace the actorref that was in the executive before
+		// this is a blocking operation only to make sure it completes.
+		// it's possible that we would already have requests coming in by the time this
+		// happens if the actor was restarted due to a crash, but that's fine because
+		// we'll just replace the actorref in the executive with another actorref pointing
+		// at the same place.
+		Timeout timeout = new Timeout(Duration.create(30, "seconds"));
+		Future<Object> res = Patterns.ask(this.executive, new AddWorkerManager(getSelf()), timeout);
+		Await.result(res, timeout.duration());
 	}
 
 	/** Report our status back to the executive */
@@ -228,50 +264,8 @@ public class WorkerManager extends UntypedActor {
 		router.route(req, getSelf());
 	}
 
-	private void onMsgActorIdentity(ActorIdentity actorId) {
-		System.out.println("#####GOT ACTOR IDENTITY#####");
-
-        this.executive = actorId.getRef();
-	}
-
 	private void onMsgTerminated(Terminated message) {
-		//TODO check that it's the executive terminating
-		
-		this.executive = null;
-		cancelAllWorkers();
-	}
-
-	private void onMsgCancelJob(CancelJob message) {
-		cancelAllWorkers();
-		
-		getSender().tell(new Boolean(true), getSelf());
-	}
-
-	private void cancelAllWorkers() {
-		// stop all the worker actors
-		for( ActorRef worker : this.workers ){
-			this.getContext().system().stop(worker);
-		}
-		
-		// delete the actor refs from the worker list
-		workers.clear();
-	}
-
-	private void onMsgAssignExecutive(AssignExecutive exec) throws Exception {
-		// we set up a quickie "good enough" executive reference and then signal to the exec caller
-		// that we're done. The caller then unblocks, and we can establish an official reference
-		// and set up watching
-		this.executive = getSender();
-		this.executive.tell(new DoneAssigningExecutive(), getSelf());
-		
-		// set up a watch on exec
-		
-		// get an ActorRef for the executive via official safe channels
-		this.executive.tell(new Identify("1"), getSelf());
-				
-		// TODO: should this be in actor identity?
-		getContext().watch(this.executive);
-		
+		// TODO: attempt to reconnect		
 	}
 
 	private void onMsgWorkResult(WorkResult res) throws IOException {
@@ -312,4 +306,11 @@ public class WorkerManager extends UntypedActor {
 			this.waitingForQueueToEmptyAndGraphToBuild = false;
 		}
 	}
+	
+	public SupervisorStrategy getStrategy () {
+		return supervisorStrategy;
+	}
+
+	/** Message class to connect to the executive */
+	private static class ConnectToExecutive { /* empty */ }
 }
