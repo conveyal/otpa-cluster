@@ -224,22 +224,11 @@ public class Executive extends UntypedActor {
 	}
 
 	private void onMsgTerminated() {
-		// TODO: implement
-		/*ActorRef dead = getSender();
+		String dead = getSender().path().toString();
+		workerManagers.remove(dead);
+		wmPathActorRefs.remove(dead);
 		
-		// if the workermanager is assigned to a jobmanager, tell the jobmanager to remove it
-		Integer jobId = getWorkerManagerJob( dead );
-		if(jobId != null){
-			getJobManager(jobId).tell( new RemoveWorkerManager(dead), getSelf() );
-			freeWorkerManager(dead.path().toString()); //TODO double check this
-		}
-		
-		// delete the workermanager from the roster
-		deleteWorkerManager(dead);*/
-	}
-
-	private void deleteWorkerManager(ActorRef dead) {
-		this.workerManagers.remove(dead.path().toString());
+		log.info("disconnected from " + dead);
 	}
 
 	private void onMsgJobStatusQuery(JobStatusQuery qry) throws Exception {
@@ -413,15 +402,10 @@ public class Executive extends UntypedActor {
 	}
 	
 	/**
-	 * Poll the worker managers to make sure that there aren't any free worker managers we don't
-	 * know about.
-	 * 
-	 * This doesn't handle terminations, as the failure detector will generate Terminated messages
-	 * for terminated actors. This is to ensure that there are no worker managers with empty
-	 * queues.
+	 * Poll the worker managers so we can give them work.
 	 */
 	private void onMsgPoll () {
-		System.out.println("Polling");
+		System.out.println("Polling " + wmPathActorRefs.size() + " workers");
 		
 		// while we're at it, mark any overdue requests for reprocessing
 		long now = System.currentTimeMillis();

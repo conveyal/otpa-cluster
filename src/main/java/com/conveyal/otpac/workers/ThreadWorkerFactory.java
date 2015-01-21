@@ -5,6 +5,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import akka.actor.ActorRef;
 import akka.actor.ActorSystem;
@@ -26,7 +27,6 @@ public class ThreadWorkerFactory implements WorkerFactory {
 	
 	public final String pointsetsBucket, graphsBucket;
 	public final Boolean workOffline;
-	private static int nextId = 0;
 	
 	public ThreadWorkerFactory(ActorSystem system, Boolean workOffline, String graphsBucket, String pointsetsBucket) {
 		this.system = system;
@@ -39,7 +39,10 @@ public class ThreadWorkerFactory implements WorkerFactory {
 		List<ActorRef> ret = new ArrayList<ActorRef>();
 		
 		for (int i = 0; i < number; i++) {
-			ActorRef manager = system.actorOf(Props.create(WorkerManager.class, null, workOffline, graphsBucket, pointsetsBucket), "manager_" + nextId++);
+			// we use a UUID to identify the actor so that if the actor respawns it will not have the same path.
+			// see issue 
+			ActorRef manager = system.actorOf(Props.create(WorkerManager.class, null, workOffline, graphsBucket, pointsetsBucket), "manager_" + 
+					UUID.randomUUID().toString());
 			ret.add(manager);
 			executive.tell(new AddWorkerManager(manager), ActorRef.noSender());
 		}
