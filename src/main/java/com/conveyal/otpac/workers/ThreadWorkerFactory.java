@@ -41,10 +41,9 @@ public class ThreadWorkerFactory implements WorkerFactory {
 		for (int i = 0; i < number; i++) {
 			// we use a UUID to identify the actor so that if the actor respawns it will not have the same path.
 			// see issue 
-			ActorRef manager = system.actorOf(Props.create(WorkerManager.class, null, workOffline, graphsBucket, pointsetsBucket), "manager_" + 
+			ActorRef manager = system.actorOf(Props.create(WorkerManager.class, executive, null, workOffline, graphsBucket, pointsetsBucket), "manager_" + 
 					UUID.randomUUID().toString());
 			ret.add(manager);
-			executive.tell(new AddWorkerManager(manager), ActorRef.noSender());
 		}
 				
 		return ret;
