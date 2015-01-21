@@ -12,13 +12,11 @@ import org.opentripplanner.profile.ProfileRequest;
  *
  */
 public class OneToManyProfileRequest extends AnalystClusterRequest implements Serializable {
-	public PointFeature from;
 	public ProfileRequest options;
 
-	public OneToManyProfileRequest(PointFeature from, String to, ProfileRequest options, String graphId) {
-		super(to, graphId);
+	public OneToManyProfileRequest(PointFeature from, String to, ProfileRequest options, String graphId, int jobId) {
+		super(from, to, graphId, jobId);
 		
-		this.from = from;
 		this.options = options.clone();
 		this.options.analyst = true;
 		

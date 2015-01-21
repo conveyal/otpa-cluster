@@ -10,13 +10,11 @@ import org.opentripplanner.routing.core.RoutingRequest;
 
 public class OneToManyRequest extends AnalystClusterRequest implements Serializable {
 
-	public PointFeature from;
 	public RoutingRequest options;
 
-	public OneToManyRequest(PointFeature from, String to, RoutingRequest options, String graphId) {
-		super(to, graphId);
+	public OneToManyRequest(PointFeature from, String to, RoutingRequest options, String graphId, int jobId) {
+		super(from, to, graphId, jobId);
 		
-		this.from = from;
 		this.options = options.clone();
 		this.options.batch = true;
 		this.options.rctx = null;

@@ -2,6 +2,7 @@ package com.conveyal.otpac.message;
 
 import java.io.Serializable;
 
+import org.opentripplanner.analyst.PointFeature;
 import org.opentripplanner.analyst.PointSet;
 import org.opentripplanner.analyst.SampleSet;
 
@@ -19,6 +20,12 @@ public abstract class AnalystClusterRequest implements Serializable {
 	/** The ID of the graph against which to calculate this request */
 	public String graphId;
 	
+	/** The origin */
+	public PointFeature from;
+	
+	/** The job ID this is associated with */
+	public int jobId;
+	
 	/**
 	 * The destinations are passed to the SPTWorker here.
 	 * Marked as transient because we never want to serialize the destinations,
@@ -26,8 +33,10 @@ public abstract class AnalystClusterRequest implements Serializable {
 	 */
 	public transient SampleSet destinations;
 	
-	public AnalystClusterRequest(String destinationPointsetId, String graphId) {
+	public AnalystClusterRequest(PointFeature from, String destinationPointsetId, String graphId, int jobId) {
+		this.from = from;
 		this.destinationPointsetId = destinationPointsetId;
 		this.graphId = graphId;
+		this.jobId = jobId;
 	}
 }
