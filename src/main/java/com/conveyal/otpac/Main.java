@@ -22,7 +22,6 @@ import com.conveyal.otpac.actors.WorkerManager;
 import com.conveyal.otpac.handlers.AddWorkerHandler;
 import com.conveyal.otpac.handlers.CancelHandler;
 import com.conveyal.otpac.handlers.FindHandler;
-import com.conveyal.otpac.handlers.GetJobResultHandler;
 import com.conveyal.otpac.workers.ThreadWorkerFactory;
 import com.conveyal.otpac.workers.WorkerFactory;
 import com.typesafe.config.Config;
@@ -97,7 +96,6 @@ public class Main {
 			// set up webapp endpoints
 			ServerConfiguration svCfg = server.getServerConfiguration();
 			svCfg.addHttpHandler(new AddWorkerHandler(executive), "/addworker");
-			svCfg.addHttpHandler(new GetJobResultHandler(executive), "/getstatus");
 			svCfg.addHttpHandler(new FindHandler(executive, chatApplication, system), "/find");
 			svCfg.addHttpHandler(new CancelHandler(executive), "/cancel");
 			
