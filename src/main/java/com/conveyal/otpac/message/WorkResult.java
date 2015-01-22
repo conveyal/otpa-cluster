@@ -34,20 +34,24 @@ public class WorkResult implements Serializable {
 	/** Was this request made in profile mode? */
 	public final boolean profile;
 
-	public WorkResult(boolean success, ResultSet feat) {
+	public WorkResult(boolean success, ResultSet feat, PointFeature point, int jobId) {
 		this.success = success;
 		this.feat = feat;
 		this.bestCase = null;
 		this.worstCase = null;
+		this.point = point;
+		this.jobId = jobId;
 		this.profile = false;
 	}
 	
-	public WorkResult(boolean success, ResultSet bestCase,  ResultSet avgCase, ResultSet worstCase, ResultSet centralTendency) {
+	public WorkResult(boolean success, ResultSet bestCase,  ResultSet avgCase, ResultSet worstCase, ResultSet centralTendency, PointFeature point, int jobId) {
 		this.success = success;
 		this.feat = centralTendency;
 		this.bestCase = bestCase;
 		this.avgCase = avgCase;
 		this.worstCase = worstCase;
+		this.point = point;
+		this.jobId = jobId;
 		this.profile = true;
 	}
 	

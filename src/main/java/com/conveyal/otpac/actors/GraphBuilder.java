@@ -1,63 +1,80 @@
 package com.conveyal.otpac.actors;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.util.Enumeration;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipException;
-import java.util.zip.ZipFile;
-import java.util.zip.ZipOutputStream;
+import java.util.HashMap;
+import java.util.Map;
 
-import org.apache.commons.compress.archivers.zip.ZipUtil;
-import org.apache.commons.io.FileUtils;
-import org.apache.commons.io.IOUtils;
-import org.opentripplanner.graph_builder.GraphBuilderTask;
-import org.opentripplanner.routing.graph.Graph;
+import org.opentripplanner.analyst.PointSet;
+import org.opentripplanner.analyst.SampleSet;
 import org.opentripplanner.routing.services.GraphService;
 import org.opentripplanner.standalone.Router;
-
-import ch.qos.logback.core.util.FileUtil;
-
-import com.amazonaws.auth.AWSCredentials;
-import com.amazonaws.auth.profile.ProfileCredentialsProvider;
-import com.amazonaws.services.s3.AmazonS3;
-import com.amazonaws.services.s3.AmazonS3Client;
-import com.amazonaws.services.s3.model.PutObjectResult;
-import com.amazonaws.services.s3.model.S3Object;
-import com.conveyal.otpac.ClusterGraphService;
-import com.conveyal.otpac.message.BuildGraph;
 
 import akka.actor.UntypedActor;
 import akka.event.Logging;
 import akka.event.LoggingAdapter;
 
+import com.conveyal.otpac.ClusterGraphService;
+import com.conveyal.otpac.PointSetDatastore;
+import com.conveyal.otpac.message.GetGraph;
+import com.conveyal.otpac.message.GetGraphAndSamples;
+import com.conveyal.otpac.message.GraphAndSampleSet;
+
 public class GraphBuilder extends UntypedActor {
 
 	private GraphService graphService;
 	
+	/**
+	 * We cache the router locally, so that we can be sure that samplesets and
+	 * routers always match.
+	 */
+	private Router router = null;
+	
+	/**
+	 * Cache of samplesets for the current router.
+	 */
+	private Map<String, SampleSet> sampleSetCache = new HashMap<String, SampleSet>();
+	
 	LoggingAdapter log = Logging.getLogger(getContext().system(), this);
+
+	/** from whence the pointsets come */
+	private PointSetDatastore pointsetCache;
 
 	@Override
 	public void onReceive(Object msg) throws Exception {
-		if (msg instanceof BuildGraph) {
-			onMsgBuildGraph((BuildGraph) msg);
+		if (msg instanceof GetGraphAndSamples)
+			onMsgGetGraphAndSamples((GetGraphAndSamples) msg);
+		else if (msg instanceof GetGraph)
+			onMsgGetGraph((GetGraph) msg);
+	}
+	
+	public GraphBuilder(String s3ConfigFilename, Boolean workOffline, String graphsBucket, String pointsetsBucket) {
+		this.graphService = new ClusterGraphService(s3ConfigFilename, workOffline, graphsBucket);
+		this.pointsetCache = new PointSetDatastore(10, s3ConfigFilename, workOffline, pointsetsBucket);
+	}
+	
+	private void buildGraphIfNeeded (String graphId) {
+		if (this.router == null || !this.router.id.equals(graphId)) {		
+			router = graphService.getRouter(graphId);
+			// clear the sample set cache as they don't match anything anymore
+			sampleSetCache.clear();
 		}
 	}
 	
-	public GraphBuilder(GraphService graphService) {
-		this.graphService = graphService;
-	}
-	
-	private void onMsgBuildGraph(BuildGraph bg) throws IOException {
+	private void onMsgGetGraphAndSamples(GetGraphAndSamples msg) throws Exception {
+		buildGraphIfNeeded(msg.graphId);
 		
-		Router r = graphService.getRouter(bg.graphId);
-
-		getSender().tell(r, getSelf());
+		if (!sampleSetCache.containsKey(msg.pointsetId)) {
+			// build the sample set
+			PointSet ps = this.pointsetCache.getPointset(msg.pointsetId);
+			SampleSet ss = ps.getSampleSet(this.router.graph);
+			sampleSetCache.put(msg.pointsetId, ss);
+		}
+				
+		getSender().tell(new GraphAndSampleSet(router, sampleSetCache.get(msg.pointsetId), msg.pointsetId), getSelf());
 	}
-
 	
+	private void onMsgGetGraph(GetGraph msg) {
+		buildGraphIfNeeded(msg.graphId);
+		
+		getSender().tell(router, getSelf());
+	}
 }

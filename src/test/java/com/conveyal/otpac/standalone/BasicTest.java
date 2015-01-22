@@ -28,19 +28,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import junit.framework.TestCase;
 
 public class BasicTest extends TestCase {
-	public void testBasicSetup() throws Exception {
-		StandaloneCluster cluster = new StandaloneCluster(true, null, null);
-
-		StandaloneExecutive exec = cluster.createExecutive();
-		StandaloneWorker worker = cluster.createWorker();
-
-		cluster.registerWorker(exec, worker);
-
-		ArrayList<JobStatus> js = exec.getJobStatus();
-		assertEquals(js.size(), 1);
-		assertEquals(js.get(0).curJobId, -1);
-	}
-
 	public void testJob() throws Exception {
 		// start up cluster
 		StandaloneCluster cluster = new StandaloneCluster(true, null, null);

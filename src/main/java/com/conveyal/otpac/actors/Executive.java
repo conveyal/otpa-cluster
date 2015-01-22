@@ -218,7 +218,7 @@ public class Executive extends UntypedActor {
 				if (chosenGraph != null) {
 					// tell the worker to switch graphs
 					// we will send it some requests once it is done and we poll it again
-					getSender().tell(new BuildGraph(chosenGraph), getSelf());
+					getSender().tell(new GetGraph(chosenGraph), getSelf());
 				}	
 			}
 		}

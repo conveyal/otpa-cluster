@@ -26,13 +26,6 @@ public abstract class AnalystClusterRequest implements Serializable {
 	/** The job ID this is associated with */
 	public int jobId;
 	
-	/**
-	 * The destinations are passed to the SPTWorker here.
-	 * Marked as transient because we never want to serialize the destinations,
-	 * but we do want to pass them within local VMs.
-	 */
-	public transient SampleSet destinations;
-	
 	public AnalystClusterRequest(PointFeature from, String destinationPointsetId, String graphId, int jobId) {
 		this.from = from;
 		this.destinationPointsetId = destinationPointsetId;

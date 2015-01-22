@@ -33,13 +33,16 @@ import com.conveyal.otpac.ClusterGraphService;
 import com.conveyal.otpac.PointSetDatastore;
 import com.conveyal.otpac.message.AddWorkerManager;
 import com.conveyal.otpac.message.AnalystClusterRequest;
-import com.conveyal.otpac.message.BuildGraph;
+import com.conveyal.otpac.message.GetGraph;
+import com.conveyal.otpac.message.GetGraphAndSamples;
 import com.conveyal.otpac.message.GetWorkerStatus;
 import com.conveyal.otpac.message.SetOneToManyContext;
 import com.conveyal.otpac.message.WorkResult;
 import com.conveyal.otpac.message.WorkerStatus;
 import com.typesafe.config.Config;
 
+// note: many fields are protected rather than private, because they are overridden or used in
+// test subclasses to make workermanagers that misbehave.
 public class WorkerManager extends UntypedActor {
 	LoggingAdapter log = Logging.getLogger(getContext().system(), this);
 
@@ -47,24 +50,22 @@ public class WorkerManager extends UntypedActor {
 		READY, BUILDING_GRAPH, WORKING
 	};
 
-	private ArrayList<ActorRef> workers;
-	private Router router;
+	protected ArrayList<ActorRef> workers;
+	protected Router router;
 	
 	/**
 	 * This router contains the graph and the graph ID.
 	 * It is unfortunate that there is a name collision between OTP and Akka.
 	 */
-	private org.opentripplanner.standalone.Router otpRouter;
-	private ActorRef graphBuilder;
+	protected org.opentripplanner.standalone.Router otpRouter;
+	protected ActorRef graphBuilder;
 	private ActorRef executive;
 	
 	private Boolean workOffline;
 
-	private GraphService graphService = null;
-	private Status status;
+	protected Status status;
 
 	private int nWorkers;
-	private PointSetDatastore s3Datastore;
 
 	/** How many requests are outstanding? */
 	private int outstandingRequests;
@@ -77,10 +78,6 @@ public class WorkerManager extends UntypedActor {
 	
 	/** The number of requests this worker manager gets at a time */
 	public int chunkSize;
-	
-	/** A cache of sample sets by point set ID for the current graph */
-	// We could use Guava caching, but this is cleared each time we get a new graph so shouldn't grow too large
-	private Map<String, SampleSet> sampleSetCache = new HashMap<String, SampleSet>();
 	
 	/** Have we received requests since the last poll? */
 	// init to false so that we don't immediately expand the queue
@@ -103,15 +100,11 @@ public class WorkerManager extends UntypedActor {
 			s3ConfigFilename = config.getString("s3.credentials.filename");
 		
 		this.workOffline = workOffline;
-
-		graphService = new ClusterGraphService(s3ConfigFilename, workOffline, graphsBucket);
-		
-		s3Datastore = new PointSetDatastore(10, s3ConfigFilename, workOffline, pointsetsBucket);
-		
+				
 		this.nWorkers = nWorkers;
 		this.workers = new ArrayList<ActorRef>();
 
-		graphBuilder = getContext().actorOf(Props.create(GraphBuilder.class, graphService), "builder");
+		graphBuilder = getContext().actorOf(Props.create(GraphBuilder.class, s3ConfigFilename, workOffline, graphsBucket, pointsetsBucket), "builder");
 
 		System.out.println("starting worker-manager with " + nWorkers + " workers");
 		
@@ -123,11 +116,11 @@ public class WorkerManager extends UntypedActor {
 		getSelf().tell(new ConnectToExecutive(), getSelf());
 	}
 
-	private void createAndRouteWorkers() {
+	protected void createAndRouteWorkers() {
 		ArrayList<Routee> routees = new ArrayList<Routee>();
 		
 		for (int i = 0; i < this.nWorkers; i++) {
-			ActorRef worker = getContext().actorOf(Props.create(SPTWorker.class), "worker-" + i);
+			ActorRef worker = getContext().actorOf(Props.create(SPTWorker.class, graphBuilder), "worker-" + i);
 			routees.add(new ActorRefRoutee(worker));
 			workers.add(worker);
 		}
@@ -147,8 +140,8 @@ public class WorkerManager extends UntypedActor {
 			onMsgConnectToExecutive();
 		} else if (message instanceof WorkResult) {
 			onMsgWorkResult((WorkResult) message);
-		} else if (message instanceof BuildGraph) {
-			onMsgBuildGraph((BuildGraph) message);
+		} else if (message instanceof GetGraph) {
+			onMsgGetGraph((GetGraph) message);
 		} else if (message instanceof AnalystClusterRequest) {
 			onMsgAnalystClusterRequest((AnalystClusterRequest) message);
 		} else if (message instanceof Terminated){
@@ -211,7 +204,7 @@ public class WorkerManager extends UntypedActor {
 	}
 
 	/** Build a graph in preparation for processing requests */
-	private void onMsgBuildGraph(BuildGraph msg) {
+	private void onMsgGetGraph(GetGraph msg) {
 		log.info("building graph: " + msg.graphId);
 		
 		if (this.otpRouter != null && msg.graphId.equals(this.otpRouter.id))
@@ -222,7 +215,7 @@ public class WorkerManager extends UntypedActor {
 		
 		if (outstandingRequests == 0) {
 			// no need to wait to build graph
-			graphBuilder.tell(new BuildGraph(graphToBuild), getSelf());
+			graphBuilder.tell(new GetGraph(graphToBuild), getSelf());
 		}
 	}
 	
@@ -245,14 +238,6 @@ public class WorkerManager extends UntypedActor {
 		
 		this.receivedRequestsSinceLastPoll = true;
 		
-		// this should be extremely fast after the first time
-		if (!sampleSetCache.containsKey(req.destinationPointsetId)) {
-			PointSet ps = s3Datastore.getPointset(req.destinationPointsetId);
-			sampleSetCache.put(req.destinationPointsetId, ps.getSampleSet(this.otpRouter.graph));
-		}
-		
-		req.destinations = sampleSetCache.get(req.destinationPointsetId);
-		
 		outstandingRequests++;
 		router.route(req, getSelf());
 	}
@@ -268,7 +253,7 @@ public class WorkerManager extends UntypedActor {
 
 		if (outstandingRequests == 0 && waitingForQueueToEmptyAndGraphToBuild) {
 			// build the graph
-			graphBuilder.tell(new BuildGraph(graphToBuild), getSelf());
+			graphBuilder.tell(new GetGraph(graphToBuild), getSelf());
 		}
 	}
 
@@ -285,19 +270,13 @@ public class WorkerManager extends UntypedActor {
 		// make sure it's the right graph
 		if (!router.id.equals(graphToBuild)) {
 			// build it again
-			graphBuilder.tell(new BuildGraph(graphToBuild), getSelf());
+			graphBuilder.tell(new GetGraph(graphToBuild), getSelf());
 		}
 		else {
 			this.otpRouter = router;
-
-			// send graph to all workers
-			for (ActorRef worker : workers) {
-				Timeout timeout = new Timeout(Duration.create(10, "seconds"));
-				Future<Object> future = Patterns.ask(worker, new SetOneToManyContext(this.otpRouter), timeout);
-				Await.result(future, timeout.duration());
-			}
-			
 			this.waitingForQueueToEmptyAndGraphToBuild = false;
+			
+			// the workers will request the graph as they need it
 		}
 	}
 
