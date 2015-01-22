@@ -83,6 +83,22 @@ public class WorkerManager extends UntypedActor {
 	// init to false so that we don't immediately expand the queue
 	private boolean receivedRequestsSinceLastPoll = false; 
 
+	/**
+	 * The root supervision strategy is to always resume, since we don't want to lose state contained
+	 * in Executive and WorkerManager. But if graph builders or SPTWorkers die, we want to restart them
+	 * to get rid of any possible tainted state. 
+	 */
+	private static final SupervisorStrategy supervisorStrategy =
+			new OneForOneStrategy(10, Duration.create(1, "minute"),
+					new Function<Throwable, Directive> () {
+
+						@Override
+						public Directive apply(Throwable arg0) throws Exception {
+							return SupervisorStrategy.restart();
+						}
+				
+			});
+	
 	public WorkerManager(ActorRef executive, Integer nWorkers, Boolean workOffline,
 			String graphsBucket, String pointsetsBucket) {
 		if(nWorkers == null)
@@ -278,6 +294,12 @@ public class WorkerManager extends UntypedActor {
 			
 			// the workers will request the graph as they need it
 		}
+	}
+	
+	/** assign the supervisor strategy */
+	@Override
+	public SupervisorStrategy supervisorStrategy () {
+		return supervisorStrategy;
 	}
 
 	/** Message class to connect to the executive */

@@ -64,7 +64,7 @@ public class GraphBuilder extends UntypedActor {
 		
 		if (!sampleSetCache.containsKey(msg.pointsetId)) {
 			// build the sample set
-			PointSet ps = this.pointsetCache.getPointset(msg.pointsetId);
+			PointSet ps = this.pointsetCache.get(msg.pointsetId);
 			SampleSet ss = ps.getSampleSet(this.router.graph);
 			sampleSetCache.put(msg.pointsetId, ss);
 		}

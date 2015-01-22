@@ -109,7 +109,7 @@ public class JobSpec implements Serializable{
 	public synchronized void buildPointSet (PointSetDatastore store) {
 		PointSet all;
 		try {
-			all = store.getPointset(this.fromPtsLoc);
+			all = store.get(this.fromPtsLoc);
 		} catch (Exception e) {
 			e.printStackTrace();
 			origins = null;
