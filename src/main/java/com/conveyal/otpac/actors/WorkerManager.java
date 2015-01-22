@@ -46,21 +46,6 @@ public class WorkerManager extends UntypedActor {
 	public static enum Status {
 		READY, BUILDING_GRAPH, WORKING
 	};
-	
-	/**
-	 * The supervision strategy. Since crashes in workermanagers are expected to be rare, we escalate all errors
-	 * so that the entire workermanager is restarted.
-	 * 
-	 * This throws away some state (notably the graph), but we'd rather know we have a clean slate.
-	 */
-	private static SupervisorStrategy supervisorStrategy =
-			new OneForOneStrategy(5, Duration.create("1 minute"),
-					new Function<Throwable, SupervisorStrategy.Directive>() {
-						@Override
-						public Directive apply(Throwable arg0) throws Exception {
-							return SupervisorStrategy.escalate();
-						}
-					});
 
 	private ArrayList<ActorRef> workers;
 	private Router router;
@@ -246,10 +231,18 @@ public class WorkerManager extends UntypedActor {
 	 * @throws Exception 
 	 */
 	private void onMsgAnalystClusterRequest(AnalystClusterRequest req) throws Exception {
+		// it's fine to drop requests at this point; they will simply be retried by the executive later
 		if (waitingForQueueToEmptyAndGraphToBuild) {
 			log.error("Got cluster request during graph build; ignoring");
 			return;
 		}
+		
+		if (this.otpRouter.id == null || !this.otpRouter.id.equals(req.graphId)) {
+			// this can happen when the spt worker has been restarted
+			log.error("Graph ID does not match, ignoring");
+			return;
+		}
+		
 		this.receivedRequestsSinceLastPoll = true;
 		
 		// this should be extremely fast after the first time
@@ -269,7 +262,8 @@ public class WorkerManager extends UntypedActor {
 	}
 
 	private void onMsgWorkResult(WorkResult res) throws IOException {
-		outstandingRequests -= 1;
+		outstandingRequests--;
+
 		this.executive.tell(res, getSelf());
 
 		if (outstandingRequests == 0 && waitingForQueueToEmptyAndGraphToBuild) {
@@ -305,10 +299,6 @@ public class WorkerManager extends UntypedActor {
 			
 			this.waitingForQueueToEmptyAndGraphToBuild = false;
 		}
-	}
-	
-	public SupervisorStrategy getStrategy () {
-		return supervisorStrategy;
 	}
 
 	/** Message class to connect to the executive */
