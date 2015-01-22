@@ -2,12 +2,6 @@ package com.conveyal.otpac.actors;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Map;
-
-import org.opentripplanner.analyst.PointSet;
-import org.opentripplanner.analyst.SampleSet;
-import org.opentripplanner.routing.services.GraphService;
 
 import scala.concurrent.Await;
 import scala.concurrent.Future;
@@ -29,14 +23,10 @@ import akka.routing.Routee;
 import akka.routing.Router;
 import akka.util.Timeout;
 
-import com.conveyal.otpac.ClusterGraphService;
-import com.conveyal.otpac.PointSetDatastore;
 import com.conveyal.otpac.message.AddWorkerManager;
 import com.conveyal.otpac.message.AnalystClusterRequest;
 import com.conveyal.otpac.message.GetGraph;
-import com.conveyal.otpac.message.GetGraphAndSamples;
 import com.conveyal.otpac.message.GetWorkerStatus;
-import com.conveyal.otpac.message.SetOneToManyContext;
 import com.conveyal.otpac.message.WorkResult;
 import com.conveyal.otpac.message.WorkerStatus;
 import com.typesafe.config.Config;
@@ -100,10 +90,10 @@ public class WorkerManager extends UntypedActor {
 			});
 	
 	public WorkerManager(ActorRef executive, Integer nWorkers, Boolean workOffline,
-			String graphsBucket, String pointsetsBucket) {
+			String graphsBucket, String pointsetsBucket) {		
 		if(nWorkers == null)
-			nWorkers = Runtime.getRuntime().availableProcessors() / 2;
-		
+			nWorkers = Runtime.getRuntime().availableProcessors();
+
 		Config config = context().system().settings().config();
 		String s3ConfigFilename = null;
 		

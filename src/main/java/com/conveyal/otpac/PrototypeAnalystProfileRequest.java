@@ -16,7 +16,7 @@ public class PrototypeAnalystProfileRequest extends ProfileRequest {
 		carSpeed = 20f;
 		
 		streetTime = 90;
-		maxWalkTime = 45;
+		maxWalkTime = 15;
 		maxBikeTime = 45;
 		maxCarTime = 45;
 		minBikeTime = 10;
