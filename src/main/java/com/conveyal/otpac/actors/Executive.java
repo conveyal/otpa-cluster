@@ -396,9 +396,10 @@ public class Executive extends UntypedActor {
 			multipointQueues.put(jobSpec.graphId, new ArrayList<JobSpec>(1));
 			multipointQueueSize.put(jobSpec.graphId, 0);
 			overdueResponses.put(jobSpec.graphId, new HashSet<MultipointJobComponent>());
-			backlogByJobId.put(jobSpec.jobId, 0);
-			completePointsByJobId.put(jobSpec.jobId, 0);
 		}
+		
+		backlogByJobId.put(jobSpec.jobId, 0);
+		completePointsByJobId.put(jobSpec.jobId, 0);
 		
 		// we need the origins to know job size, and this will fetch the point set or grab it from RAM.
 		// it's fine to do this repeatedly, because the point set cache should be large enough that
