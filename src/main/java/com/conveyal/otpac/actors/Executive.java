@@ -240,7 +240,14 @@ public class Executive extends UntypedActor {
 	private void onMsgJobStatusQuery(JobStatusQuery qry) throws Exception {
 		JobSpec js = jobSpecsByJobId.get(qry.jobId);
 		// this is not inefficient because the pointset is cached
-		long total = js.getOrigins(pointsetDatastore).capacity;
+		long total;
+		try {
+			total = js.getOrigins(pointsetDatastore).capacity;
+		} catch (Exception e) {
+			// drop the request
+			return;
+		}
+		
 		long complete = completePointsByJobId.get(js.jobId);
 		JobStatus stat = new JobStatus(qry.jobId, total, complete);
 		getSender().tell(stat, getSelf());
@@ -302,7 +309,7 @@ public class Executive extends UntypedActor {
 		
 		List<AnalystClusterRequest> reqs = new ArrayList<AnalystClusterRequest>(count);
 		
-		while (reqs.size() < count && multipointQueueSize.get(graphId) > 0) {
+		QUEUE: while (reqs.size() < count && multipointQueueSize.get(graphId) > 0) {
 			// if there are any jobs that need to be re-run, re-run them
 			if (overdueResponses.get(graphId).size() > 0) {
 				Iterator<MultipointJobComponent> it = overdueResponses.get(graphId).iterator();
@@ -325,12 +332,23 @@ public class Executive extends UntypedActor {
 				
 				// start again so we don't try to grab something off the multipoint queue if there
 				// is nothing to be had.
-				continue;
+				// label not strictly necessary but helps keep track of what's going on
+				continue QUEUE;
 			}
 			
 			// pull one job off the queue
 			JobSpec js = queue.get(0);
-			PointSet origins = js.getOrigins(this.pointsetDatastore);
+			
+			PointSet origins;
+			try {
+				origins = js.getOrigins(this.pointsetDatastore);
+			} catch (Exception e) {
+				// we may have already enqueued some backlogged requests, so we don't want to
+				// forget about those. but assume that S3 is down for now, and don't retry until
+				// asked again on the next request.
+				// label is not strictly necessary but reminds us what's going on
+				break QUEUE;
+			}
 			
 			while (js.jobsSentToWorkers < origins.capacity && reqs.size() < count) {
 				PointFeature origin = origins.getFeature(js.jobsSentToWorkers);
