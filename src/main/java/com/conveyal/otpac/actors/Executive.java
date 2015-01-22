@@ -178,7 +178,7 @@ public class Executive extends UntypedActor {
 		// If the queue is draining, send some more requests
 		if (msg.queueSize < msg.chunkSize && !msg.buildingGraph) {
 			// decide what to do: more from the same graph?
-			if (msg.graph != null && multipointQueues.get(msg.graph).size() > 0) {
+			if (msg.graph != null && multipointQueueSize.get(msg.graph) > 0) {
 				sendJobsToWorkerManager(msg.graph, workerManager, msg.chunkSize);
 			}
 			else {
@@ -415,7 +415,7 @@ public class Executive extends UntypedActor {
 	 * Poll the worker managers so we can give them work.
 	 */
 	private void onMsgPoll () {
-		System.out.println("Polling " + wmPathActorRefs.size() + " workers");
+		log.debug("Polling " + wmPathActorRefs.size() + " workers. Queue sizes: " + multipointQueueSize);
 		
 		// while we're at it, mark any overdue requests for reprocessing
 		long now = System.currentTimeMillis();
@@ -433,6 +433,7 @@ public class Executive extends UntypedActor {
 			// bump up the queue size
 			this.multipointQueueSize.increment(js.graphId);
 			log.warning("Reprocessing request because it did not return after 30 seconds " + next);
+			log.warning("Now reprocessing " + this.overdueResponses.get(js.graphId).size() + " requests on graph " + js.graphId);
 			
 			// it's no longer backlogged, now it's queued
 			this.backlogByJobId.adjustValue(js.jobId, -1);
