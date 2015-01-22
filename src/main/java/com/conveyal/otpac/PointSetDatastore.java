@@ -18,9 +18,11 @@ import org.apache.commons.io.IOUtils;
 import org.opentripplanner.analyst.PointSet;
 import org.opentripplanner.analyst.PointSetCache;
 
+import com.amazonaws.AmazonServiceException;
 import com.amazonaws.auth.AWSCredentials;
 import com.amazonaws.auth.profile.ProfileCredentialsProvider;
 import com.amazonaws.services.s3.AmazonS3Client;
+import com.amazonaws.services.s3.model.GetObjectMetadataRequest;
 import com.amazonaws.services.s3.model.ObjectMetadata;
 import com.amazonaws.services.s3.model.S3Object;
 import com.google.common.cache.CacheBuilder;
@@ -72,7 +74,12 @@ public class PointSetDatastore extends PointSetCache {
 		FileUtils.copyFile(pointSetFile, renamedPointSetFile);
 		
 		if(!this.workOffline) {
-			s3.putObject(pointsetBucket, pointSetId, pointSetFile);	
+			// only upload if it doesn't exist
+			try {
+				s3.getObjectMetadata(pointsetBucket, pointSetId);
+			} catch (AmazonServiceException e) {
+				s3.putObject(pointsetBucket, pointSetId, pointSetFile);	
+			}
 		} 
 		else {
 			if(renamedPointSetFile.exists())

@@ -33,6 +33,7 @@ import org.opentripplanner.standalone.Router;
 import akka.event.Logging;
 import akka.event.LoggingAdapter;
 
+import com.amazonaws.AmazonServiceException;
 import com.amazonaws.auth.AWSCredentials;
 import com.amazonaws.auth.profile.ProfileCredentialsProvider;
 import com.amazonaws.services.s3.AmazonS3Client;
@@ -150,7 +151,12 @@ public class ClusterGraphService extends GraphService {
 		}
 			
 		if(!workOffline && graphDataZip != null) {
-			PutObjectResult graphZip = s3.putObject(graphBucket, graphId+".zip", graphDataZip);
+			// only upload if it's not there already
+			try {
+				s3.getObject(graphBucket, graphId + ".zip");
+			} catch (AmazonServiceException e) {
+				s3.putObject(graphBucket, graphId+".zip", graphDataZip);
+			}
 		}
 		
 		graphDataZip.delete();
