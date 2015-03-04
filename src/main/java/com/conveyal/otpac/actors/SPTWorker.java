@@ -6,7 +6,7 @@ import org.opentripplanner.analyst.SampleSet;
 import org.opentripplanner.analyst.TimeSurface;
 import org.opentripplanner.profile.ProfileResponse;
 import org.opentripplanner.profile.AnalystProfileRouterPrototype;
-import org.opentripplanner.routing.algorithm.EarliestArrivalSPTService;
+import org.opentripplanner.routing.algorithm.EarliestArrivalSearch;
 import org.opentripplanner.routing.error.VertexNotFoundException;
 import org.opentripplanner.routing.graph.Graph;
 import org.opentripplanner.routing.spt.ShortestPathTree;
@@ -112,7 +112,7 @@ public class SPTWorker extends UntypedActor {
 		}
 		
 		try {
-			EarliestArrivalSPTService algo = new EarliestArrivalSPTService();
+			EarliestArrivalSearch algo = new EarliestArrivalSearch();
 			algo.maxDuration = 60*60;
 			
 			long d0 = System.currentTimeMillis();

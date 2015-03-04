@@ -10,7 +10,6 @@ import org.opentripplanner.analyst.Histogram;
 import org.opentripplanner.analyst.PointFeature;
 import org.opentripplanner.analyst.ResultSet;
 
-import com.bedatadriven.geojson.GeometrySerializer;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonGenerationException;
 import com.fasterxml.jackson.core.JsonGenerator;
@@ -89,6 +88,7 @@ public class WorkResult implements Serializable {
 		ByteArrayOutputStream out = new ByteArrayOutputStream();
 		JsonGenerator jgen = jsonFactory.createGenerator(out);
 		jgen.setCodec(new ObjectMapper());
+		ObjectMapper geomSerializer = new ObjectMapper();
 		
 		jgen.writeStartObject();
 		{
@@ -108,10 +108,9 @@ public class WorkResult implements Serializable {
 				}
 				
 				Geometry geom = this.point.getGeom();
-				if(geom!=null){
-					GeometrySerializer gs = new GeometrySerializer();
+				if(geom != null){
 					jgen.writeFieldName("geom");
-					gs.writeGeometry(jgen, geom);
+					geomSerializer.writeValue(jgen, geom);
 				}
 			}
 		}

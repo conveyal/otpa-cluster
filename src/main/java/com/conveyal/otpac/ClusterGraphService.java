@@ -9,6 +9,7 @@ import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Enumeration;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipException;
@@ -17,7 +18,8 @@ import java.util.zip.ZipOutputStream;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
-import org.opentripplanner.graph_builder.GraphBuilderTask;
+import org.mapdb.DBMaker;
+import org.opentripplanner.graph_builder.GraphBuilder;
 import org.opentripplanner.routing.graph.Graph;
 import org.opentripplanner.routing.graph.Graph.LoadLevel;
 import org.opentripplanner.routing.impl.DefaultStreetVertexIndexFactory;
@@ -27,7 +29,6 @@ import org.opentripplanner.routing.services.StreetVertexIndexFactory;
 import org.opentripplanner.routing.services.StreetVertexIndexService;
 import org.opentripplanner.routing.services.GraphSource.Factory;
 import org.opentripplanner.standalone.CommandLineParameters;
-import org.opentripplanner.standalone.OTPConfigurator;
 import org.opentripplanner.standalone.Router;
 
 import akka.event.Logging;
@@ -50,7 +51,8 @@ public class ClusterGraphService extends GraphService {
 	private Boolean workOffline = false;
 	private AmazonS3Client s3;
 
-	private ConcurrentHashMap<String,Router> graphMap = new ConcurrentHashMap<String,Router>();
+	// don't use more than 60% of free memory to cache graphs
+	private Map<String,Router> graphMap = DBMaker.newCacheDirect(0.6 * Runtime.getRuntime().freeMemory() / (1024*1024*1024D));
 	
 	@Override
 	public synchronized Router getRouter(String graphId) {
@@ -70,12 +72,9 @@ public class ClusterGraphService extends GraphService {
 			}
 			
 			CommandLineParameters params = new CommandLineParameters();
-			params.build = new ArrayList<File>(1);
-			params.build.add(new File(GRAPH_DIR, graphId));
+			params.build = new File(GRAPH_DIR, graphId);
 			params.inMemory = true;
-			params.longDistance = true;
-			GraphBuilderTask gbt = new OTPConfigurator(params).builderFromParameters();
-			
+			GraphBuilder gbt = GraphBuilder.forDirectory(params, params.build);
 			gbt.run();
 			
 			Graph g = gbt.getGraph();
@@ -90,7 +89,7 @@ public class ClusterGraphService extends GraphService {
 			
 			// temporarily disable graph caching so we don't run out of RAM.
 			// Long-term we will use an actual cache for this.
-			//graphMap.put(graphId,r);
+			graphMap.put(graphId,r);
 			
 			return r;
 					
