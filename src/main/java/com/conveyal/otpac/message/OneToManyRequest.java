@@ -18,4 +18,13 @@ public class OneToManyRequest extends AnalystClusterRequest implements Serializa
 		this.options.rctx = null;
 		this.options.from = new GenericLocation(from.getLat(), from.getLon());
 	}
+
+	/** used for single point requests with from specified by options */
+	public OneToManyRequest(String to, RoutingRequest options, String graphId, int jobId) {
+		super(null, to, graphId, jobId);
+
+		this.options = options.clone();
+		this.options.batch = true;
+		this.options.rctx = null;
+	}
 }

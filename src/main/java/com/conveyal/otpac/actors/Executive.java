@@ -1,47 +1,28 @@
 package com.conveyal.otpac.actors;
 
-import gnu.trove.map.TIntIntMap;
-import gnu.trove.map.TObjectLongMap;
-import gnu.trove.map.hash.TIntIntHashMap;
-import gnu.trove.map.hash.TObjectIntHashMap;
-import gnu.trove.map.hash.TObjectLongHashMap;
-
-import java.util.AbstractQueue;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentLinkedQueue;
-
-import org.opentripplanner.analyst.PointFeature;
-import org.opentripplanner.analyst.PointSet;
-
-import com.conveyal.otpac.PointSetDatastore;
-import com.conveyal.otpac.message.*;
-import com.google.common.collect.ImmutableSet;
-import com.typesafe.config.Config;
-
-import scala.concurrent.Await;
-import scala.concurrent.Future;
-import scala.concurrent.duration.Duration;
-import akka.actor.ActorIdentity;
 import akka.actor.ActorRef;
-import akka.actor.ActorSelection;
-import akka.actor.ActorSystem;
 import akka.actor.Cancellable;
-import akka.actor.Identify;
 import akka.actor.Terminated;
 import akka.actor.UntypedActor;
 import akka.event.Logging;
 import akka.event.LoggingAdapter;
-import akka.pattern.Patterns;
-import akka.util.Timeout;
+import com.conveyal.otpac.PointSetDatastore;
+import com.conveyal.otpac.message.*;
+import com.google.common.collect.HashMultimap;
+import com.google.common.collect.Multimap;
+import com.typesafe.config.Config;
+import gnu.trove.map.TIntIntMap;
+import gnu.trove.map.TObjectLongMap;
+import gnu.trove.map.hash.TIntIntHashMap;
+import gnu.trove.map.hash.TObjectLongHashMap;
+import org.opentripplanner.analyst.PointFeature;
+import org.opentripplanner.analyst.PointSet;
+import scala.concurrent.duration.Duration;
+
+import java.util.*;
+import java.util.Map.Entry;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 public class Executive extends UntypedActor {
 	private Map<String,ActorRef> wmPathActorRefs; // path->canonical actorref
@@ -111,7 +92,7 @@ public class Executive extends UntypedActor {
 	/**
 	 * A queue for single-point jobs.
 	 */
-	//private List<SinglePointJobSpec> singlePointQueue;
+	private Multimap<String, SinglePointJobSpec> singlePointQueue = HashMultimap.create();
 
 	/**
 	 * Worker polling
@@ -174,11 +155,23 @@ public class Executive extends UntypedActor {
 		String workerManager = getSender().path().toString();
 		
 		workerManagers.put(workerManager, msg.graph);
+
+		// if there are single point requests to be sent and no workers are on that graph, send them to this worker
+		// unless there are single point requests for the graph this worker is on as well
+		for (String graphId : singlePointQueue.keySet()) {
+			if (getWorkerManagersForGraph(graphId).size() == 0 && !singlePointQueue.keySet().contains(msg.graph)) {
+				getSender().tell(new GetGraph(graphId), getSelf());
+				// once the graph builds and we poll again we will send it this single point request.
+
+				// don't send the graph to everybody, write down that we sent it here
+				workerManagers.put(workerManager, graphId);
+			}
+		}
 		
 		// If the queue is draining, send some more requests
 		if (msg.queueSize < msg.chunkSize && !msg.buildingGraph) {
 			// decide what to do: more from the same graph?
-			if (msg.graph != null && multipointQueueSize.get(msg.graph) > 0) {
+			if (msg.graph != null && (!singlePointQueue.get(msg.graph).isEmpty() || multipointQueueSize.get(msg.graph) > 0)) {
 				sendJobsToWorkerManager(msg.graph, workerManager, msg.chunkSize);
 			}
 			else {
@@ -219,6 +212,7 @@ public class Executive extends UntypedActor {
 					// tell the worker to switch graphs
 					// we will send it some requests once it is done and we poll it again
 					getSender().tell(new GetGraph(chosenGraph), getSelf());
+					workerManagers.put(workerManager, chosenGraph);
 				}	
 			}
 		}
@@ -235,6 +229,8 @@ public class Executive extends UntypedActor {
 		String dead = getSender().path().toString();
 		
 		log.info("disconnected from " + dead);
+		
+		workerManagers.remove(dead);
 	}
 
 	private void onMsgJobStatusQuery(JobStatusQuery qry) throws Exception {
@@ -272,26 +268,28 @@ public class Executive extends UntypedActor {
 	private void onMsgWorkResult(WorkResult wr) {
 		JobSpec js = jobSpecsByJobId.get(wr.jobId);
 		
-		// remove it from the backlog
-		// it will be removed from the queue by onMsgPoll, in due course
-		// time does not matter as it is not used in equality (on purpose)
-		MultipointJobComponent c = new MultipointJobComponent(wr.jobId, wr.point, 0);
+		if (js.callback != null) {
+			js.callback.tell(wr, getSelf());
+		}
 		
-		// we decrement and call the callback only if we removed it from the backlog.
-		// it is possible to get the same result twice if a job was restarted and then the original job returned.
-		// this way the caller can rely on only receiving a message once.
-		if (backlog.remove(c)) {
-			// keep track of how many have returned
-			completePointsByJobId.increment(wr.jobId);
-			
-			backlogByJobId.adjustValue(wr.jobId, -1);
-			
-			if (backlogByJobId.get(wr.jobId) < 0)
-				log.error("received work result and decremented backlog below 0");
-			
 		
-			if (js.callback != null) {
-				js.callback.tell(wr, getSelf());
+		if (!(js instanceof SinglePointJobSpec)) {
+			// remove it from the backlog
+			// it will be removed from the queue by onMsgPoll, in due course
+			// time does not matter as it is not used in equality (on purpose)
+			MultipointJobComponent c = new MultipointJobComponent(wr.jobId, wr.point, 0);
+			
+			// we decrement and call the callback only if we removed it from the backlog.
+			// it is possible to get the same result twice if a job was restarted and then the original job returned.
+			// this way the caller can rely on only receiving a message once.
+			if (backlog.remove(c)) {
+				// keep track of how many have returned
+				completePointsByJobId.increment(wr.jobId);
+				
+				backlogByJobId.adjustValue(wr.jobId, -1);
+				
+				if (backlogByJobId.get(wr.jobId) < 0)
+					log.error("received work result and decremented backlog below 0");
 			}
 		}
 	}
@@ -303,13 +301,39 @@ public class Executive extends UntypedActor {
 	private int sendJobsToWorkerManager (String graphId, String workerManager, int count) {
 		if (count == 0)
 			return 0;
-		
+
+		// when we send a block of requests to a worker, we expect them all to return
+		// within 30 seconds. If they don't, we re-send them.
+
+		long sendTime = System.currentTimeMillis();
+
+		List<AnalystClusterRequest> reqs = new ArrayList<AnalystClusterRequest>(count);
+
+		// first grab any waiting single point jobs
+		// note that the single point jobs on a single graph are not being processed in any particular order,
+		// which shouldn't matter since they will all complete very soon
+		if (singlePointQueue.containsKey(graphId)) {
+			Iterator<SinglePointJobSpec> it = singlePointQueue.get(graphId).iterator();
+			while (reqs.size() <= count && it.hasNext()) {
+				SinglePointJobSpec spec = it.next();
+				it.remove();
+
+				AnalystClusterRequest req;
+				if (spec.profileRouting)
+					req = new OneToManyProfileRequest(spec.toPtsLoc, spec.profileOptions, graphId, spec.jobId);
+				else
+					req = new OneToManyRequest(spec.toPtsLoc, spec.options, graphId, spec.jobId);
+				
+				req.includeTimes = spec.includeTimes;
+				
+				reqs.add(req);
+			}
+		}
+
 		// pull some jobs off the queue
 		List<JobSpec> queue = multipointQueues.get(graphId);
-		
-		List<AnalystClusterRequest> reqs = new ArrayList<AnalystClusterRequest>(count);
-		
-		QUEUE: while (reqs.size() < count && multipointQueueSize.get(graphId) > 0) {
+
+		QUEUE: while (reqs.size() <= count && multipointQueueSize.get(graphId) > 0) {
 			// if there are any jobs that need to be re-run, re-run them
 			if (overdueResponses.get(graphId).size() > 0) {
 				Iterator<MultipointJobComponent> it = overdueResponses.get(graphId).iterator();
@@ -319,13 +343,23 @@ public class Executive extends UntypedActor {
 					it.remove();
 					
 					JobSpec js = jobSpecsByJobId.get(c.jobId);
+					AnalystClusterRequest req;
 					if (js.profileRouting) {
-						reqs.add(new OneToManyProfileRequest(c.from, js.toPtsLoc, js.profileOptions, js.graphId, js.jobId));
+						req = new OneToManyProfileRequest(c.from, js.toPtsLoc, js.profileOptions, js.graphId, js.jobId);
 					}
 					else {
-						reqs.add(new OneToManyRequest(c.from, js.toPtsLoc, js.options, js.graphId, js.jobId));
+						req = new OneToManyRequest(c.from, js.toPtsLoc, js.options, js.graphId, js.jobId);
 					}
+
+					req.includeTimes = js.includeTimes;
 					
+					reqs.add(req);
+					
+					sent.add(c);
+					if (!backlog.add(c))
+						log.error("backlog already contained " + c);
+					backlogByJobId.increment(js.jobId);
+
 					// make the queue smaller
 					multipointQueueSize.adjustValue(graphId, -1);
 				}
@@ -353,15 +387,23 @@ public class Executive extends UntypedActor {
 			while (js.jobsSentToWorkers < origins.capacity && reqs.size() < count) {
 				PointFeature origin = origins.getFeature(js.jobsSentToWorkers);
 
+				AnalystClusterRequest req;
+
 				if (js.profileRouting) {
-					reqs.add(new OneToManyProfileRequest(origin, js.toPtsLoc, js.profileOptions, js.graphId, js.jobId));
+					req = new OneToManyProfileRequest(origin, js.toPtsLoc, js.profileOptions, js.graphId, js.jobId);
 				}
 				else {
-					reqs.add(new OneToManyRequest(origin, js.toPtsLoc, js.options, js.graphId, js.jobId));
+					req = new OneToManyRequest(origin, js.toPtsLoc, js.options, js.graphId, js.jobId);
 				}
 				
 				js.jobsSentToWorkers++;
 				multipointQueueSize.adjustValue(graphId, -1);
+
+				MultipointJobComponent c = new MultipointJobComponent(req.jobId, req.from, sendTime);
+				sent.add(c);
+				if (!backlog.add(c))
+					log.error("backlog already contained " + c);
+				backlogByJobId.increment(js.jobId);
 			}
 			
 			if (js.jobsSentToWorkers == origins.capacity) {
@@ -371,18 +413,9 @@ public class Executive extends UntypedActor {
 		}
 		
 		ActorRef wmar = wmPathActorRefs.get(workerManager);
-		
-		// when we send a block of requests to a worker, we expect them all to return
-		// within 30 seconds. If they don't, we re-send them.
-		
-		long sendTime = System.currentTimeMillis(); 
+
 		for (AnalystClusterRequest req : reqs) {
 			wmar.tell(req, getSelf());
-			MultipointJobComponent c = new MultipointJobComponent(req.jobId, req.from, sendTime);
-			sent.add(c);
-			if (!backlog.add(c))
-				log.error("backlog already contained " + c);
-			backlogByJobId.increment(req.jobId);
 		}
 		
 		return reqs.size();
@@ -390,24 +423,29 @@ public class Executive extends UntypedActor {
 	
 	private void onMsgJobSpec(JobSpec jobSpec) throws Exception {
 		jobSpec.jobId = nextJobId++;
-		
-		// add to queue
-		if (!multipointQueues.containsKey(jobSpec.graphId)) {
-			multipointQueues.put(jobSpec.graphId, new ArrayList<JobSpec>(1));
-			multipointQueueSize.put(jobSpec.graphId, 0);
-			overdueResponses.put(jobSpec.graphId, new HashSet<MultipointJobComponent>());
+
+		if (jobSpec instanceof SinglePointJobSpec) {
+			// enqueue in the high-priority, single-point queue
+			singlePointQueue.put(jobSpec.graphId, (SinglePointJobSpec) jobSpec);
+		} else {
+			// add to queue
+			if (!multipointQueues.containsKey(jobSpec.graphId)) {
+				multipointQueues.put(jobSpec.graphId, new ArrayList<JobSpec>(1));
+				multipointQueueSize.put(jobSpec.graphId, 0);
+				overdueResponses.put(jobSpec.graphId, new HashSet<MultipointJobComponent>());
+			}
+
+			backlogByJobId.put(jobSpec.jobId, 0);
+			completePointsByJobId.put(jobSpec.jobId, 0);
+
+			// we need the origins to know job size, and this will fetch the point set or grab it from RAM.
+			// it's fine to do this repeatedly, because the point set cache should be large enough that
+			// subsequent calls are very fast (in-memory reference passing fast).
+			PointSet origins = jobSpec.getOrigins(this.pointsetDatastore);
+
+			multipointQueues.get(jobSpec.graphId).add(jobSpec);
+			multipointQueueSize.put(jobSpec.graphId, multipointQueueSize.get(jobSpec.graphId) + origins.capacity);
 		}
-		
-		backlogByJobId.put(jobSpec.jobId, 0);
-		completePointsByJobId.put(jobSpec.jobId, 0);
-		
-		// we need the origins to know job size, and this will fetch the point set or grab it from RAM.
-		// it's fine to do this repeatedly, because the point set cache should be large enough that
-		// subsequent calls are very fast (in-memory reference passing fast).
-		PointSet origins = jobSpec.getOrigins(this.pointsetDatastore);
-		
-		multipointQueues.get(jobSpec.graphId).add(jobSpec);
-		multipointQueueSize.put(jobSpec.graphId, multipointQueueSize.get(jobSpec.graphId) + origins.capacity);		
 		
 		// save the job spec
 		jobSpecsByJobId.put(jobSpec.jobId, jobSpec);

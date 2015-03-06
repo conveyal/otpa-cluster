@@ -29,6 +29,9 @@ public class JobSpec implements Serializable{
 	/** Are we using profile routing? */
 	public boolean profileRouting;
 	
+	/** should times be included in the results? (i.e. resultsetwithtimes instead of resultset) */
+	public boolean includeTimes = false;
+	
 	/** JobItemActor to call back when we get a WorkResult */
 	public ActorRef callback = null;
 	

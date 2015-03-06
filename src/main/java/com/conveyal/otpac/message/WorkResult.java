@@ -25,9 +25,8 @@ public class WorkResult implements Serializable {
 	public int jobId;
 	
 	/** The result, or the central tendency of the results in profile mode */
-	private ResultSet feat;
+	private ResultSet pointEstimate;
 	private ResultSet bestCase;
-	private ResultSet avgCase;
 	private ResultSet worstCase;
 	
 	/** Was this request made in profile mode? */
@@ -35,7 +34,7 @@ public class WorkResult implements Serializable {
 
 	public WorkResult(boolean success, ResultSet feat, PointFeature point, int jobId) {
 		this.success = success;
-		this.feat = feat;
+		this.pointEstimate = feat;
 		this.bestCase = null;
 		this.worstCase = null;
 		this.point = point;
@@ -43,11 +42,10 @@ public class WorkResult implements Serializable {
 		this.profile = false;
 	}
 	
-	public WorkResult(boolean success, ResultSet bestCase,  ResultSet avgCase, ResultSet worstCase, ResultSet centralTendency, PointFeature point, int jobId) {
+	public WorkResult(boolean success, ResultSet bestCase,  ResultSet pointEstimate, ResultSet worstCase, PointFeature point, int jobId) {
 		this.success = success;
-		this.feat = centralTendency;
+		this.pointEstimate = pointEstimate;
 		this.bestCase = bestCase;
-		this.avgCase = avgCase;
 		this.worstCase = worstCase;
 		this.point = point;
 		this.jobId = jobId;
@@ -56,24 +54,19 @@ public class WorkResult implements Serializable {
 	
 	public String toString(){
 		if(success)
-			return "<Job success:"+success+" point:"+point+" histograms.size:"+ (profile ? bestCase :feat).histograms.size()+">";
+			return "<Job success:"+success+" point:"+point+" histograms.size:"+ (profile ? bestCase : pointEstimate).histograms.size()+">";
 		else
 			return "<Job success:"+success+">";
 	}
 	
 	/** The result, or the central tendency of the results in profile mode */
-	public ResultSet getResult() {
-		return feat;
+	public ResultSet getPointEstimate() {
+		return pointEstimate;
 	}
 	
 	/** The best-case result in profile mode */
 	public ResultSet getBestCase () {
 		return bestCase;
-	}
-
-	/** The best-case result in profile mode */
-	public ResultSet getAvgCase () {
-		return avgCase;
 	}
 
 	/** The worst-case result in profile mode */
@@ -104,7 +97,7 @@ public class WorkResult implements Serializable {
 					writeHistogramsJson("worstCase", jgen, this.worstCase.histograms);
 				}
 				else {
-					writeHistogramsJson("histograms", jgen, this.feat.histograms);
+					writeHistogramsJson("histograms", jgen, this.pointEstimate.histograms);
 				}
 				
 				Geometry geom = this.point.getGeom();

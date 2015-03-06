@@ -2,6 +2,7 @@ package com.conveyal.otpac.actors;
 
 import org.opentripplanner.analyst.PointSet;
 import org.opentripplanner.analyst.ResultSet;
+import org.opentripplanner.analyst.ResultSetWithTimes;
 import org.opentripplanner.analyst.SampleSet;
 import org.opentripplanner.analyst.TimeSurface;
 import org.opentripplanner.profile.ProfileResponse;
@@ -125,8 +126,15 @@ public class SPTWorker extends UntypedActor {
 			
 			TimeSurface ts = new TimeSurface( spt );
 			
-			ResultSet ind = new ResultSet(sampleSet, ts);
-			ind.id = req.from.getId();
+			ResultSet ind;
+			
+			if (req.includeTimes)
+				ind = new ResultSetWithTimes(sampleSet, ts);
+			else
+				ind = new ResultSet(sampleSet, ts);
+			
+			if (req.from != null)
+				ind.id = req.from.getId();
 
 			WorkResult res = new WorkResult(true, ind, req.from, req.jobId);
 			getSender().tell(res, getSelf());
@@ -146,36 +154,43 @@ public class SPTWorker extends UntypedActor {
 		
 		AnalystProfileRouterPrototype rtr;
 		try {
-				rtr = new AnalystProfileRouterPrototype(this.router.graph, message.options);
+			rtr = new AnalystProfileRouterPrototype(this.router.graph, message.options);
 		} catch (Exception e) {
 			log.debug("failed to calc timesurface for feature {}", message.from.getId());
 			e.printStackTrace();
 			// we use the version with three nulls to imply that it was a profile request
-			getSender().tell(new WorkResult(false, null, null, null, null, message.from, message.jobId), getSelf());
+			getSender().tell(new WorkResult(false, null, null, null, message.from, message.jobId), getSelf());
 			return;
 		}
 		
 		try {
 			TimeSurface.RangeSet result = rtr.route();
 
-			ResultSet bestCase = new ResultSet(sampleSet, result.min);
-			bestCase.id = message.from.getId();
-
-			ResultSet avgCase = new ResultSet(sampleSet, result.avg);
-			avgCase.id = message.from.getId();
+			ResultSet bestCase, avgCase, worstCase;
 			
-			ResultSet worstCase = new ResultSet(sampleSet, result.max);
-			worstCase.id = message.from.getId();
+			if (message.includeTimes) {
+				bestCase = new ResultSetWithTimes(sampleSet, result.min);
+				avgCase = new ResultSetWithTimes(sampleSet, result.avg);
+				worstCase = new ResultSetWithTimes(sampleSet, result.max);
 			
-			// TODO: Central tendency calculation
-			WorkResult result1 = new WorkResult(true, bestCase, avgCase, worstCase, null, message.from, message.jobId);
+			}
+			else {
+				bestCase = new ResultSet(sampleSet, result.min);
+				avgCase = new ResultSet(sampleSet, result.avg);
+				worstCase = new ResultSet(sampleSet, result.max);
+			}
+			
+			if (message.from != null)
+				bestCase.id = avgCase.id = worstCase.id = message.from.getId();
+			
+			WorkResult result1 = new WorkResult(true, bestCase, avgCase, worstCase, message.from, message.jobId);
 
 			getSender().tell(result1, getSelf());
 		} catch (Exception e) {
 			log.debug("failed to calc timesurface for feature {}", message.from.getId());
 			e.printStackTrace();
 			// we use the version with three nulls to imply that it was a profile request
-			WorkResult res = new WorkResult(false, null, null, null, null, message.from, message.jobId);
+			WorkResult res = new WorkResult(false, null, null, null, message.from, message.jobId);
 			getSender().tell(res, getSelf());
 		}
 		finally {

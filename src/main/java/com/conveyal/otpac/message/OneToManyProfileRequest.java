@@ -25,4 +25,14 @@ public class OneToManyProfileRequest extends AnalystClusterRequest implements Se
 		this.options.fromLat = this.options.toLat = from.getLat();
 		this.options.fromLon = this.options.toLon = from.getLon();
 	}
+
+	/** used in single point mode with origin specified by options */
+	public OneToManyProfileRequest(String to, ProfileRequest options, String graphId, int jobId) {
+		super(null, to, graphId, jobId);
+		this.options = options.clone();
+		this.options.analyst = true;
+
+		this.options.toLat = this.options.fromLat;
+		this.options.toLon = this.options.fromLon;
+	}
 }

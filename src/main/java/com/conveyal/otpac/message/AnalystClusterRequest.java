@@ -26,6 +26,9 @@ public abstract class AnalystClusterRequest implements Serializable {
 	/** The job ID this is associated with */
 	public int jobId;
 	
+	/** Should times be included in the results (i.e. ResultSetWithTimes rather than ResultSet) */
+	public boolean includeTimes = false;
+	
 	public AnalystClusterRequest(PointFeature from, String destinationPointsetId, String graphId, int jobId) {
 		this.from = from;
 		this.destinationPointsetId = destinationPointsetId;
