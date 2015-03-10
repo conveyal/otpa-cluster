@@ -101,12 +101,22 @@ public class SPTWorker extends UntypedActor {
 		log.debug("got req {}", req);
 		
 		// check/get the right graph and sample set, or fail if we can't
-		if (!checkGraph(req)) return;
+		if (!checkGraph(req)) {
+			log.error("unable to get graph %s", req.graphId);
+			WorkResult res = new WorkResult(false, null, req.from, req.jobId);
+			getSender().tell(res, getSelf());
+			return;
+		}
 		
 		try{
 			req.options.setRoutingContext(this.router.graph);
 		} catch ( VertexNotFoundException ex ) {
-			log.debug("could not find origin vertex {}", req.options.from);
+			log.debug("could not find origin %s", req.options.from);
+			WorkResult res = new WorkResult(false, null, req.from, req.jobId);
+			getSender().tell(res, getSelf());
+			return;
+		} catch (Exception e) {
+			log.error("Failed to set routing context %s", req.graphId);
 			WorkResult res = new WorkResult(false, null, req.from, req.jobId);
 			getSender().tell(res, getSelf());
 			return;
@@ -140,7 +150,11 @@ public class SPTWorker extends UntypedActor {
 			getSender().tell(res, getSelf());
 		}
 		catch(Exception e) {
-			log.debug("failed to calc timesurface for feature {}", req.from.getId());
+			if (req.from != null)
+				log.debug("failed to calc timesurface for feature %s", req.from.getId());
+			else 
+				log.debug("failed to calc timesurface for location %s", req.options.from);
+			
 			WorkResult res = new WorkResult(false, null, req.from, req.jobId);
 			getSender().tell(res, getSelf());
 		}
@@ -156,7 +170,11 @@ public class SPTWorker extends UntypedActor {
 		try {
 			rtr = new AnalystProfileRouterPrototype(this.router.graph, message.options);
 		} catch (Exception e) {
-			log.debug("failed to calc timesurface for feature {}", message.from.getId());
+			if (message.from != null)
+				log.debug("failed to calc timesurface for feature %s", message.from.getId());
+			else 
+				log.debug("failed to calc timesurface for location %s, %s", message.options.fromLat, message.options.fromLon);
+			
 			e.printStackTrace();
 			// we use the version with three nulls to imply that it was a profile request
 			getSender().tell(new WorkResult(false, null, null, null, message.from, message.jobId), getSelf());
@@ -187,7 +205,10 @@ public class SPTWorker extends UntypedActor {
 
 			getSender().tell(result1, getSelf());
 		} catch (Exception e) {
-			log.debug("failed to calc timesurface for feature {}", message.from.getId());
+			if (message.from != null)
+				log.debug("failed to calc timesurface for feature %s", message.from.getId());
+			else 
+				log.debug("failed to calc timesurface for location %s, %s", message.options.fromLat, message.options.fromLon);
 			e.printStackTrace();
 			// we use the version with three nulls to imply that it was a profile request
 			WorkResult res = new WorkResult(false, null, null, null, message.from, message.jobId);
