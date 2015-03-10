@@ -16,6 +16,8 @@ import java.util.zip.ZipException;
 import java.util.zip.ZipFile;
 import java.util.zip.ZipOutputStream;
 
+import jersey.repackaged.com.google.common.collect.Maps;
+
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.mapdb.DBMaker;
@@ -52,7 +54,7 @@ public class ClusterGraphService extends GraphService {
 	private AmazonS3Client s3;
 
 	// don't use more than 60% of free memory to cache graphs
-	private Map<String,Router> graphMap = DBMaker.newCacheDirect(0.6 * Runtime.getRuntime().freeMemory() / (1024*1024*1024D));
+	private Map<String,Router> graphMap = Maps.newConcurrentMap();
 	
 	@Override
 	public synchronized Router getRouter(String graphId) {
@@ -89,7 +91,7 @@ public class ClusterGraphService extends GraphService {
 			
 			// temporarily disable graph caching so we don't run out of RAM.
 			// Long-term we will use an actual cache for this.
-			graphMap.put(graphId,r);
+			//graphMap.put(graphId,r);
 			
 			return r;
 					
