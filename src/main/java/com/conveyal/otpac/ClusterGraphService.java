@@ -290,6 +290,9 @@ public class ClusterGraphService extends GraphService {
 		byte[] buffer = new byte[1024];
 		
 		for(File f : graphDirectory.listFiles()) {
+			if (f.isDirectory())
+				continue;
+			
 			ZipEntry zipEntry = new ZipEntry(f.getName());
 			zipOutputStream.putNextEntry(zipEntry);
     		FileInputStream fileInput = new FileInputStream(f);
