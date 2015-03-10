@@ -384,7 +384,7 @@ public class Executive extends UntypedActor {
 				break QUEUE;
 			}
 			
-			while (js.jobsSentToWorkers < origins.capacity && reqs.size() < count) {
+			while (js.jobsSentToWorkers < origins.capacity && reqs.size() <= count) {
 				PointFeature origin = origins.getFeature(js.jobsSentToWorkers);
 
 				AnalystClusterRequest req;
@@ -395,6 +395,8 @@ public class Executive extends UntypedActor {
 				else {
 					req = new OneToManyRequest(origin, js.toPtsLoc, js.options, js.graphId, js.jobId);
 				}
+				
+				reqs.add(req);
 				
 				js.jobsSentToWorkers++;
 				multipointQueueSize.adjustValue(graphId, -1);
