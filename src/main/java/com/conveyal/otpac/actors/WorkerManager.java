@@ -69,9 +69,8 @@ public class WorkerManager extends UntypedActor {
 	/** The number of requests this worker manager gets at a time */
 	public int chunkSize;
 	
-	/** Have we received requests since the last poll? */
-	// init to false so that we don't immediately expand the queue
-	private boolean receivedRequestsSinceLastPoll = false; 
+	/** How many requests have we received since the last poll? */
+	private int requestsReceivedSinceLastPoll = 0;
 
 	/**
 	 * The root supervision strategy is to always resume, since we don't want to lose state contained
@@ -187,13 +186,13 @@ public class WorkerManager extends UntypedActor {
 			chunkSize *= 0.667;
 		
 		// buffer underrun, ask for more this time
-		if (outstandingRequests == 0 && receivedRequestsSinceLastPoll && !waitingForQueueToEmptyAndGraphToBuild)
+		else if (outstandingRequests == 0 && requestsReceivedSinceLastPoll >= chunkSize && !waitingForQueueToEmptyAndGraphToBuild)
 			// do this here not in onWorkResult so that the queue cannot grow unbounded
 			// suppose that the requests are being processed as fast as they are coming in
 			// the queue expands 1.5x each time.
 			chunkSize *= 1.5;
 		
-		receivedRequestsSinceLastPoll = false;
+		requestsReceivedSinceLastPoll = 0;
 		
 		// don't let the chunk size get too small
 		if (chunkSize < 10)
@@ -242,7 +241,7 @@ public class WorkerManager extends UntypedActor {
 			return;
 		}
 		
-		this.receivedRequestsSinceLastPoll = true;
+		this.requestsReceivedSinceLastPoll++;
 		
 		outstandingRequests++;
 		router.route(req, getSelf());
