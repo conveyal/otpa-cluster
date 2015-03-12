@@ -152,6 +152,10 @@ public class Executive extends UntypedActor {
 	private void onMsgWorkerStatus(WorkerStatus msg) {
 		System.out.println("got worker status: " + msg.toString());
 		
+		// don't build graphs over and over and over again
+		if (msg.buildingGraph)
+			return;
+		
 		String workerManager = getSender().path().toString();
 		
 		workerManagers.put(workerManager, msg.graph);
