@@ -71,6 +71,9 @@ public class PointSetDatastore extends PointSetCache {
 	
 		File renamedPointSetFile = new File(POINT_DIR, pointSetId);
 		
+		if(renamedPointSetFile.exists())
+			renamedPointSetFile.delete();
+		
 		FileUtils.copyFile(pointSetFile, renamedPointSetFile);
 		
 		if(!this.workOffline) {
@@ -81,12 +84,6 @@ public class PointSetDatastore extends PointSetCache {
 				s3.putObject(pointsetBucket, pointSetId, pointSetFile);	
 			}
 		} 
-		else {
-			if(renamedPointSetFile.exists())
-				renamedPointSetFile.delete();
-			
-			FileUtils.copyFile(pointSetFile, renamedPointSetFile);
-		}
 		
 		return pointSetId;
 
@@ -130,7 +127,6 @@ public class PointSetDatastore extends PointSetCache {
 			
 			
 			// grab it from the cache
-			InputStream objectData = new FileInputStream(cachedFile);
 			
 			PointSet ret=null;
 			if( isCsv(cachedFile) ){
@@ -156,7 +152,6 @@ public class PointSetDatastore extends PointSetCache {
 					
 			}
 			
-			objectData.close();
 			return ret;
 	
 		}

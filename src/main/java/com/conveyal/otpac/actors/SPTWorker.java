@@ -1,5 +1,7 @@
 package com.conveyal.otpac.actors;
 
+import java.util.concurrent.TimeoutException;
+
 import org.opentripplanner.analyst.PointSet;
 import org.opentripplanner.analyst.ResultSet;
 import org.opentripplanner.analyst.ResultSetWithTimes;
@@ -29,6 +31,7 @@ import com.conveyal.otpac.message.GetGraphAndSamples;
 import com.conveyal.otpac.message.GraphAndSampleSet;
 import com.conveyal.otpac.message.OneToManyProfileRequest;
 import com.conveyal.otpac.message.OneToManyRequest;
+import com.conveyal.otpac.message.ResultFailed;
 import com.conveyal.otpac.message.SetOneToManyContext;
 import com.conveyal.otpac.message.WorkResult;
 
@@ -69,16 +72,16 @@ public class SPTWorker extends UntypedActor {
 			// this shouldn't build the graph; rather, it should be getting a graph from memory
 			// on the graphbuilder, which is in the local JVM so should work via reference passing.
 			// the graph should be built by WorkerManager
-			// however, in the interests of being resilient, we give graph building a very long timeout
-			// if the graph builder gets restarted at some point, this will actually build the graph
-			// and nobody is counting on this thread to do anything; if a few workresults get backed up,
-			// no big deal; they'll just be retried.
-			// however, we probably ought to handle OTP throwing an exception on graph build as this is not
-			// likely to be a recoverable situation. Then again, it could be an S3 error.
-			Timeout t = new Timeout(Duration.create(10, "minutes"));
+			// However, building a SampleSet can take some time, so give it a bit of a long timeout.
+			Timeout t = new Timeout(Duration.create(90, "seconds"));
 			GetGraphAndSamples gg = new GetGraphAndSamples(req.graphId, req.destinationPointsetId);
 			Future<Object> future = Patterns.ask(graphBuilder, gg, t);
-			GraphAndSampleSet g = (GraphAndSampleSet) Await.result(future, t.duration());
+			GraphAndSampleSet g;
+			try {
+				g = (GraphAndSampleSet) Await.result(future, t.duration());
+			} catch (TimeoutException e) {
+				return false;
+			}
 			
 			this.router = g.router;
 			this.sampleSet = g.sampleSet;
@@ -103,8 +106,7 @@ public class SPTWorker extends UntypedActor {
 		// check/get the right graph and sample set, or fail if we can't
 		if (!checkGraph(req)) {
 			log.error("unable to get graph %s", req.graphId);
-			WorkResult res = new WorkResult(false, null, req.from, req.jobId);
-			getSender().tell(res, getSelf());
+			getSender().tell(new ResultFailed(), getSelf());
 			return;
 		}
 		
@@ -164,7 +166,12 @@ public class SPTWorker extends UntypedActor {
 	 * @throws Exception */
 	private void onMsgOneToManyProfileRequest(OneToManyProfileRequest message) throws Exception {
 		// check/get the right graph and sample set, or fail if we can't
-		if (!checkGraph(message)) return;
+		if (!checkGraph(message)) {
+			log.error("unable to get graph %s", message.graphId);
+			getSender().tell(new ResultFailed(), getSelf());
+			return;
+		}
+		
 		
 		AnalystProfileRouterPrototype rtr;
 		try {

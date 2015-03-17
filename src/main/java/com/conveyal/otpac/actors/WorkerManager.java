@@ -27,6 +27,7 @@ import com.conveyal.otpac.message.AddWorkerManager;
 import com.conveyal.otpac.message.AnalystClusterRequest;
 import com.conveyal.otpac.message.GetGraph;
 import com.conveyal.otpac.message.GetWorkerStatus;
+import com.conveyal.otpac.message.ResultFailed;
 import com.conveyal.otpac.message.WorkResult;
 import com.conveyal.otpac.message.WorkerStatus;
 import com.typesafe.config.Config;
@@ -145,6 +146,8 @@ public class WorkerManager extends UntypedActor {
 			onMsgConnectToExecutive();
 		} else if (message instanceof WorkResult) {
 			onMsgWorkResult((WorkResult) message);
+		} else if (message instanceof ResultFailed) {
+			onMsgResultFailed((ResultFailed) message);
 		} else if (message instanceof GetGraph) {
 			onMsgGetGraph((GetGraph) message);
 		} else if (message instanceof AnalystClusterRequest) {
@@ -256,6 +259,22 @@ public class WorkerManager extends UntypedActor {
 
 		this.executive.tell(res, getSelf());
 
+		if (outstandingRequests == 0 && waitingForQueueToEmptyAndGraphToBuild) {
+			// build the graph
+			graphBuilder.tell(new GetGraph(graphToBuild), getSelf());
+		}
+	}
+	
+	/**
+	 * The result could not be computed on the SPTWorker, not because there is no result but because of a transient
+	 * problem.
+	 * @param rf
+	 */
+	private void onMsgResultFailed (ResultFailed rf) {
+		outstandingRequests--;
+		
+		// we needn't tell the executive anything, it will retry automatically
+		
 		if (outstandingRequests == 0 && waitingForQueueToEmptyAndGraphToBuild) {
 			// build the graph
 			graphBuilder.tell(new GetGraph(graphToBuild), getSelf());
