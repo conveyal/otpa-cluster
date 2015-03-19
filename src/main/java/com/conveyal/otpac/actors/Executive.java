@@ -25,6 +25,9 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 public class Executive extends UntypedActor {
+	/** how long to retain single-point graphs that are not actively being used */
+	public static final long GRAPH_CACHE_TIME = 5 * 60 * 1000;
+	
 	private Map<String,ActorRef> wmPathActorRefs; // path->canonical actorref
 	private Map<String, String> workerManagers; // path -> current router ID 
 	
@@ -60,6 +63,12 @@ public class Executive extends UntypedActor {
 	 * which are made up of thousands of jobs and may vary widely in size.
 	 */
 	private TObjectLongMap<String> multipointQueueSize = new TObjectLongHashMap<String>(4);
+	
+	/**
+	 * The last time a single-point request was received for each graph. Used to determine if graphs
+	 * can be evicted to run multipoint queries.
+	 */
+	private TObjectLongMap<String> graphLastUsedTime = new TObjectLongHashMap<String>(4);
 	
 	/**
 	 * Index of job specs by job ID.
@@ -161,14 +170,32 @@ public class Executive extends UntypedActor {
 		workerManagers.put(workerManager, msg.graph);
 
 		// if there are single point requests to be sent and no workers are on that graph, send them to this worker
-		// unless there are single point requests for the graph this worker is on as well
+		// unless there are single point requests for the graph this worker is on as well. If the graph has been used
+		// for single point job recently, keep it around unless this is true of all of the workers.
+		
+		boolean allWorkersHaveRecentSinglePointRequests = true;
+		
+		for (String graphId : workerManagers.values()) {
+			if (graphId == null || !graphLastUsedTime.containsKey(graphId) ||
+					graphLastUsedTime.get(graphId) + GRAPH_CACHE_TIME < System.currentTimeMillis()) {
+				allWorkersHaveRecentSinglePointRequests = false;
+				break;
+			}
+		}
+		
+		boolean thisWorkerHasRecentSinglePointRequests = !(msg.graph == null || !graphLastUsedTime.containsKey(msg.graph) ||
+				graphLastUsedTime.get(msg.graph) + GRAPH_CACHE_TIME < System.currentTimeMillis());
+		
 		for (String graphId : singlePointQueue.keySet()) {
-			if (getWorkerManagersForGraph(graphId).size() == 0 && !singlePointQueue.keySet().contains(msg.graph)) {
+			if (getWorkerManagersForGraph(graphId).size() == 0 && !singlePointQueue.keySet().contains(msg.graph) &&
+					(allWorkersHaveRecentSinglePointRequests || !thisWorkerHasRecentSinglePointRequests)) {
 				getSender().tell(new GetGraph(graphId), getSelf());
-				// once the graph builds and we poll again we will send it this single point request.
 
 				// don't send the graph to everybody, write down that we sent it here
 				workerManagers.put(workerManager, graphId);
+				
+				// once the graph builds and we poll again we will send it this single point request.
+				return;
 			}
 		}
 		
@@ -433,6 +460,7 @@ public class Executive extends UntypedActor {
 		if (jobSpec instanceof SinglePointJobSpec) {
 			// enqueue in the high-priority, single-point queue
 			singlePointQueue.put(jobSpec.graphId, (SinglePointJobSpec) jobSpec);
+			graphLastUsedTime.put(jobSpec.graphId, System.currentTimeMillis());
 		} else {
 			// add to queue
 			if (!multipointQueues.containsKey(jobSpec.graphId)) {

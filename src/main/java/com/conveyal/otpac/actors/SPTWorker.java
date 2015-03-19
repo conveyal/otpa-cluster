@@ -9,6 +9,7 @@ import org.opentripplanner.analyst.SampleSet;
 import org.opentripplanner.analyst.TimeSurface;
 import org.opentripplanner.profile.ProfileResponse;
 import org.opentripplanner.profile.AnalystProfileRouterPrototype;
+import org.opentripplanner.profile.ProfileRouter;
 import org.opentripplanner.routing.algorithm.EarliestArrivalSearch;
 import org.opentripplanner.routing.error.VertexNotFoundException;
 import org.opentripplanner.routing.graph.Graph;
@@ -173,9 +174,9 @@ public class SPTWorker extends UntypedActor {
 		}
 		
 		
-		AnalystProfileRouterPrototype rtr;
+		ProfileRouter rtr;
 		try {
-			rtr = new AnalystProfileRouterPrototype(this.router.graph, message.options);
+			rtr = new ProfileRouter(this.router.graph, message.options);
 		} catch (Exception e) {
 			if (message.from != null)
 				log.debug("failed to calc timesurface for feature %s", message.from.getId());
@@ -189,7 +190,8 @@ public class SPTWorker extends UntypedActor {
 		}
 		
 		try {
-			TimeSurface.RangeSet result = rtr.route();
+			rtr.route();
+			TimeSurface.RangeSet result = rtr.timeSurfaceRangeSet;
 
 			ResultSet bestCase, avgCase, worstCase;
 			

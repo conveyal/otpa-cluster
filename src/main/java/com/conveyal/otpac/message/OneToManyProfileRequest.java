@@ -17,7 +17,12 @@ public class OneToManyProfileRequest extends AnalystClusterRequest implements Se
 	public OneToManyProfileRequest(PointFeature from, String to, ProfileRequest options, String graphId, int jobId) {
 		super(from, to, graphId, jobId);
 		
-		this.options = options.clone();
+		try {
+			this.options = options.clone();
+		} catch (CloneNotSupportedException e) {
+			e.printStackTrace();
+			throw new RuntimeException(e);
+		}
 		this.options.analyst = true;
 		
 		// Even though we're making an analyst request, OTP requires a to location
@@ -29,7 +34,12 @@ public class OneToManyProfileRequest extends AnalystClusterRequest implements Se
 	/** used in single point mode with origin specified by options */
 	public OneToManyProfileRequest(String to, ProfileRequest options, String graphId, int jobId) {
 		super(null, to, graphId, jobId);
-		this.options = options.clone();
+		try {
+			this.options = options.clone();
+		} catch (CloneNotSupportedException e) {
+			e.printStackTrace();
+			throw new RuntimeException(e);
+		}
 		this.options.analyst = true;
 
 		this.options.toLat = this.options.fromLat;

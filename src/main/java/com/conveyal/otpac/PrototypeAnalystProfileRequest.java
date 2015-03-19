@@ -1,5 +1,6 @@
 package com.conveyal.otpac;
 
+import org.opentripplanner.api.parameter.QualifiedModeSet;
 import org.opentripplanner.profile.Option;
 import org.opentripplanner.profile.ProfileRequest;
 import org.opentripplanner.routing.core.TraverseModeSet;
@@ -29,9 +30,7 @@ public class PrototypeAnalystProfileRequest extends ProfileRequest {
 		
 		limit = 10;
 		suboptimalMinutes = 5;
-		accessModes = new TraverseModeSet("WALK");
-		directModes = new TraverseModeSet("WALK");
-		egressModes = new TraverseModeSet("WALK");
+		accessModes = directModes = egressModes = new QualifiedModeSet("WALK");
 		transitModes = new TraverseModeSet("TRANSIT");
 	}
 }
