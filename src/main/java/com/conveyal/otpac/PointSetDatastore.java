@@ -9,6 +9,8 @@ import java.io.OutputStream;
 import java.util.Enumeration;
 import java.util.List;
 import java.util.UUID;
+import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
@@ -27,6 +29,7 @@ import com.amazonaws.services.s3.model.ObjectMetadata;
 import com.amazonaws.services.s3.model.S3Object;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
+import com.google.common.io.ByteStreams;
 
 public class PointSetDatastore extends PointSetCache {
 
@@ -79,9 +82,23 @@ public class PointSetDatastore extends PointSetCache {
 		if(!this.workOffline) {
 			// only upload if it doesn't exist
 			try {
-				s3.getObjectMetadata(pointsetBucket, pointSetId);
+				s3.getObjectMetadata(pointsetBucket, pointSetId + ".gz");
 			} catch (AmazonServiceException e) {
-				s3.putObject(pointsetBucket, pointSetId, pointSetFile);	
+				// gzip compression in storage, not because we're worried about file size but to speed file transfer
+				FileInputStream fis = new FileInputStream(pointSetFile);
+				File tempFile = File.createTempFile(pointSetId, ".gz");
+				FileOutputStream fos = new FileOutputStream(tempFile);
+				GZIPOutputStream gos = new GZIPOutputStream(fos);
+				
+				try {
+					ByteStreams.copy(fis, gos);
+				} finally {
+					gos.close();
+					fis.close();
+				}
+				
+				s3.putObject(pointsetBucket, pointSetId + ".gz", tempFile);
+				tempFile.delete();
 			}
 		} 
 		
@@ -116,9 +133,18 @@ public class PointSetDatastore extends PointSetCache {
 				// get pointset metadata from S3
 				cachedFile = new File(POINT_DIR, pointSetId);
 				if(!cachedFile.exists()){
-					S3Object obj = s3.getObject(pointsetBucket, pointSetId);
+					POINT_DIR.mkdirs();
+					
+					S3Object obj = s3.getObject(pointsetBucket, pointSetId + ".gz");
 					ObjectMetadata objMet = obj.getObjectMetadata();
-					Util.saveFile( cachedFile, obj.getObjectContent(), objMet.getContentLength(), true);
+					FileOutputStream fos = new FileOutputStream(cachedFile);
+					GZIPInputStream gis = new GZIPInputStream(obj.getObjectContent());
+					try {
+						ByteStreams.copy(gis, fos);
+					} finally {
+						fos.close();
+						gis.close();
+					}
 				}
 			}
 			else 
