@@ -174,9 +174,9 @@ public class SPTWorker extends UntypedActor {
 		}
 		
 		
-		ProfileRouter rtr;
+		AnalystProfileRouterPrototype rtr;
 		try {
-			rtr = new ProfileRouter(this.router.graph, message.options);
+			rtr = new AnalystProfileRouterPrototype(this.router.graph, message.options);
 		} catch (Exception e) {
 			if (message.from != null)
 				log.debug("failed to calc timesurface for feature %s", message.from.getId());
@@ -190,8 +190,7 @@ public class SPTWorker extends UntypedActor {
 		}
 		
 		try {
-			rtr.route();
-			TimeSurface.RangeSet result = rtr.timeSurfaceRangeSet;
+			TimeSurface.RangeSet result = rtr.route();
 
 			ResultSet bestCase, avgCase, worstCase;
 			
