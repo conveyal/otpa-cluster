@@ -205,7 +205,7 @@ public class Executive extends UntypedActor {
 			if (msg.graph != null && (!singlePointQueue.get(msg.graph).isEmpty() || multipointQueueSize.get(msg.graph) > 0)) {
 				sendJobsToWorkerManager(msg.graph, workerManager, msg.chunkSize);
 			}
-			else {
+			else if (!thisWorkerHasRecentSinglePointRequests) {
 				// TODO: don't evict graphs that are needed for single point mode
 				// first: any non-empty queues without a worker
 				// next: largest queue/worker ratio
