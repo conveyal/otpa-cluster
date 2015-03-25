@@ -345,7 +345,7 @@ public class Executive extends UntypedActor {
 		// which shouldn't matter since they will all complete very soon
 		if (singlePointQueue.containsKey(graphId)) {
 			Iterator<SinglePointJobSpec> it = singlePointQueue.get(graphId).iterator();
-			while (reqs.size() <= count && it.hasNext()) {
+			while (reqs.size() < count && it.hasNext()) {
 				SinglePointJobSpec spec = it.next();
 				it.remove();
 
@@ -364,7 +364,7 @@ public class Executive extends UntypedActor {
 		// pull some jobs off the queue
 		List<JobSpec> queue = multipointQueues.get(graphId);
 
-		QUEUE: while (reqs.size() <= count && multipointQueueSize.get(graphId) > 0) {
+		QUEUE: while (reqs.size() < count && multipointQueueSize.get(graphId) > 0) {
 			// if there are any jobs that need to be re-run, re-run them
 			if (overdueResponses.get(graphId).size() > 0) {
 				Iterator<MultipointJobComponent> it = overdueResponses.get(graphId).iterator();
@@ -415,7 +415,7 @@ public class Executive extends UntypedActor {
 				break QUEUE;
 			}
 			
-			while (js.jobsSentToWorkers < origins.capacity && reqs.size() <= count) {
+			while (js.jobsSentToWorkers < origins.capacity && reqs.size() < count) {
 				PointFeature origin = origins.getFeature(js.jobsSentToWorkers);
 
 				AnalystClusterRequest req;
