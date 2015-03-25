@@ -299,12 +299,12 @@ public class Executive extends UntypedActor {
 	private void onMsgWorkResult(WorkResult wr) {
 		JobSpec js = jobSpecsByJobId.get(wr.jobId);
 		
-		if (js.callback != null) {
-			js.callback.tell(wr, getSelf());
+		if (js instanceof SinglePointJobSpec) {
+			if (js.callback != null) {
+				js.callback.tell(wr, getSelf());
+			}
 		}
-		
-		
-		if (!(js instanceof SinglePointJobSpec)) {
+		else {
 			// remove it from the backlog
 			// it will be removed from the queue by onMsgPoll, in due course
 			// time does not matter as it is not used in equality (on purpose)
@@ -321,6 +321,10 @@ public class Executive extends UntypedActor {
 				
 				if (backlogByJobId.get(wr.jobId) < 0)
 					log.error("received work result and decremented backlog below 0");
+				
+				if (js.callback != null) {
+					js.callback.tell(wr, getSelf());
+				}
 			}
 		}
 	}
