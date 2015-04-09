@@ -10,6 +10,8 @@ import org.opentripplanner.analyst.TimeSurface;
 import org.opentripplanner.profile.ProfileResponse;
 import org.opentripplanner.profile.AnalystProfileRouterPrototype;
 import org.opentripplanner.profile.ProfileRouter;
+import org.opentripplanner.profile.RoundBasedProfileRouter;
+import org.opentripplanner.routing.algorithm.AStar;
 import org.opentripplanner.routing.algorithm.EarliestArrivalSearch;
 import org.opentripplanner.routing.error.VertexNotFoundException;
 import org.opentripplanner.routing.graph.Graph;
@@ -126,11 +128,9 @@ public class SPTWorker extends UntypedActor {
 		}
 		
 		try {
-			EarliestArrivalSearch algo = new EarliestArrivalSearch();
-			algo.maxDuration = 60*60;
-			
+			AStar astar = new AStar();
 			long d0 = System.currentTimeMillis();
-			ShortestPathTree spt = algo.getShortestPathTree(req.options);
+			ShortestPathTree spt = astar.getShortestPathTree(req.options, 10); 
 			
 			req.options.cleanup();
 			
@@ -174,9 +174,9 @@ public class SPTWorker extends UntypedActor {
 		}
 		
 		
-		ProfileRouter rtr;
+		RoundBasedProfileRouter rtr;
 		try {
-			rtr = new ProfileRouter(this.router.graph, message.options);
+			rtr = new RoundBasedProfileRouter(this.router.graph, message.options);
 		} catch (Exception e) {
 			if (message.from != null)
 				log.debug("failed to calc timesurface for feature %s", message.from.getId());

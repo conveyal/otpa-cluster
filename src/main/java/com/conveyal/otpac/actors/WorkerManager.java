@@ -223,6 +223,8 @@ public class WorkerManager extends UntypedActor {
 		
 		if (outstandingRequests == 0) {
 			// no need to wait to build graph
+			// release current graph for GC
+			this.otpRouter = null;
 			graphBuilder.tell(new GetGraph(graphToBuild), getSelf());
 		}
 	}
@@ -261,6 +263,7 @@ public class WorkerManager extends UntypedActor {
 
 		if (outstandingRequests == 0 && waitingForQueueToEmptyAndGraphToBuild) {
 			// build the graph
+			this.otpRouter = null;
 			graphBuilder.tell(new GetGraph(graphToBuild), getSelf());
 		}
 	}
@@ -277,6 +280,7 @@ public class WorkerManager extends UntypedActor {
 		
 		if (outstandingRequests == 0 && waitingForQueueToEmptyAndGraphToBuild) {
 			// build the graph
+			this.otpRouter = null;
 			graphBuilder.tell(new GetGraph(graphToBuild), getSelf());
 		}
 	}
@@ -294,6 +298,7 @@ public class WorkerManager extends UntypedActor {
 		// make sure it's the right graph
 		if (!router.id.equals(graphToBuild)) {
 			// build it again
+			this.otpRouter = null;
 			graphBuilder.tell(new GetGraph(graphToBuild), getSelf());
 		}
 		else {
