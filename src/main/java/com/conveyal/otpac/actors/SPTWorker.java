@@ -10,7 +10,7 @@ import org.opentripplanner.analyst.TimeSurface;
 import org.opentripplanner.profile.ProfileResponse;
 import org.opentripplanner.profile.AnalystProfileRouterPrototype;
 import org.opentripplanner.profile.ProfileRouter;
-import org.opentripplanner.profile.RoundBasedProfileRouter;
+import org.opentripplanner.profile.RepeatedRaptorProfileRouter;
 import org.opentripplanner.routing.algorithm.AStar;
 import org.opentripplanner.routing.algorithm.EarliestArrivalSearch;
 import org.opentripplanner.routing.error.VertexNotFoundException;
@@ -174,9 +174,9 @@ public class SPTWorker extends UntypedActor {
 		}
 		
 		
-		RoundBasedProfileRouter rtr;
+		RepeatedRaptorProfileRouter rtr;
 		try {
-			rtr = new RoundBasedProfileRouter(this.router.graph, message.options);
+			rtr = new RepeatedRaptorProfileRouter(this.router.graph, message.options);
 		} catch (Exception e) {
 			if (message.from != null)
 				log.debug("failed to calc timesurface for feature %s", message.from.getId());
@@ -224,7 +224,7 @@ public class SPTWorker extends UntypedActor {
 			getSender().tell(res, getSelf());
 		}
 		finally {
-			rtr.cleanup();
+			//rtr.cleanup();
 		}
 	}
 }
