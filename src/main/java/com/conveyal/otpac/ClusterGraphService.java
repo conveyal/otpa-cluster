@@ -16,7 +16,7 @@ import java.util.zip.ZipException;
 import java.util.zip.ZipFile;
 import java.util.zip.ZipOutputStream;
 
-import jersey.repackaged.com.google.common.collect.Maps;
+import com.google.common.collect.Maps;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
@@ -319,13 +319,6 @@ public class ClusterGraphService extends GraphService {
 	@Override
 	public Collection<String> getRouterIds() {
 		return graphMap.keySet();
-	}
-
-	
-
-	@Override
-	public boolean reloadGraphs(boolean arg0) {
-		return false;
 	}
 
 	@Override
