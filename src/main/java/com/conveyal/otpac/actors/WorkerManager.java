@@ -99,8 +99,8 @@ public class WorkerManager extends UntypedActor {
 		
 		this.executive = executive;
 		
-		// Chunk size starts average. If we see buffer over- or underruns we change it dynamically
-		chunkSize = 100;
+		// Chunk size starts small. If we see buffer underruns we change it dynamically
+		chunkSize = 10;
 
 		if (config.hasPath("s3.credentials.filename"))
 			s3ConfigFilename = config.getString("s3.credentials.filename");
@@ -193,13 +193,14 @@ public class WorkerManager extends UntypedActor {
 			// do this here not in onWorkResult so that the queue cannot grow unbounded
 			// suppose that the requests are being processed as fast as they are coming in
 			// the queue expands 1.5x each time.
-			chunkSize *= 1.5;
+			// we add one so the queue can't get stuck at size 1.
+			chunkSize = (int) (chunkSize * 1.5 + 1);
 		
 		requestsReceivedSinceLastPoll = 0;
 		
 		// don't let the chunk size get too small
-		if (chunkSize < 10)
-			chunkSize = 10;
+		if (chunkSize < 1)
+			chunkSize = 1;
 		
 		if (chunkSize > 1000)
 			chunkSize = 1000;
