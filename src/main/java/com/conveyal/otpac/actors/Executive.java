@@ -514,8 +514,8 @@ public class Executive extends UntypedActor {
 		
 		// while we're at it, mark any overdue requests for reprocessing
 		long now = System.currentTimeMillis();
-		// pull out all the items that are taking more than 30 seconds to process.
-		while (sent.size() > 0 && now - sent.peek().sentTime > 30 * 1000) {
+		// pull out all the items that are taking more than 120 seconds to process.
+		while (sent.size() > 0 && now - sent.peek().sentTime > 120 * 1000) {
 			MultipointJobComponent next = sent.poll();
 			
 			if (!backlog.contains(next))
@@ -527,7 +527,7 @@ public class Executive extends UntypedActor {
 			this.overdueResponses.get(js.graphId).add(next);
 			// bump up the queue size
 			this.multipointQueueSize.increment(js.graphId);
-			log.warning("Reprocessing request because it did not return after 30 seconds " + next);
+			log.warning("Reprocessing request because it did not return after 120 seconds " + next);
 			log.warning("Now reprocessing " + this.overdueResponses.get(js.graphId).size() + " requests on graph " + js.graphId);
 			
 			// it's no longer backlogged, now it's queued
