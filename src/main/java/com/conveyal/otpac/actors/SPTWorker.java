@@ -2,19 +2,12 @@ package com.conveyal.otpac.actors;
 
 import java.util.concurrent.TimeoutException;
 
-import org.opentripplanner.analyst.PointSet;
 import org.opentripplanner.analyst.ResultSet;
-import org.opentripplanner.analyst.ResultSetWithTimes;
 import org.opentripplanner.analyst.SampleSet;
 import org.opentripplanner.analyst.TimeSurface;
-import org.opentripplanner.profile.ProfileResponse;
-import org.opentripplanner.profile.AnalystProfileRouterPrototype;
-import org.opentripplanner.profile.ProfileRouter;
 import org.opentripplanner.profile.RepeatedRaptorProfileRouter;
 import org.opentripplanner.routing.algorithm.AStar;
-import org.opentripplanner.routing.algorithm.EarliestArrivalSearch;
 import org.opentripplanner.routing.error.VertexNotFoundException;
-import org.opentripplanner.routing.graph.Graph;
 import org.opentripplanner.routing.spt.ShortestPathTree;
 import org.opentripplanner.standalone.Router;
 
@@ -28,14 +21,12 @@ import akka.event.LoggingAdapter;
 import akka.pattern.Patterns;
 import akka.util.Timeout;
 
-import com.conveyal.otpac.PointSetDatastore;
 import com.conveyal.otpac.message.AnalystClusterRequest;
 import com.conveyal.otpac.message.GetGraphAndSamples;
 import com.conveyal.otpac.message.GraphAndSampleSet;
 import com.conveyal.otpac.message.OneToManyProfileRequest;
 import com.conveyal.otpac.message.OneToManyRequest;
 import com.conveyal.otpac.message.ResultFailed;
-import com.conveyal.otpac.message.SetOneToManyContext;
 import com.conveyal.otpac.message.WorkResult;
 
 public class SPTWorker extends UntypedActor {
@@ -142,9 +133,9 @@ public class SPTWorker extends UntypedActor {
 			ResultSet ind;
 			
 			if (req.includeTimes)
-				ind = new ResultSetWithTimes(sampleSet, ts);
+				ind = new ResultSet(sampleSet, ts, true);
 			else
-				ind = new ResultSet(sampleSet, ts);
+				ind = new ResultSet(sampleSet, ts, false);
 			
 			if (req.from != null)
 				ind.id = req.from.getId();
@@ -176,7 +167,7 @@ public class SPTWorker extends UntypedActor {
 		
 		RepeatedRaptorProfileRouter rtr;
 		try {
-			rtr = new RepeatedRaptorProfileRouter(this.router.graph, message.options);
+			rtr = new RepeatedRaptorProfileRouter(this.router.graph, message.options, sampleSet);
 		} catch (Exception e) {
 			if (message.from != null)
 				log.debug("failed to calc timesurface for feature %s", message.from.getId());
@@ -190,27 +181,14 @@ public class SPTWorker extends UntypedActor {
 		}
 		
 		try {
-			rtr.route();
-			TimeSurface.RangeSet result = rtr.timeSurfaceRangeSet;
-
-			ResultSet bestCase, avgCase, worstCase;
-			
-			if (message.includeTimes) {
-				bestCase = new ResultSetWithTimes(sampleSet, result.min);
-				avgCase = new ResultSetWithTimes(sampleSet, result.avg);
-				worstCase = new ResultSetWithTimes(sampleSet, result.max);
-			
-			}
-			else {
-				bestCase = new ResultSet(sampleSet, result.min);
-				avgCase = new ResultSet(sampleSet, result.avg);
-				worstCase = new ResultSet(sampleSet, result.max);
-			}
+			rtr.route();			
+			ResultSet.RangeSet res = rtr.makeResults(message.includeTimes); 
 			
 			if (message.from != null)
-				bestCase.id = avgCase.id = worstCase.id = message.from.getId();
+				res.max.id = res.avg.id = res.min.id = message.from.getId();
 			
-			WorkResult result1 = new WorkResult(true, bestCase, avgCase, worstCase, message.from, message.jobId);
+			// recall that min != worst
+			WorkResult result1 = new WorkResult(true, res.min, res.avg, res.max, message.from, message.jobId);
 
 			getSender().tell(result1, getSelf());
 		} catch (Exception e) {
