@@ -15,7 +15,7 @@ public class OneToManyProfileRequest extends AnalystClusterRequest implements Se
 	public ProfileRequest options;
 
 	public OneToManyProfileRequest(PointFeature from, String to, ProfileRequest options, String graphId, int jobId) {
-		super(from, to, graphId, jobId);
+		super(from, to, graphId, jobId, true);
 		
 		try {
 			this.options = options.clone();
@@ -33,7 +33,7 @@ public class OneToManyProfileRequest extends AnalystClusterRequest implements Se
 
 	/** used in single point mode with origin specified by options */
 	public OneToManyProfileRequest(String to, ProfileRequest options, String graphId, int jobId) {
-		super(null, to, graphId, jobId);
+		super(null, to, graphId, jobId, true);
 		try {
 			this.options = options.clone();
 		} catch (CloneNotSupportedException e) {
@@ -45,4 +45,7 @@ public class OneToManyProfileRequest extends AnalystClusterRequest implements Se
 		this.options.toLat = this.options.fromLat;
 		this.options.toLon = this.options.fromLon;
 	}
+	
+	/** used for deserialization from JSON */
+	public OneToManyProfileRequest() { /* empty */ }
 }

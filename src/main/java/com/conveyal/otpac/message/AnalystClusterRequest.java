@@ -29,10 +29,17 @@ public abstract class AnalystClusterRequest implements Serializable {
 	/** Should times be included in the results (i.e. ResultSetWithTimes rather than ResultSet) */
 	public boolean includeTimes = false;
 	
-	public AnalystClusterRequest(PointFeature from, String destinationPointsetId, String graphId, int jobId) {
+	/** Is this a profile request? */
+	public boolean profile;
+	
+	public AnalystClusterRequest(PointFeature from, String destinationPointsetId, String graphId, int jobId, boolean profile) {
 		this.from = from;
 		this.destinationPointsetId = destinationPointsetId;
 		this.graphId = graphId;
 		this.jobId = jobId;
+		this.profile = profile;
 	}
+	
+	/** used for deserialization from JSON */
+	public AnalystClusterRequest () { /* do nothing */ }
 }

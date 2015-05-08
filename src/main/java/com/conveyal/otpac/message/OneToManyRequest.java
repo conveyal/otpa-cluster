@@ -11,7 +11,7 @@ public class OneToManyRequest extends AnalystClusterRequest implements Serializa
 	public RoutingRequest options;
 
 	public OneToManyRequest(PointFeature from, String to, RoutingRequest options, String graphId, int jobId) {
-		super(from, to, graphId, jobId);
+		super(from, to, graphId, jobId, false);
 		
 		this.options = options.clone();
 		this.options.batch = true;
@@ -21,10 +21,13 @@ public class OneToManyRequest extends AnalystClusterRequest implements Serializa
 
 	/** used for single point requests with from specified by options */
 	public OneToManyRequest(String to, RoutingRequest options, String graphId, int jobId) {
-		super(null, to, graphId, jobId);
+		super(null, to, graphId, jobId, false);
 
 		this.options = options.clone();
 		this.options.batch = true;
 		this.options.rctx = null;
 	}
+	
+	/** used for deserialization from JSON */
+	public OneToManyRequest () { /* nothing */ }
 }

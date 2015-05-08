@@ -82,11 +82,11 @@ public class PointSetDatastore extends PointSetCache {
 		if(!this.workOffline) {
 			// only upload if it doesn't exist
 			try {
-				s3.getObjectMetadata(pointsetBucket, pointSetId + ".gz");
+				s3.getObjectMetadata(pointsetBucket, pointSetId + ".json.gz");
 			} catch (AmazonServiceException e) {
 				// gzip compression in storage, not because we're worried about file size but to speed file transfer
 				FileInputStream fis = new FileInputStream(pointSetFile);
-				File tempFile = File.createTempFile(pointSetId, ".gz");
+				File tempFile = File.createTempFile(pointSetId, ".json.gz");
 				FileOutputStream fos = new FileOutputStream(tempFile);
 				GZIPOutputStream gos = new GZIPOutputStream(fos);
 				
@@ -97,7 +97,7 @@ public class PointSetDatastore extends PointSetCache {
 					fis.close();
 				}
 				
-				s3.putObject(pointsetBucket, pointSetId + ".gz", tempFile);
+				s3.putObject(pointsetBucket, pointSetId + ".json.gz", tempFile);
 				tempFile.delete();
 			}
 		} 
@@ -131,11 +131,11 @@ public class PointSetDatastore extends PointSetCache {
 			
 			if(!workOffline) {
 				// get pointset metadata from S3
-				cachedFile = new File(POINT_DIR, pointSetId);
+				cachedFile = new File(POINT_DIR, pointSetId + ".json");
 				if(!cachedFile.exists()){
 					POINT_DIR.mkdirs();
 					
-					S3Object obj = s3.getObject(pointsetBucket, pointSetId + ".gz");
+					S3Object obj = s3.getObject(pointsetBucket, pointSetId + ".json.gz");
 					ObjectMetadata objMet = obj.getObjectMetadata();
 					FileOutputStream fos = new FileOutputStream(cachedFile);
 					GZIPInputStream gis = new GZIPInputStream(obj.getObjectContent());
@@ -148,7 +148,7 @@ public class PointSetDatastore extends PointSetCache {
 				}
 			}
 			else 
-				cachedFile = new File(POINT_DIR, pointSetId);
+				cachedFile = new File(POINT_DIR, pointSetId + ".json.gz");
 			
 			
 			
