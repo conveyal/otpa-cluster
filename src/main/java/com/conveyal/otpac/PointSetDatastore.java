@@ -72,7 +72,7 @@ public class PointSetDatastore extends PointSetCache {
 		if(pointSetId == null)
 			pointSetId = Util.hashFile(pointSetFile) + "." + FilenameUtils.getExtension(pointSetFile.getName()).toLowerCase();
 	
-		File renamedPointSetFile = new File(POINT_DIR, pointSetId);
+		File renamedPointSetFile = new File(POINT_DIR, pointSetId + ".json");
 		
 		if(renamedPointSetFile.exists())
 			renamedPointSetFile.delete();
