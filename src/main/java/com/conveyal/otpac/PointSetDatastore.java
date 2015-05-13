@@ -148,7 +148,7 @@ public class PointSetDatastore extends PointSetCache {
 				}
 			}
 			else 
-				cachedFile = new File(POINT_DIR, pointSetId + ".json.gz");
+				cachedFile = new File(POINT_DIR, pointSetId + ".json");
 			
 			
 			
