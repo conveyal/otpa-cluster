@@ -53,7 +53,7 @@ dependencies {
   compile group: 'commons-io', name: 'commons-io', version: '2.4'
   compile group: 'junit', name: 'junit', version:'4.11'
   compile group: 'commons-cli', name: 'commons-cli', version: '1.2'
-  compile group: 'org.opentripplanner', name: 'otp', version: '0.17.0-SNAPSHOT', changing: true
+  compile group: 'org.opentripplanner', name: 'otp', version: '0.17.0', changing: true
   compile group: 'com.google.guava', name: 'guava', version: '18.0'
   compile group: 'org.mapdb', name: 'mapdb', version: '1.0.7'
 }
