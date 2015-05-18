@@ -22,6 +22,7 @@ import akka.pattern.Patterns;
 import akka.util.Timeout;
 
 import com.conveyal.otpac.message.AnalystClusterRequest;
+import com.conveyal.otpac.message.GetGraph;
 import com.conveyal.otpac.message.GetGraphAndSamples;
 import com.conveyal.otpac.message.GraphAndSampleSet;
 import com.conveyal.otpac.message.OneToManyProfileRequest;
@@ -68,26 +69,48 @@ public class SPTWorker extends UntypedActor {
 			// the graph should be built by WorkerManager
 			// However, building a SampleSet can take some time, so give it a bit of a long timeout.
 			Timeout t = new Timeout(Duration.create(90, "seconds"));
-			GetGraphAndSamples gg = new GetGraphAndSamples(req.graphId, req.destinationPointsetId);
-			Future<Object> future = Patterns.ask(graphBuilder, gg, t);
-			GraphAndSampleSet g;
-			try {
-				g = (GraphAndSampleSet) Await.result(future, t.duration());
-			} catch (TimeoutException e) {
-				return false;
+			
+			if (req.destinationPointsetId != null) {
+				GetGraphAndSamples gg = new GetGraphAndSamples(req.graphId, req.destinationPointsetId);
+				Future<Object> future = Patterns.ask(graphBuilder, gg, t);
+				GraphAndSampleSet g;
+				try {
+					g = (GraphAndSampleSet) Await.result(future, t.duration());
+				} catch (TimeoutException e) {
+					return false;
+				}
+				
+				this.router = g.router;
+				this.sampleSet = g.sampleSet;
+				this.pointsetId = g.pointsetId;
 			}
 			
-			this.router = g.router;
-			this.sampleSet = g.sampleSet;
-			this.pointsetId = g.pointsetId;
+			else {
+				GetGraph gg = new GetGraph(req.graphId);
+				Future<Object> future = Patterns.ask(graphBuilder, gg, t);
+				Router g;
+				try {
+					g = (Router) Await.result(future, t.duration());
+				} catch (TimeoutException e) {
+					return false;
+				}
+				
+				this.router = g;
+				this.sampleSet = null;
+				this.pointsetId = null;
+			}
+			
+
 		}
 		
-		if (this.router == null || !this.router.id.equals(req.graphId) ||
-				this.sampleSet == null || !this.pointsetId.equals(req.destinationPointsetId)) {
-			log.error("graph build did not return correct graph and sampleset!");
-			log.error("expected: " + req.graphId + " / " + req.destinationPointsetId +
-					", got " + (this.router == null ? "null" : this.router.id) + " / " + this.pointsetId);
-			
+		if (this.router == null || !this.router.id.equals(req.graphId)) {
+			log.error("graph build did not return correct graph!");
+			return false;
+		}
+		
+		if (req.destinationPointsetId != null &&
+				(this.sampleSet == null || !this.pointsetId.equals(req.destinationPointsetId))) {
+			log.error("graph build did not return correct sampleset!");
 			return false;
 		}
 		
@@ -132,10 +155,10 @@ public class SPTWorker extends UntypedActor {
 			
 			ResultSet ind;
 			
-			if (req.includeTimes)
-				ind = new ResultSet(sampleSet, ts, true);
+			if (req.destinationPointsetId != null)
+				ind = new ResultSet(sampleSet, ts, req.includeTimes, false);
 			else
-				ind = new ResultSet(sampleSet, ts, false);
+				ind = new ResultSet(ts);
 			
 			if (req.from != null)
 				ind.id = req.from.getId();
@@ -167,7 +190,10 @@ public class SPTWorker extends UntypedActor {
 		
 		RepeatedRaptorProfileRouter rtr;
 		try {
-			rtr = new RepeatedRaptorProfileRouter(this.router.graph, message.options, sampleSet);
+			if (message.destinationPointsetId != null)
+				rtr = new RepeatedRaptorProfileRouter(this.router.graph, message.options, sampleSet);
+			else
+				rtr = new RepeatedRaptorProfileRouter(this.router.graph, message.options);
 		} catch (Exception e) {
 			if (message.from != null)
 				log.debug("failed to calc timesurface for feature %s", message.from.getId());
