@@ -129,9 +129,16 @@ public class ClusterGraphService extends GraphService {
 		
 		File graphDir = new File(GRAPH_DIR, graphId);
 		
-		if (graphDir.exists())
-			graphDir.delete();
+		if (graphDir.exists()) {
+			if (graphDir.list().length == 0) {
+				graphDir.delete();
+			}
+			else {
+				return;
+			}
+		}
 		
+		// if we're here the directory has either been deleted or never existed
 		graphDir.mkdirs();
 		
 		File graphDataZip = new File(GRAPH_DIR, graphId + ".zip");
