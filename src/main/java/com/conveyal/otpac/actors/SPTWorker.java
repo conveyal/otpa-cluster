@@ -62,7 +62,8 @@ public class SPTWorker extends UntypedActor {
 
 	private boolean checkGraph (AnalystClusterRequest req) throws Exception {
 		if (this.router == null || !this.router.id.equals(req.graphId) ||
-				this.sampleSet == null || !this.pointsetId.equals(req.destinationPointsetId)) {
+				this.pointsetId != null && !this.pointsetId.equals(req.destinationPointsetId) ||
+				this.pointsetId == null && req.destinationPointsetId != null) {
 			// get the graph
 			// this shouldn't build the graph; rather, it should be getting a graph from memory
 			// on the graphbuilder, which is in the local JVM so should work via reference passing.
