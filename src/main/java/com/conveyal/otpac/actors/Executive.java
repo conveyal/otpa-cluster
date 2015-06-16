@@ -108,7 +108,7 @@ public class Executive extends UntypedActor {
 	 */
 	private final Cancellable poll = getContext().system().scheduler().schedule(
 			Duration.create(5,  "seconds"), 
-			Duration.create(3, "seconds"),
+			Duration.create(1500, "milliseconds"),
 			getSelf(), new Poll(), getContext().dispatcher(), null);
 	
 	LoggingAdapter log = Logging.getLogger(getContext().system(), this);
