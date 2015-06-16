@@ -1,34 +1,27 @@
 package com.conveyal.otpac.actors;
 
-import java.util.concurrent.TimeoutException;
-
-import org.opentripplanner.analyst.ResultSet;
-import org.opentripplanner.analyst.SampleSet;
-import org.opentripplanner.analyst.TimeSurface;
-import org.opentripplanner.profile.RepeatedRaptorProfileRouter;
-import org.opentripplanner.routing.algorithm.AStar;
-import org.opentripplanner.routing.error.VertexNotFoundException;
-import org.opentripplanner.routing.spt.ShortestPathTree;
-import org.opentripplanner.standalone.Router;
-
-import scala.concurrent.Await;
-import scala.concurrent.Future;
-import scala.concurrent.duration.Duration;
 import akka.actor.ActorRef;
 import akka.actor.UntypedActor;
 import akka.event.Logging;
 import akka.event.LoggingAdapter;
 import akka.pattern.Patterns;
 import akka.util.Timeout;
+import com.conveyal.otpac.message.*;
+import org.opentripplanner.analyst.PointSet;
+import org.opentripplanner.analyst.ResultSet;
+import org.opentripplanner.analyst.SampleSet;
+import org.opentripplanner.analyst.TimeSurface;
+import org.opentripplanner.profile.IsochroneGenerator;
+import org.opentripplanner.profile.RepeatedRaptorProfileRouter;
+import org.opentripplanner.routing.algorithm.AStar;
+import org.opentripplanner.routing.error.VertexNotFoundException;
+import org.opentripplanner.routing.spt.ShortestPathTree;
+import org.opentripplanner.standalone.Router;
+import scala.concurrent.Await;
+import scala.concurrent.Future;
+import scala.concurrent.duration.Duration;
 
-import com.conveyal.otpac.message.AnalystClusterRequest;
-import com.conveyal.otpac.message.GetGraph;
-import com.conveyal.otpac.message.GetGraphAndSamples;
-import com.conveyal.otpac.message.GraphAndSampleSet;
-import com.conveyal.otpac.message.OneToManyProfileRequest;
-import com.conveyal.otpac.message.OneToManyRequest;
-import com.conveyal.otpac.message.ResultFailed;
-import com.conveyal.otpac.message.WorkResult;
+import java.util.concurrent.TimeoutException;
 
 public class SPTWorker extends UntypedActor {
 
@@ -97,7 +90,10 @@ public class SPTWorker extends UntypedActor {
 				}
 				
 				this.router = g;
-				this.sampleSet = null;
+				// TODO cache
+				// TODO error kernel: should this be in the graph builder?
+				PointSet ps = PointSet.regularGrid(g.graph.getExtent(), IsochroneGenerator.GRID_SIZE_METERS);
+				this.sampleSet = new SampleSet(ps, g.graph.getSampleFactory());
 				this.pointsetId = null;
 			}
 			
@@ -187,14 +183,14 @@ public class SPTWorker extends UntypedActor {
 			getSender().tell(new ResultFailed(), getSelf());
 			return;
 		}
-		
-		
+
+		// is this an isochrone request?
+		boolean isIsoRequest = message.destinationPointsetId == null;
+
 		RepeatedRaptorProfileRouter rtr;
 		try {
-			if (message.destinationPointsetId != null)
-				rtr = new RepeatedRaptorProfileRouter(this.router.graph, message.options, sampleSet);
-			else
-				rtr = new RepeatedRaptorProfileRouter(this.router.graph, message.options);
+			// if this is an isochrone request the sampleset will be a regular grid
+			rtr = new RepeatedRaptorProfileRouter(this.router.graph, message.options, sampleSet);
 		} catch (Exception e) {
 			if (message.from != null)
 				log.debug("failed to calc timesurface for feature %s", message.from.getId());
@@ -209,7 +205,7 @@ public class SPTWorker extends UntypedActor {
 		
 		try {
 			rtr.route();			
-			ResultSet.RangeSet res = rtr.makeResults(message.includeTimes); 
+			ResultSet.RangeSet res = rtr.makeResults(message.includeTimes, !isIsoRequest, isIsoRequest);
 			
 			if (message.from != null)
 				res.max.id = res.avg.id = res.min.id = message.from.getId();
